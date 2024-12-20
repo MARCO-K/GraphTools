@@ -1,0 +1,12 @@
+﻿TOPIC
+	about_AzureResourceCleanup
+	
+SHORT DESCRIPTION
+	This module provides extra functionality for cleanup Azure resources.
+
+LONG DESCRIPTION
+	This module provides extra functionality for cleanup Azure resources.
+
+	
+KEYWORDS
+	module azure cleanup
