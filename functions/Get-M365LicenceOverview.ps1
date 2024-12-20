@@ -66,7 +66,6 @@ function Get-M365LicenceOverview
             $learnUrl = 'https://learn.microsoft.com/en-us/entra/identity/users/licensing-service-plan-reference'
             $learnPage = Invoke-WebRequest -Uri $learnUrl -UseBasicParsing
             $csvLink = $learnPage.Links | Where-Object Href -Match 'licensing.csv' | Select-Object -First 1 -ExpandProperty Href
-            $csvlink = ((Invoke-WebRequest -Uri $link -UseBasicParsing).Links | where-Object Href -Match 'CSV').href
             $csv = Invoke-WebRequest -Uri $csvlink
             $skucsv = [System.Text.Encoding]::UTF8.GetString($csv.RawContentStream.ToArray()) | ConvertFrom-Csv -Delimiter ','
         } 
@@ -85,6 +84,7 @@ function Get-M365LicenceOverview
                 {
                     if ($LastLogin)
                     {
+                        Write-PSFMessage -Level 'Verbose' -Message "Retrieving users that have not logged in for $LastLogin days."
                         $filter = "signInActivity/lastSignInDateTime ge $([datetime]::UtcNow.AddDays(-$LastLogin).ToString('s'))Z"
                         $users = Get-MgBetaUser -Filter $filter -All -Property Id, UserPrincipalName, DisplayName, SignInActivity
                     }
@@ -110,9 +110,9 @@ function Get-M365LicenceOverview
     {
         $UsersLicenses = foreach ($user in $users)
         {
-
+            Write-PSFMessage -Level 'Verbose' -Message ("Retrieving license information for user {0}" -f $user.UserPrincipalName)
             $Licenses = Get-MgBetaUserLicenseDetail -UserId $user.UserPrincipalname
-            if ($licences)
+            if ($Licenses)
             {
                 Write-PSFMessage -Level 'Verbose' -Message ("Processing user {0}" -f $user.UserPrincipalName) 
                 foreach ($License in $Licenses)
