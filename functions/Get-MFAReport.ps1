@@ -1,7 +1,36 @@
+<#
+.SYNOPSIS
+    Retrieves and analyzes Multi-Factor Authentication (MFA) registration details for users.
+.DESCRIPTION
+    This function collects MFA registration details from Microsoft Graph and provides filtering options for analysis.
+.PARAMETER NewSession
+    Establishes a fresh Microsoft Graph connection
+.PARAMETER AdminsOnly
+    Filters results to admin users only
+.PARAMETER UsersWithoutMFA
+    Filters results to users without registered MFA
+.PARAMETER NoGuestUser
+    Excludes guest users from results
+.PARAMETER MFACapable
+    Filters to users capable of MFA
+.PARAMETER MarkMethods
+    Adds method strength analysis to results
+.PARAMETER Scope
+    Microsoft Graph permission scopes required
+.PARAMETER WeakMethods
+    Authentication methods considered weak
+.PARAMETER StrongMethods
+    Authentication methods considered strong
+.EXAMPLE
+    Get-MFAReport -AdminsOnly -MarkMethods
+.EXAMPLE
+    Get-MFAReport -UsersWithoutMFA -NoGuestUser
+#>
 function Get-MFAReport
 {
     [CmdletBinding()]
-    Param (
+    [OutputType([PSObject])]
+    param(
         [Switch]$NewSession,
         [Switch]$AdminsOnly,
         [Switch]$UsersWithoutMFA,
@@ -13,113 +42,98 @@ function Get-MFAReport
         [string[]]$StrongMethods = @('FIDO2', 'WindowsHelloForBusiness', 'microsoftAuthenticatorPush', 'microsoftAuthenticatorPasswordless', 'passKeyDeviceBound')
     )
 
-    Begin
+    begin
     {
-
+        # Module Management
         if (-not (Get-Module -Name Microsoft.Graph.Beta.Reports -ListAvailable))
         {
-            Write-PSFMessage -Level 'Verbose' -Message 'Microsoft Graph Beta module is not available.'
             try
             {
-                Install-Module -Name Microsoft.Graph.Beta.Reports -Scope CurrentUser -Force
+                Install-Module -Name Microsoft.Graph.Beta.Reports -Scope CurrentUser -Force -ErrorAction Stop
             }
             catch
             {
-                Write-PSFMessage -Level 'Error' -Message 'Failed to install Microsoft.Graph.Beta.Reports module.'
-                return
+                throw "Module installation failed: $_"
             }
         }
 
-        if ($NewSession)
-        {
-            Write-PSFMessage -Level 'Verbose' -Message 'Close existing Microsoft Graph session.'
-            Disconnect-MgGraph
-        }
-
-        $mgContext = Get-MgContext
-        if (-not $mgContext.Account -or -not $mgContext.TenantId)
-        {
-            Write-PSFMessage -Level 'Verbose' -Message 'No Microsoft Graph context found. Attempting to connect.'
-            try
-            {
-                Connect-MgGraph -Scopes $scope -NoWelcome
-            }
-            catch
-            {
-                Write-PSFMessage -Level 'Error' -Message 'Failed to connect to Microsoft Graph.'
-                return
-            }
-        }
-
+        # Graph Connection Handling
         try
         {
-            $report = Get-MgBetaReportAuthenticationMethodUserRegistrationDetail -All
+            if ($NewSession) 
+            { 
+                Write-PSFMessage -Level 'Verbose' -Message 'Close existing Microsoft Graph session.'
+                Disconnect-MgGraph -ErrorAction SilentlyContinue 
+            }
+            
+            $context = Get-MgContext
+            if (-not $context)
+            {
+                Write-PSFMessage -Level 'Verbose' -Message 'No Microsoft Graph context found. Attempting to connect.'
+                Connect-MgGraph -Scopes $Scope -NoWelcome -ErrorAction Stop
+            }
+        }
+        catch
+        {
+            Write-PSFMessage -Level 'Error' -Message 'Failed to connect to Microsoft Graph.'
+            throw "Graph connection failed: $_"
+        }
+
+        # Data Collection
+        try
+        {
+            $report = Get-MgBetaReportAuthenticationMethodUserRegistrationDetail -All -ErrorAction Stop
         }
         catch
         {
             Write-PSFMessage -Level 'Error' -Message 'Failed to retrieve MFA report from Microsoft Graph.'
-            return
+            throw "Failed to retrieve MFA data: $_"
         }
     }
 
-    Process
+    process
     {
-        $MFAList = $report | ForEach-Object {
+        # Data Transformation
+        $MFAList = foreach ($item in $report)
+        {
             [PSCustomObject][ordered]@{
-                UPN                                    = $_.UserPrincipalName
-                DisplayName                            = $_.UserDisplayName
-                IsAdmin                                = $_.IsAdmin
-                UserType                               = $_.UserType
-                MethodCount                            = ($_.MethodsRegistered | Measure-Object).Count
-                RegisteredMethods                      = $_.MethodsRegistered
-                UserPreferredAuthMethod                = $_.UserPreferredMethodForSecondaryAuthentication
-                IsSystemPreferredAuthenticationEnabled = $_.IsSystemPreferredAuthenticationMethodEnabled
-                IsPasswordlessCapable                  = $_.IsPasswordlessCapable
-                IsMfaRegistered                        = $_.IsMfaRegistered
-                IsMfaCapable                           = $_.IsMfaCapable
-                SystemPreferredAuthenticationMethod    = $_.SystemPreferredAuthenticationMethods -join ","
+                UPN                                    = $item.UserPrincipalName
+                DisplayName                            = $item.UserDisplayName
+                IsAdmin                                = $item.IsAdmin
+                UserType                               = $item.UserType
+                MethodCount                            = $item.MethodsRegistered.Count
+                RegisteredMethods                      = $item.MethodsRegistered
+                UserPreferredAuthMethod                = $item.UserPreferredMethodForSecondaryAuthentication
+                IsSystemPreferredAuthenticationEnabled = $item.IsSystemPreferredAuthenticationMethodEnabled
+                IsPasswordlessCapable                  = $item.IsPasswordlessCapable
+                IsMfaRegistered                        = $item.IsMfaRegistered
+                IsMfaCapable                           = $item.IsMfaCapable
+                SystemPreferredAuthenticationMethod    = $item.SystemPreferredAuthenticationMethods -join ','
             }
         }
-    }
 
-    End
-    {
+        # Filter Pipeline
         Write-PSFMessage -Level 'Verbose' -Message 'Filtering the MFA report based on the provided parameters.'
-        if ($MFACapable)
-        {
-            $MFAList = $MFAList | Where-Object { $_.IsMfaCapable -eq $true }
+        $filtered = $MFAList | Where-Object {
+            (-not $AdminsOnly -or $_.IsAdmin) -and
+            (-not $UsersWithoutMFA -or -not $_.IsMfaRegistered) -and
+            (-not $NoGuestUser -or $_.UserType -eq 'Member') -and
+            (-not $MFACapable -or $_.IsMfaCapable)
         }
-        if ($AdminsOnly)
-        {
-            $MFAList = $MFAList | Where-Object { $_.IsAdmin -eq $true }
-        }
-        if ($UsersWithoutMFA)
-        {
-            $MFAList = $MFAList | Where-Object { $_.IsMfaRegistered -eq $false }
-        }
-        if ($NoGuestUser)
-        {
-            $MFAList = $MFAList | Where-Object { $_.UserType -eq 'Member' }
-        }
+
+        # Method Analysis
         if ($MarkMethods)
         {
-            $MFAList  | ForEach-Object {
-                foreach ($method in $_.RegisteredMethods)
-                {
-                    if ($WeakMethods -contains $method)
-                    {
-                        $_ | Add-Member -MemberType NoteProperty -Name 'WeakMethod' -Value $true -Force
-                    }
-                    if ($StrongMethods -contains $method)
-                    {
-                        $_ | Add-Member -MemberType NoteProperty -Name 'StrongMethod' -Value $true -Force
-            
-                    }
-                }
-            }
+            $filtered = $filtered | Select-Object *, 
+            @{Name = 'WeakMethod'; Expression = { [bool]($_.RegisteredMethods | Where-Object { $_ -in $WeakMethods }) } },
+            @{Name = 'StrongMethod'; Expression = { [bool]($_.RegisteredMethods | Where-Object { $_ -in $StrongMethods }) } }
         }
-        Write-PSFMessage -Level 'Verbose' -Message 'MFA report collected successfully. The report contains $($MFAList.Count) entries.'
-        $MFAList
+
+        $filtered
+    }
+
+    end
+    {
+        Write-PSFMessage -Level 'Verbose' -Message 'MFA report collected successfully. The report contains $($MFAList.Count) entries.'    
     }
 }
-
