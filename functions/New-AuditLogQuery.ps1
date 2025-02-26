@@ -1,154 +1,206 @@
+<#
+.SYNOPSIS
+Retrieves and processes Microsoft 365 audit logs through the Graph API.
+
+.DESCRIPTION
+This function queries Microsoft 365 audit logs, waits for completion, processes results, 
+and optionally cleans up the query job.
+
+.PARAMETER Scopes
+Required Microsoft Graph permissions (default: AuditLogsQuery.Read.All)
+
+.PARAMETER Start
+Number of days back to start the search (default: 7)
+
+.PARAMETER End
+Number of days forward from start for end date (default: 1)
+
+.PARAMETER Delete
+Switch to delete the audit query job after completion (default: true)
+
+.PARAMETER Operations
+Array of operations to filter
+
+.PARAMETER RecordType
+Array of record types to filter
+
+.PARAMETER Properties
+Array of properties to return in results
+
+.PARAMETER maxWaitMinutes
+Maximum time to wait for query completion (default: 10)
+
+.PARAMETER sleepSeconds
+Time to wait between query status checks (default: 30)
+
+.EXAMPLE
+New-AuditLogQuery -Start 30 -End 0 -Operations "FileDeleted" -Properties "Id","Operation","UserId"
+
+.EXAMPLE
+New-AuditLogQuery -Scopes "AuditLog.Read.All" -Delete:$false -Verbose
+#>
 function New-AuditLogQuery
 {
     [CmdletBinding()]
-    param (
-        [string[]]$Scopes = ('AuditLogsQuery.Read.All'),
+    param(
+        [Parameter(Mandatory = $false)]
+        [string[]]$Scopes = @('AuditLogsQuery.Read.All'),
+        
+        [Parameter(Mandatory = $false)]
         [int]$Start = 7,
+        
+        [Parameter(Mandatory = $false)]
         [int]$End = 1,
-        [switch]$delete,
-        [array]$Operations,
-        [ValidateSet('AzureActiveDirectory', 'SharePoint', 'Exchange', 'General', 'DLP', 'ThreatIntelligence', 'CloudAppSecurity', 'PowerBI', 'Teams', 'SecurityComplianceCenter', 'Viva Engage', 'InformationBarriers', 'Project', 'SharePointFileOperation', 'SharePointSharingOperation', 'SharePointPageOperation')][string[]]$RecordType,
-        [array]$Properties = @('Id', 'CreationTime', 'Operation', 'UserId', 'UserType', 'ClientIP', 'Workload', 'RecordType', 'OrganizationId', 'ObjectId')
+        
+        [Parameter(Mandatory = $false)]
+        [switch]$Delete,
+        
+        [Parameter(Mandatory = $false)]
+        [array]$Operations = @(),
+        
+        [Parameter(Mandatory = $false)]
+        [array]$RecordType = @(),
+        
+        [Parameter(Mandatory = $false)]
+        [array]$Properties = @('Id', 'CreationTime', 'Operation', 'UserId', 'UserType', 
+            'ClientIP', 'Workload', 'RecordType', 'ClientAppId', 
+            'ResultStatus', 'ObjectId'),
+
+        [Parameter(Mandatory = $false)]
+        [int]$maxWaitMinutes = 10,
+
+        [Parameter(Mandatory = $false)]
+        [int]$sleepSeconds = 30
     )
 
     begin
     {
-        Write-Verbose "Starting New-AuditLogQuery function"
-        if (Get-MgContext)
+        # Validate date range
+        if ($Start -lt 0 -or $End -lt 0)
         {
-            Write-Verbose "Using existing connection"
-        }
-        else
-        {
-            Write-Verbose "Connecting to Microsoft Graph"
-            Connect-MgGraph -Scopes $Scopes -NoWelcome
+            throw "Start and End parameters must be positive integers"
         }
 
-        # Set retry policy
+        # Connect to Microsoft Graph
+        try
+        {
+            Connect-MgGraph -NoWelcome -Scopes $Scopes -ErrorAction Stop | Out-Null
+            Write-Verbose "Connected to Microsoft Graph with scopes: $($Scopes -join ', ')"
+        }
+        catch
+        {
+            throw "Graph connection failed: $_"
+        }
+
+        # Configure request context
         Set-MgRequestContext -MaxRetry 10 -RetryDelay 15
     }
 
     process
     {
-        # Collect query informations
-        $AuditQueryName = ("Audit Job created at {0}" -f (Get-Date))
-        $StartDate = (Get-Date).AddDays(-$Start)
-        $EndDate = (Get-Date).AddDays($End)
-        $AuditQueryStart = (Get-Date $StartDate -format s)
-        $AuditQueryEnd = (Get-Date $EndDate -format s)
-        $AuditQueryParameters = @{}
-        $AuditQueryParameters.Add("@odata.type", "#microsoft.graph.security.auditLogQuery")
-        $AuditQueryParameters.Add("displayName", $AuditQueryName)
-        if ($Operations)
+        try
         {
-            $AuditQueryParameters.Add("OperationFilters", $Operations)
-        }
-        if ($RecordType)
-        {
-            $AuditQueryParameters.Add("RecordTypeFilters", $RecordType)
-        }
-        $AuditQueryParameters.Add("filterStartDateTime", $AuditQueryStart)
-        $AuditQueryParameters.Add("filterEndDateTime", $AuditQueryEnd)
-
-        # Submit the audit query
-        $URI = '/beta/security/auditLog/queries/'
-        $AuditJob = Invoke-MgGraphRequest -Uri $Uri -Method POST -Body $($AuditQueryParameters | ConvertTo-Json)
-
-        # Check the audit query status every 30 seconds until it completes
-        [int]$i = 1
-        [int]$SleepSeconds = 30
-        [int]$SecondsElapsed = 0
-        $SearchFinished = $false
-        Write-Verbose "Checking audit query status..."
-        Start-Sleep -Seconds $SecondsElapsed
-        $Uri = '/beta/security/auditLog/queries/' + $AuditJob.Id
-        $response = Invoke-MgGraphRequest -Uri $uri -Method GET
-        $AuditQueryStatus = $response.status
-        Write-Verbose ("Waiting for audit search to complete. Check {0} after {1} seconds. Current state {2}" -f $i, $SecondsElapsed, $AuditQueryStatus)
-        While ($SearchFinished -eq $false)
-        {
-            $i++
-            Write-Verbose ("Waiting for audit search to complete. Check {0} after {1} seconds. Current state {2}" -f $i, $SecondsElapsed, $AuditQueryStatus)
-            If ($AuditQueryStatus -eq 'succeeded')
-            {
-                $SearchFinished = $true
+            # Region: Query Setup
+            # ----------------------------------
+            $queryParams = @{
+                "@odata.type"       = "#microsoft.graph.security.auditLogQuery"
+                displayName         = "Audit Job created at $(Get-Date)"
+                filterStartDateTime = (Get-Date).AddDays(-$Start).ToString("s")
+                filterEndDateTime   = (Get-Date).AddDays($End).ToString("s")
             }
-            Else
+
+            if ($Operations) { $queryParams.Add("OperationFilters", $Operations) }
+            if ($RecordType) { $queryParams.Add("RecordTypeFilters", $RecordType) }
+
+            # Region: Query Execution
+            # ----------------------------------
+            Write-Verbose "Submitting audit query..."
+            $auditJob = Invoke-MgGraphRequest -Uri '/beta/security/auditLog/queries/' `
+                -Method POST `
+                -Body ($queryParams | ConvertTo-Json)
+
+            # Region: Query Monitoring
+            # ----------------------------------
+            $uri = ("/beta/security/auditLog/queries/{0}" -f $AuditJob.Id)
+            $status = $null
+            $attempt = 1
+
+            do
             {
-                Start-Sleep -Seconds $SleepSeconds
-                $SecondsElapsed = $SecondsElapsed + $SleepSeconds
-                $response = Invoke-MgGraphRequest -Uri $Uri -Method GET
-                $AuditQueryStatus = $response.status
-            }
-        }
-
-        # collect the results
-        $uri = ("/beta/security/auditLog/queries/{0}/records" -f $AuditJob.Id)
-        [array]$SearchRecords = Invoke-MgGraphRequest -Uri $Uri -Method GET
-        $AuditRecords = $SearchRecords.value
-        Write-Verbose ("{0} audit records fetched so far..." -f $AuditRecords.count)
-        # Paginate to fetch all available audit records
-        $NextLink = $SearchRecords.'@Odata.NextLink'
-        While ($null -ne $NextLink)
-        {
-            #$SearchRecords = $null
-            [array]$SearchRecords = Invoke-MgGraphRequest -Uri $NextLink -Method GET
-            $AuditRecords += $SearchRecords.value
-            Write-Verbose ("{0} audit records fetched so far..." -f $AuditRecords.count)
-            $NextLink = $SearchRecords.'@odata.NextLink'
-        }
-
-        # Select the properties to display
-        $Records = @()
-        if ($Properties)
-        {
-            $Records = $AuditRecords.auditData | Select-Object -Property $Properties
-        }
-        else
-        {
-            $Records = $AuditRecords.auditData
-        }
-
-
-        # Process results and create custom objects
-        $results =
-        foreach ($entry in $Records)
-        {
-            $props = [ordered]@{}
-
-            # Dynamically map properties from API response
-            foreach ($prop in $Properties)
-            {
-                # Handle nested properties using dot notation
-                $propPath = $prop -split '\.'
-                $value = $entry
-                foreach ($segment in $propPath)
+                $response = Invoke-MgGraphRequest -Uri $uri -Method GET
+                $status = $response.status
+                
+                Write-Verbose "Query status: $status (Attempt $attempt)"
+                
+                if ($status -ne 'succeeded')
                 {
-                    $value = $value.$segment
-                    if ($null -eq $value)
-                    {
-                        break
-                    }
+                    $attempt++
+                    Start-Sleep -Seconds $sleepSeconds
                 }
-                $props[$prop] = $value
-            }
-            # Create the custom object
-            [PSCustomObject]$props
-        }
 
-        $results
+                if (($attempt * $sleepSeconds) -gt ($maxWaitMinutes * 60))
+                {
+                    throw "Query did not complete within $maxWaitMinutes minutes"
+                }
+            } while ($status -ne 'succeeded')
+
+            # Region: Results Processing
+            # ----------------------------------
+            Write-Verbose "Collecting results..."
+            $records = @()
+            $resultsUri = "/beta/security/auditLog/queries/$($auditJob.Id)/records"
+            
+            do
+            {
+                $response = Invoke-MgGraphRequest -Uri $resultsUri -Method GET
+                $records += $response.value
+                $resultsUri = $response.'@odata.nextLink'
+                
+                Write-Verbose "Retrieved $($records.Count) records so far..."
+            } while ($null -ne $resultsUri)
+
+            # Region: Data Transformation
+            # ----------------------------------
+            $processedResults = foreach ($entry in $records)
+            {
+                $props = [ordered]@{}
+                
+                foreach ($prop in $Properties)
+                {
+                    $value = $entry
+                    foreach ($segment in ($prop -split '\.'))
+                    {
+                        $value = $value.$segment
+                        if ($null -eq $value) { break }
+                    }
+                    $props[$prop] = $value
+                }
+                [PSCustomObject]$props
+            }
+
+            # Region: Cleanup
+            # ----------------------------------
+            if ($Delete)
+            {
+                Write-Verbose "Cleaning up audit query..."
+                Invoke-MgGraphRequest -Uri $uri -Method DELETE | Out-Null
+            }
+
+            # Output results
+            $processedResults
+        }
+        catch
+        {
+            Write-Error "Audit log operation failed: $_"
+            throw
+        }
     }
 
     end
     {
-        # Delete the audit query
-        if ($delete)
-        {
-            $Uri = ("/beta/security/auditLog/queries/{0}" -f $AuditJob.Id)
-            $result = Invoke-MgGraphRequest -Uri $Uri -Method 'DELETE'
-            Write-Verbose "Audit query deleted."
-            $result.value
-        }
-        Write-Verbose "New-AuditLogQuery function completed"
+        Write-Verbose "Audit log processing completed"
     }
 }
+
+# Example usage
+# $Records = New-AuditLogQuery -Start 2 -End 0 -Verbose
