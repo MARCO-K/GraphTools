@@ -2,11 +2,10 @@
 	about_AzureResourceCleanup
 	
 SHORT DESCRIPTION
-	This module provides extra functionality for cleanup Azure resources.
+	This module provides some extra functionality for working with MS Graph API
 
 LONG DESCRIPTION
-	This module provides extra functionality for cleanup Azure resources.
-
+	This module provides some extra functionality for working with MS Graph API
 	
 KEYWORDS
-	module azure cleanup
+	module azure EntraID

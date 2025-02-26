@@ -38,5 +38,5 @@ Import-Module GraphTools
 2. Run a Function: For example, to list risky users:
 
 ```powershell
-Get-MSGraphRiskyUsers
+Get-MFAReport -UsersWithoutMFA -NoGuestUser
 ```

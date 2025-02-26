@@ -121,6 +121,3 @@ AS SELECT * FROM read_csv_auto('$downloadUrl');
         if ($conn) { $conn.close() }
     }
 }
-
-# Usage example
-#Import-GitHubCsvToDuckDB -Owner "LETHAL-FORENSICS" -Repository "Microsoft-Analyzer-Suite" -Directory "Config" -LocalPath "C:\temp\MSA" -DbName "demo3.db"

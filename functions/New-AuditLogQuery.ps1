@@ -202,5 +202,3 @@ function New-AuditLogQuery
     }
 }
 
-# Example usage
-# $Records = New-AuditLogQuery -Start 2 -End 0 -Verbose
