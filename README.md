@@ -22,6 +22,10 @@ This function collects MFA registration details from Microsoft Graph and provide
 
 This function queries Microsoft 365 audit logs, waits for completion, processes results. You can filter by different Operations or RecordTypes.
 
+### Get-InactiveUsers
+
+Retrieves user accounts with advanced filtering options including inactivity days.
+
 ## Manual Installation
 
 1. Clone or download the repository.
