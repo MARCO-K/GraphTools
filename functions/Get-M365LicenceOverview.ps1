@@ -1,28 +1,53 @@
-function Get-M365LicenceOverview
+<#
+.SYNOPSIS
+    Retrieves Microsoft 365 license information with detailed service plan analysis
+.DESCRIPTION
+    This function provides a comprehensive view of user licenses and service plans across the organization
+.PARAMETER FilterLicenseSKU
+    Filters results by specific license SKU
+.PARAMETER FilterServicePlan
+    Filters results by service plan name
+.PARAMETER FilterUser
+    Filters results by user principal name
+.PARAMETER LastLogin
+    Filters users by last login date (days since last login)
+.PARAMETER NewSession
+    Forces a new Graph connection
+.PARAMETER Scopes
+    Microsoft Graph permission scopes
+.EXAMPLE
+    Get-M365LicenseOverview -FilterLicenseSKU "ENTERPRISE"
+.EXAMPLE
+    Get-M365LicenseOverview -FilterServicePlan "EXCHANGE" -LastLogin 90
+#>
+function Get-M365LicenseOverview
 {
-
     [CmdletBinding(DefaultParameterSetName = 'All')]
-    param (
+    [OutputType([PSObject])]
+    param(
         [Parameter(ParameterSetName = "SKU")]
-        [string]$FilterLicenceSKU,
+        [ValidateNotNullOrEmpty()]
+        [string]$FilterLicenseSKU,
 
         [Parameter(ParameterSetName = "ServicePlan")]
+        [ValidateNotNullOrEmpty()]
         [string]$FilterServicePlan,
 
-        [Parameter(ParameterSetName = "User")]
+        [Parameter(ParameterSetName = "User", Mandatory = $false)]
         [string]$FilterUser,
 
-        [Parameter(ParameterSetName = "User")]
+        [Parameter(ParameterSetName = "User", Mandatory = $false)]
+        [ValidateRange(1, 3650)]
         [int]$LastLogin,
 
         [Switch]$NewSession,
 
+        [ValidateSet('User.Read.All', 'Organization.Read.All')]
         [string[]]$Scopes = ('User.Read.All', 'Organization.Read.All')
     )
 
-    Begin
+    begin
     {
-
         # Ensure required modules are imported
         $requiredModules = @(
             'Microsoft.Graph.Beta.Users',
@@ -39,45 +64,71 @@ function Get-M365LicenceOverview
             Import-Module -Name $module -Global -WarningAction SilentlyContinue | Out-Null
         }
 
-        if ($NewSession)
-        {
-            Write-PSFMessage -Level 'Verbose' -Message 'Close existing Microsoft Graph session.'
-            Disconnect-MgGraph
-        }
-
-        $mgContext = Get-MgContext
-        if (-not $mgContext.Account -or -not $mgContext.TenantId)
-        {
-            try
-            {
-                Write-PSFMessage -Level 'Verbose' -Message 'No Microsoft Graph context found. Attempting to connect.'
-                Connect-MgGraph -Scopes $Scopes -NoWelcome
-            }
-            catch
-            {
-                Write-PSFMessage -Level 'Error' -Message 'Failed to connect to Microsoft Graph.'
-                return
-            }
-        }
-
-
+        # Handle Graph connection
         try
         {
-            $learnUrl = 'https://learn.microsoft.com/en-us/entra/identity/users/licensing-service-plan-reference'
-            $learnPage = Invoke-WebRequest -Uri $learnUrl -UseBasicParsing
-            $csvLink = $learnPage.Links | Where-Object Href -Match 'licensing.csv' | Select-Object -First 1 -ExpandProperty Href
-            $csv = Invoke-WebRequest -Uri $csvlink
-            $skucsv = [System.Text.Encoding]::UTF8.GetString($csv.RawContentStream.ToArray()) | ConvertFrom-Csv -Delimiter ','
-        } 
+            if ($NewSession)
+            { 
+                Write-PSFMessage -Level 'Verbose' -Message 'Close existing Microsoft Graph session.'
+                Disconnect-MgGraph -ErrorAction SilentlyContinue 
+            }
+            
+            $ctx = Get-MgContext
+            if (-not $ctx)
+            {
+                Write-PSFMessage -Level 'Verbose' -Message 'No Microsoft Graph context found. Attempting to connect.'
+                Connect-MgGraph -Scopes $Scopes -NoWelcome -ErrorAction Stop
+            }
+        }
+        catch
+        {
+            Write-PSFMessage -Level 'Error' -Message 'Failed to connect to Microsoft Graph.'
+            throw "Graph connection failed: $_"
+        }
+
+        # Load service plan data
+        try
+        {
+            Write-PSFMessage -Level 'Verbose' -Message 'Retrieve license overview from Microsoft.'
+            $csvUrl = 'https://learn.microsoft.com/en-us/entra/identity/users/licensing-service-plan-reference'
+            $csvLink = (Invoke-WebRequest -Uri $csvUrl -UseBasicParsing).Links |
+            Where-Object href -match 'licensing.csv' |
+            Select-Object -First 1 -ExpandProperty href
+
+            $skuTable = Invoke-RestMethod -Uri $csvLink | ConvertFrom-Csv
+        }
         catch
         {
             Write-PSFMessage -Level 'Error' -Message 'Failed to retrieve license overview from Microsoft.'
-            break
+            throw "Failed to load service plan data: $_"
         }
 
-        # Retrieve users based on parameters
+        # Build lookup tables for better performance
+        Write-PSFMessage -Level 'Verbose' -Message 'Build lookup tables.'
+        $skuLookup = @{}
+        $servicePlanLookup = @{}
+        $skuTable | ForEach-Object {
+            $skuLookup[$_.GUID] = $_
+            if (-not $servicePlanLookup.ContainsKey($_.GUID))
+            {
+                $servicePlanLookup[$_.GUID] = [Collections.Generic.List[object]]::new()
+            }
+            $servicePlanLookup[$_.GUID].Add($_)
+        }
+    }
+
+    process
+    {
         try
         {
+            # Build user filter
+            $userParams = @{}
+            $userParams = @{
+                All              = $true
+                Property         = 'Id,UserPrincipalName,DisplayName,SignInActivity,AssignedLicenses'
+                ConsistencyLevel = 'eventual'
+            }
+
             switch ($PSCmdlet.ParameterSetName)
             {
                 'User'
@@ -86,107 +137,51 @@ function Get-M365LicenceOverview
                     {
                         Write-PSFMessage -Level 'Verbose' -Message "Retrieving users that have not logged in for $LastLogin days."
                         $filter = "signInActivity/lastSignInDateTime ge $([datetime]::UtcNow.AddDays(-$LastLogin).ToString('s'))Z"
-                        $users = Get-MgBetaUser -Filter $filter -All -Property Id, UserPrincipalName, DisplayName, SignInActivity
+                        $userParams['Filter'] = $filter
                     }
-                    else
+                    if ($FilterUser)
                     {
-                        $users = Get-MgBetaUser -Filter "UserPrincipalName -like '$FilterUser'" -All -Property Id, UserPrincipalName, DisplayName, SignInActivity
+                        Write-PSFMessage -Level 'Verbose' -Message "Retrieving users with UPN: $FilterUser."
+                        $userParams['Filter'] = "startsWith(userPrincipalName, '$FilterUser')"
                     }
                 }
-                Default
+            }
+
+            # Process users
+            Write-PSFMessage -Level 'Verbose' -Message "Process users."
+            Get-MgBetaUser @userParams | ForEach-Object {
+                $user = $_
+                Write-PSFMessage -Level 'Verbose' -Message "Process user: $($user.DisplayName)."
+                foreach ($license in $user.AssignedLicenses)
                 {
-                    $users = Get-MgBetaUser -All -Property Id, UserPrincipalName, DisplayName, SignInActivity
+                    $skuData = $skuLookup[$license.SkuId]
+                    if (-not $skuData) { continue }
+                    $servicePlans = $servicePlanLookup[$license.SkuId]
+                    foreach ($plan in $servicePlans)
+                    {
+                        # Apply filters early in pipeline
+                        if ($FilterLicenseSKU -and $skuData.String_Id -notmatch $FilterLicenseSKU) { continue }
+                        if ($FilterServicePlan -and $plan.Service_Plans_Included_Friendly_Names -notmatch $FilterServicePlan) { continue }
+
+                        # Create output object
+                        [PSCustomObject]@{
+                            UserPrincipalName        = $user.UserPrincipalName
+                            LicenseFriendlyName      = $skuData.Product_Display_Name
+                            LicenseSKU               = $skuData.String_Id
+                            ServicePlan              = $plan.Service_Plans_Included_Friendly_Names
+                            AppliesTo                = $license.ServicePlans.AppliesTo
+                            ProvisioningStatus       = $license.ServicePlans.ProvisioningStatus
+                            LastInteractiveSignIn    = $user.SignInActivity.LastSignInDateTime
+                            LastNonInteractiveSignIn = $user.SignInActivity.LastNonInteractiveSignInDateTime
+                            LastSuccessfulSignInDate = $user.SignInActivity.LastSuccessfulSignInDateTime
+                        }
+                    }
                 }
             }
         }
         catch
         {
-            Write-PSFMessage -Level Error -Message "Failed to retrieve users: $_"
-            return
-        }
-    }
-
-    Process
-    {
-        $UsersLicenses = foreach ($user in $users)
-        {
-            Write-PSFMessage -Level 'Verbose' -Message ("Retrieving license information for user {0}" -f $user.UserPrincipalName)
-            $Licenses = Get-MgBetaUserLicenseDetail -UserId $user.UserPrincipalname
-            if ($Licenses)
-            {
-                Write-PSFMessage -Level 'Verbose' -Message ("Processing user {0}" -f $user.UserPrincipalName) 
-                foreach ($License in $Licenses)
-                {
-                    # Get SKU friendly name
-                    $SKUfriendlyname = $skucsv | Where-Object String_Id -Contains $License.SkuPartNumber | Select-Object -First 1
-                    # Get service plans for the SKU
-                    $SKUserviceplan = $skucsv | Where-Object GUID -Contains $License.SkuId
-
-                    foreach ($serviceplan in $SKUserviceplan)
-                    {
-                        # Apply filters if specified
-                        if ($FilterLicenceSKU)
-                        {
-                            if ($SKUfriendlyname.Product_Display_Name -match $FilterLicenceSKU )
-                            {
-                                [PSCustomObject][ordered]@{
-                                    User                      = $User.UserPrincipalName
-                                    LicenseSKU                = $SKUfriendlyname.Product_Display_Name
-                                    Serviceplan               = $serviceplan.Service_Plans_Included_Friendly_Names
-                                    AppliesTo                 = ($licenses.ServicePlans | Where-Object ServicePlanId -eq $serviceplan.Service_Plan_Id).AppliesTo | Select-Object -First 1
-                                    ProvisioningStatus        = ($licenses.ServicePlans | Where-Object ServicePlanId -eq $serviceplan.Service_Plan_Id).ProvisioningStatus | Select-Object -First 1
-                                    LastInteractiveSignIn     = $User.SignInActivity.LastSignInDateTime
-                                    LastNonInteractiveSignin  = $User.SignInActivity.LastNonInteractiveSignInDateTime
-                                    LastSuccessfullSignInDate = $User.SignInActivity.LastSuccessfulSignInDateTime
-                                }
-                            }
-                        }
-                        elseif ($FilterServicePlan)
-                        {
-                            if ($serviceplan.Service_Plans_Included_Friendly_Names -match $FilterServicePlan)
-                            {
-                                [PSCustomObject][ordered]@{
-                                    User                      = $User.UserPrincipalName
-                                    LicenseSKU                = $SKUfriendlyname.Product_Display_Name
-                                    Serviceplan               = $serviceplan.Service_Plans_Included_Friendly_Names
-                                    AppliesTo                 = ($licenses.ServicePlans | Where-Object ServicePlanId -eq $serviceplan.Service_Plan_Id).AppliesTo | Select-Object -First 1
-                                    ProvisioningStatus        = ($licenses.ServicePlans | Where-Object ServicePlanId -eq $serviceplan.Service_Plan_Id).ProvisioningStatus | Select-Object -First 1
-                                    LastInteractiveSignIn     = $User.SignInActivity.LastSignInDateTime
-                                    LastNonInteractiveSignin  = $User.SignInActivity.LastNonInteractiveSignInDateTime
-                                    LastSuccessfullSignInDate = $User.SignInActivity.LastSuccessfulSignInDateTime
-                                }
-                            }
-                        }
-                        else
-                        {
-                            [PSCustomObject][ordered]@{
-                                User                      = $User.UserPrincipalName
-                                LicenseSKU                = $SKUfriendlyname.Product_Display_Name
-                                Serviceplan               = $serviceplan.Service_Plans_Included_Friendly_Names
-                                AppliesTo                 = ($licenses.ServicePlans | Where-Object ServicePlanId -eq $serviceplan.Service_Plan_Id).AppliesTo | Select-Object -First 1
-                                ProvisioningStatus        = ($licenses.ServicePlans | Where-Object ServicePlanId -eq $serviceplan.Service_Plan_Id).ProvisioningStatus | Select-Object -First 1
-                                LastInteractiveSignIn     = $User.SignInActivity.LastSignInDateTime
-                                LastNonInteractiveSignin  = $User.SignInActivity.LastNonInteractiveSignInDateTime
-                                LastSuccessfullSignInDate = $User.SignInActivity.LastSuccessfulSignInDateTime
-                            }
-                        }
-                    }
-                }
-            }
-        }
-    }
-
-    End
-    {
-        Write-PSFMessage -Level 'Verbose' -Message 'Output all license information'
-        if ($UsersLicenses.count -gt 0)
-        {
-            $UsersLicenses
-        }
-
-        else
-        {
-            Write-PSFMessage -Level  'Error' -Message 'No licenses found, check permissions and/or -Filter value'
+            throw "License processing failed: $_"
         }
     }
 }
