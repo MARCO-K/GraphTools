@@ -1,6 +1,6 @@
 # MS Graph tools
 
-![GraphTools]![alt text](image.png)
+![GraphTools](image.png)
 
 **GraphTools** is a robust PowerShell module designed for IT security professionals focused on Entra ID and Microsoft 365.
 
