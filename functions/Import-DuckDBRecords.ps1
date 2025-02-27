@@ -36,15 +36,14 @@ function Import-DuckDBRecords
         [Parameter(Mandatory = $true)]
         [string]$TableName,
         
-        [Parameter(Mandatory = $true)]
-        [ValidateScript({
-                if (-not (Test-Path (Split-Path $_ -Parent)))
-                {
-                    throw "Parent directory does not exist"
-                }
-                $true
-            })]
-        [string]$DbPath,
+        [Parameter(Mandatory = $false, ParameterSetName = 'newDB')]
+        [ValidateScript({ Test-Path $_ -IsValid })]
+        [string]$LocalPath,
+        [Parameter(Mandatory = $false, ParameterSetName = 'newDB')]
+        [string]$DbName = "demo2.db",
+        [Parameter(Mandatory = $false, ParameterSetName = 'ExistingDB')]
+        [ValidateScript({ $_ })]
+        [Object]$DBConn,
         
         [Parameter(Mandatory = $false)]
         [int]$BatchSize = 10000
@@ -58,16 +57,18 @@ function Import-DuckDBRecords
             throw "No records provided for processing"
         }
 
-        # Create database connection
-        try
+        # Create output directory and connect to DB based on parameter set
+        if ($PSCmdlet.ParameterSetName -eq 'newDB')
         {
-            $conn = New-DuckDBConnection $DbPath
-            Write-Verbose "Connected to DuckDB at $DbPath"
+            if (-not (Test-Path -Path $LocalPath -PathType Container))
+            {
+                New-Item -Path $LocalPath -ItemType Directory -Force | Out-Null
+            }
+            $dbPath = Join-Path -Path $LocalPath -ChildPath $DbName
+            # Create new DuckDB connection
+            $conn = New-DuckDBConnection -DB $dbPath
         }
-        catch
-        {
-            throw "Failed to connect to DuckDB: $_"
-        }
+        # For 'ExistingDB' parameter set, $conn is already provided and validated
 
         # Initialize duplicate tracking
         $seenIds = [System.Collections.Generic.HashSet[string]]::new([StringComparer]::OrdinalIgnoreCase)
@@ -81,7 +82,7 @@ function Import-DuckDBRecords
         {
             if (-not $record.ID)
             {
-                Write-Warning "Record missing ID field, skipping"
+                Write-PSFMessage -Level Warning -Message "Skipping record: missing ID field"
                 continue
             }
             
@@ -97,6 +98,10 @@ function Import-DuckDBRecords
         try
         {
             # Create dynamic table schema
+            if ($uniqueRecords.Count -eq 0)
+            {
+                throw "No unique records found for processing"
+            }
             $firstRecord = $uniqueRecords[0]
             $columns = @()
 
@@ -119,7 +124,7 @@ CREATE OR REPLACE TABLE $TableName (
 );
 "@
             $conn.sql($createTableQuery)
-            Write-Verbose "Created table $TableName with schema: $($columns -join ', ')"
+            Write-PSFMessage -Level Verbose -Message "Created table $TableName with schema: $($columns -join ', ')"
 
             # Batch insert with transaction control
             $counter = 0
@@ -162,11 +167,11 @@ CREATE OR REPLACE TABLE $TableName (
 
             # Final commit
             $conn.sql("COMMIT")
-            Write-Verbose "Total records inserted: $counter"
+            Write-PSFMessage -Level Verbose -Message "Total records inserted: $counter"
 
             # Verify results
             $rowCount = ($conn.sql("SELECT COUNT(*) FROM $TableName")).'count_star()' -as [int]
-            Write-Host "Successfully inserted $rowCount records into $TableName"
+            Write-PSFMessage -Level Verbose -Message "Successfully inserted $rowCount records into $TableName"
         }
         catch
         {
@@ -176,12 +181,7 @@ CREATE OR REPLACE TABLE $TableName (
         finally
         {
             if ($conn) { $conn.Close() }
-            Write-Verbose "Database connection closed"
+            Write-PSFMessage -Level Verbose -Message "Database connection closed"
         }
     }
 }
-
-# Usage example:
-#ToDo parameterize dbName
-# $dbpath = 'c:\temp\MSA\demo3.db'
-# Import-DuckDBRecords -Records $Records -TableName 'UAL' -DbPath $dbpath -Verbose
