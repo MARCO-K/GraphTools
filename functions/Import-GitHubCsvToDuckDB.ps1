@@ -35,40 +35,41 @@ function Import-GitHubCsvToDuckDB
     param(
         [Parameter(Mandatory = $true)]
         [string]$Owner,
-        
         [Parameter(Mandatory = $true)]
         [string]$Repository,
-        
         [Parameter(Mandatory = $false)]
         [string]$Branch = "main",
-        
         [Parameter(Mandatory = $true)]
         [string]$Directory,
-        
-        [Parameter(Mandatory = $true)]
+        [Parameter(Mandatory = $false)]
+        [string]$FileType = "*.csv",
+        [Parameter(Mandatory = $false, ParameterSetName = 'newDB')]
         [ValidateScript({ Test-Path $_ -IsValid })]
         [string]$LocalPath,
-        
-        [Parameter(Mandatory = $false)]
-        [string]$DbName = "demo2.db"
+        [Parameter(Mandatory = $false, ParameterSetName = 'newDB')]
+        [string]$DbName = "demo2.db",
+        [Parameter(Mandatory = $false, ParameterSetName = 'ExistingDB')]
+        [ValidateScript({ $conn })]
+        [Object]$conn
     )
 
-    # Create output directory if it doesn't exist
-    if (-not (Test-Path -Path $LocalPath))
+    # Create output directory and connect to DB based on parameter set
+    if ($PSCmdlet.ParameterSetName -eq 'newDB')
     {
-        New-Item -Path $LocalPath -ItemType Directory -Force | Out-Null
+        if (-not (Test-Path -Path $LocalPath))
+        {
+            New-Item -Path $LocalPath -ItemType Directory -Force | Out-Null
+        }
+        $dbPath = Join-Path -Path $LocalPath -ChildPath $DbName
+        # Create new DuckDB connection
+        $conn = New-DuckDBConnection -DB $dbPath
     }
-
-    # Create database path
-    $dbPath = Join-Path -Path $LocalPath -ChildPath $DbName
+    # For 'ExistingDB' parameter set, $conn is already provided and validated
 
     try
     {
-        # Create DuckDB connection
-        $conn = New-DuckDBConnection -DB $dbPath
-
         # Get repository contents
-        $apiUrl = "https://api.github.com/repos/$Owner/$Repository/contents/$Directory`?ref=$Branch"
+        $apiUrl = "https://api.github.com/repos/$Owner/$Repository/contents/$Directory"
         Write-PSFMessage -Level Verbose -Message "Retrieving CSV files from GitHub repository: $apiUrl."
 
         $headers = @{
@@ -78,11 +79,11 @@ function Import-GitHubCsvToDuckDB
         $contents = Invoke-RestMethod -Uri $apiUrl -Headers $headers -Method Get
 
         # Filter CSV files
-        $csvFiles = $contents | Where-Object { $_.name -like "*.csv" }
+        $csvFiles = $contents | Where-Object { $_.name -like $FileType }
 
         if (-not $csvFiles)
         {
-            Write-Warning "No CSV files found in the specified directory."
+            Write-PSFMessage -Level Warning -Message  "No CSV files found in the specified directory."
             return
         }
 
@@ -101,25 +102,27 @@ CREATE OR REPLACE TABLE $tableName
 AS SELECT * FROM read_csv_auto('$downloadUrl');
 "@
                 $conn.sql($query)
-                Write-Host "Successfully created table: $tableName"
+                Write-PSFMessage -Level Verbose -Message "Successfully created table: $tableName"
             }
             catch
             {
-                Write-Error "Failed to create table $tableName"
+                Write-PSFMessage -Level Error -Message  "Failed to create table $tableName"
             }
         }
 
         # Show created tables
         $tables = $conn.sql('SELECT * FROM pg_catalog.pg_tables;')
-        Write-Host "Created tables: $($tables.tablename -join ', ')"
+        Write-PSFMessage -Level Verbose -Message "Created tables: $($tables.tablename -join ', ')"
     }
     catch
     {
-        Write-Error "Operation failed: $_"
+        Write-PSFMessage -Level Error -Message "Operation failed: $_"
     }
     finally
     {
-        # Cleanup connection
-        if ($conn) { $conn.close() }
+        if ($PSCmdlet.ParameterSetName -eq 'newDB')
+        {
+            $conn.Close()
+        }
     }
 }
