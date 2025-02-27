@@ -69,6 +69,8 @@ function Import-GitHubCsvToDuckDB
 
         # Get repository contents
         $apiUrl = "https://api.github.com/repos/$Owner/$Repository/contents/$Directory`?ref=$Branch"
+        Write-PSFMessage -Level Verbose -Message "Retrieving CSV files from GitHub repository: $apiUrl."
+
         $headers = @{
             "Accept" = "application/vnd.github.v3+json"
         }
