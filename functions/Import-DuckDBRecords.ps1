@@ -147,6 +147,7 @@ CREATE OR REPLACE TABLE $TableName (
                 }
 
                 # Execute insert
+                write-psfmessage -level verbose -message "INSERT INTO $TableName VALUES ($($values[0] -join ', '))"
                 $conn.sql("INSERT INTO $TableName VALUES ($($values -join ', '))")
                 $counter++
 
