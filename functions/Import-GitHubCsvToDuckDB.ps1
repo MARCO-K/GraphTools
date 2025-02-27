@@ -49,8 +49,8 @@ function Import-GitHubCsvToDuckDB
         [Parameter(Mandatory = $false, ParameterSetName = 'newDB')]
         [string]$DbName = "demo2.db",
         [Parameter(Mandatory = $false, ParameterSetName = 'ExistingDB')]
-        [ValidateScript({ $conn })]
-        [Object]$conn
+        [ValidateScript({ $_ })]
+        [Object]$DBConn
     )
 
     # Create output directory and connect to DB based on parameter set
