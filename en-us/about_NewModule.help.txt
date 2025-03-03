@@ -1,5 +1,5 @@
 ﻿TOPIC
-	about_AzureResourceCleanup
+	about_GraphTools
 	
 SHORT DESCRIPTION
 	This module provides some extra functionality for working with MS Graph API

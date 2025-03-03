@@ -1,4 +1,5 @@
 $script:ModuleRoot = $PSScriptRoot
+$script:ModuleVersion = (Import-PowerShellDataFile -Path "$($script:ModuleRoot)\GraphTools.psd1").ModuleVersion
 
 #region Helper function
 function Import-ModuleFile
@@ -36,10 +37,10 @@ function Import-ModuleFile
 #. Import-ModuleFile -Path "$ModuleRoot\internal\scripts\preimport.ps1"
 
 #region Load functions
-#foreach ($function in (Get-ChildItem "$ModuleRoot\internal\functions" -Recurse -File -Filter "*.ps1"))
-#{
-#	. Import-ModuleFile -Path $function.FullName
-#}
+foreach ($function in (Get-ChildItem "$ModuleRoot\internal\functions" -Recurse -File -Filter "*.ps1"))
+{
+	. Import-ModuleFile -Path $function.FullName
+}
 
 foreach ($function in (Get-ChildItem "$ModuleRoot\functions" -Recurse -File -Filter "*.ps1"))
 {
