@@ -77,7 +77,7 @@ function New-AuditLogQuery
     {
         # Module Management
         $modules = ('Microsoft.Graph.Authentication')
-        Install-RequiredModule -ModuleNames $modules -Verbose
+        Install-GTRequiredModule -ModuleNames $modules -Verbose
 
         # Validate date range
         if ($Start -lt 0 -or $End -lt 0)

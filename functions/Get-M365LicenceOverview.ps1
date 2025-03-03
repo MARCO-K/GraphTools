@@ -53,7 +53,7 @@ function Get-M365LicenseOverview
             'Microsoft.Graph.Beta.Users',
             'Microsoft.Graph.Beta.Identity.DirectoryManagement'
         )
-        Install-RequiredModules -RequiredModules $requiredModules
+        Install-GTRequiredModules -RequiredModules $requiredModules
 
         # Handle Graph connection
         try

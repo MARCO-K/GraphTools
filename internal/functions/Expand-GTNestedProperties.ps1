@@ -1,3 +1,19 @@
+<#
+.SYNOPSIS
+    Expands nested properties of PSObjects into a flat structure.
+
+.DESCRIPTION
+    This function takes PSObjects with nested properties and expands them into a flat structure.
+    It processes both base properties and nested array properties, handling different nested object types.
+
+.PARAMETER InputObject
+    The PSObject(s) to be processed. This parameter is mandatory and accepts input from the pipeline.
+
+.EXAMPLE
+    $input = [PSCustomObject]@{ Name = 'Test'; Properties = @([PSCustomObject]@{ Name = 'Nested'; Value = 'Value' }) }
+    $input | Expand-GTNestedProperties
+
+#>
 function Expand-GTNestedProperties
 {
     [CmdletBinding()]

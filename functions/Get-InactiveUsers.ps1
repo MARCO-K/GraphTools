@@ -40,7 +40,7 @@ function Get-InactiveUsers
     {
         # Module Management
         $modules = ('Microsoft.Graph.Authentication', 'Microsoft.Graph.Beta.Users')
-        Install-RequiredModule -ModuleNames $modules -Verbose
+        Install-GTRequiredModule -ModuleNames $modules -Verbose
 
         # Graph Connection Handling
         try

@@ -10,11 +10,11 @@
 .PARAMETER AllowPrerelease
     Allow installation of prerelease versions
 .EXAMPLE
-    Install-RequiredModule -ModuleNames Microsoft.Graph.Beta.Reports, Pester
+    Install-GTRequiredModule -ModuleNames Microsoft.Graph.Beta.Reports, Pester
 .EXAMPLE
-    Install-RequiredModule -ModuleNames Az -Scope AllUsers -Verbose
+    Install-GTRequiredModule -ModuleNames Az -Scope AllUsers -Verbose
 #>
-function Install-RequiredModule
+function Install-GTRequiredModule
 {
     [CmdletBinding(SupportsShouldProcess, ConfirmImpact = 'Medium')]
     param(

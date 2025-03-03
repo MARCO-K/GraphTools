@@ -46,7 +46,7 @@ function Get-MFAReport
     {
         # Module Management
         $modules = ('Microsoft.Graph.Authentication', 'Microsoft.Graph.Beta.Reports')
-        Install-RequiredModule -ModuleNames $modules -Verbose
+        Install-GTRequiredModule -ModuleNames $modules -Verbose
 
         # Graph Connection Handling
         try

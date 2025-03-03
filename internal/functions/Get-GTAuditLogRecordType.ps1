@@ -6,11 +6,11 @@
 .PARAMETER DocUrl
     URL of the documentation page (default: Office 365 Management API schema)
 .EXAMPLE
-    Get-AuditLogRecordTypes | Format-Table
+    Get-GTAuditLogRecordTypes | Format-Table
 .EXAMPLE
-    Get-AuditLogRecordTypes -Verbose | Export-Csv AuditLogRecordTypes.csv
+    Get-GTAuditLogRecordTypes -Verbose | Export-Csv AuditLogRecordTypes.csv
 #>
-function Get-AuditLogRecordTypes
+function Get-GTAuditLogRecordTypes
 {
     [CmdletBinding()]
     [OutputType([PSObject[]])]
@@ -103,7 +103,3 @@ function Get-AuditLogRecordTypes
         }
     }
 }
-
-# Usage examples:
-# Get-AuditLogRecordTypes
-# Get-AuditLogRecordTypes | Where-Object { $_.Name -match "Azure" }
