@@ -45,17 +45,8 @@ function Get-MFAReport
     begin
     {
         # Module Management
-        if (-not (Get-Module -Name Microsoft.Graph.Beta.Reports -ListAvailable))
-        {
-            try
-            {
-                Install-Module -Name Microsoft.Graph.Beta.Reports -Scope CurrentUser -Force -ErrorAction Stop
-            }
-            catch
-            {
-                throw "Module installation failed: $_"
-            }
-        }
+        $modules = ('Microsoft.Graph.Authentication', 'Microsoft.Graph.Beta.Reports')
+        Install-RequiredModule -ModuleNames $modules -Verbose
 
         # Graph Connection Handling
         try

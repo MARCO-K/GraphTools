@@ -75,6 +75,10 @@ function New-AuditLogQuery
 
     begin
     {
+        # Module Management
+        $modules = ('Microsoft.Graph.Authentication')
+        Install-RequiredModule -ModuleNames $modules -Verbose
+
         # Validate date range
         if ($Start -lt 0 -or $End -lt 0)
         {
@@ -85,7 +89,7 @@ function New-AuditLogQuery
         try
         {
             Connect-MgGraph -NoWelcome -Scopes $Scopes -ErrorAction Stop | Out-Null
-            Write-Verbose "Connected to Microsoft Graph with scopes: $($Scopes -join ', ')"
+            Write-PSFMessage -Level Verbose -Message "Connected to Microsoft Graph with scopes: $($Scopes -join ', ')"
         }
         catch
         {
@@ -114,7 +118,7 @@ function New-AuditLogQuery
 
             # Region: Query Execution
             # ----------------------------------
-            Write-Verbose "Submitting audit query..."
+            Write-PSFMessage -Level Verbose -Message "Submitting audit query..."
             $auditJob = Invoke-MgGraphRequest -Uri '/beta/security/auditLog/queries/' `
                 -Method POST `
                 -Body ($queryParams | ConvertTo-Json)
@@ -130,7 +134,7 @@ function New-AuditLogQuery
                 $response = Invoke-MgGraphRequest -Uri $uri -Method GET
                 $status = $response.status
                 
-                Write-Verbose "Query status: $status (Attempt $attempt)"
+                Write-PSFMessage -Level Verbose -Message "Query status: $status (Attempt $attempt)"
                 
                 if ($status -ne 'succeeded')
                 {
@@ -146,7 +150,7 @@ function New-AuditLogQuery
 
             # Region: Results Processing
             # ----------------------------------
-            Write-Verbose "Collecting results..."
+            Write-PSFMessage -Level Verbose -Message "Collecting results..."
             $records = @()
             $resultsUri = "/beta/security/auditLog/queries/$($auditJob.Id)/records"
             
@@ -156,7 +160,7 @@ function New-AuditLogQuery
                 $records += $response.value
                 $resultsUri = $response.'@odata.nextLink'
                 
-                Write-Verbose "Retrieved $($records.Count) records so far..."
+                Write-PSFMessage -Level Verbose -Message "Retrieved $($records.Count) records so far..."
             } while ($null -ne $resultsUri)
 
             # Region: Data Transformation
@@ -182,7 +186,7 @@ function New-AuditLogQuery
             # ----------------------------------
             if ($Delete)
             {
-                Write-Verbose "Cleaning up audit query..."
+                Write-PSFMessage -Level Verbose -Message "Cleaning up audit query..."
                 Invoke-MgGraphRequest -Uri $uri -Method DELETE | Out-Null
             }
 
@@ -191,14 +195,14 @@ function New-AuditLogQuery
         }
         catch
         {
-            Write-Error "Audit log operation failed: $_"
+            Write-PSFMessage -Level Error -Message "Audit log operation failed: $_"
             throw
         }
     }
 
     end
     {
-        Write-Verbose "Audit log processing completed"
+        Write-PSFMessage -Level Verbose -Message "Audit log processing completed"
     }
 }
 

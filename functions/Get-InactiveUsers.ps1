@@ -38,7 +38,32 @@ function Get-InactiveUsers
 
     begin
     {
-        Write-PSFMessage -Level Verbose -Message "Function started with parameters: $($PSBoundParameters | ConvertTo-Json)"
+        # Module Management
+        $modules = ('Microsoft.Graph.Authentication', 'Microsoft.Graph.Beta.Users')
+        Install-RequiredModule -ModuleNames $modules -Verbose
+
+        # Graph Connection Handling
+        try
+        {
+            if ($NewSession) 
+            { 
+                Write-PSFMessage -Level 'Verbose' -Message 'Close existing Microsoft Graph session.'
+                Disconnect-MgGraph -ErrorAction SilentlyContinue 
+            }
+            
+            $context = Get-MgContext
+            if (-not $context)
+            {
+                Write-PSFMessage -Level 'Verbose' -Message 'No Microsoft Graph context found. Attempting to connect.'
+                Connect-MgGraph -Scopes $Scope -NoWelcome -ErrorAction Stop
+            }
+        }
+        catch
+        {
+            Write-PSFMessage -Level 'Error' -Message 'Failed to connect to Microsoft Graph.'
+            throw "Graph connection failed: $_"
+        }
+
     }
 
     process
@@ -124,7 +149,7 @@ function Get-InactiveUsers
                 $_.InactiveDays -ge $InactiveDaysOlderThan)
             }
 
-            Write-PSFMessage -Level Host -Message "Found $($filteredUsers.Count) matching users"
+            Write-PSFMessage -Level Verbose -Message "Found $($filteredUsers.Count) matching users"
             $filteredUsers
         }
         catch

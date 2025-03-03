@@ -53,16 +53,7 @@ function Get-M365LicenseOverview
             'Microsoft.Graph.Beta.Users',
             'Microsoft.Graph.Beta.Identity.DirectoryManagement'
         )
-
-        foreach ($module in $requiredModules)
-        {
-            if (-not (Get-Module -Name $module -ListAvailable))
-            {
-                Write-PSFMessage -Level 'Verbose' -Message "Module '$module' is not installed. Please install it before running this function."
-                return
-            }
-            Import-Module -Name $module -Global -WarningAction SilentlyContinue | Out-Null
-        }
+        Install-RequiredModules -RequiredModules $requiredModules
 
         # Handle Graph connection
         try
