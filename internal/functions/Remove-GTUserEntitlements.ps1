@@ -18,6 +18,7 @@ function Remove-GTUserEntitlements
         [switch]$removeGroupOwners,
         [switch]$removeLicenses,
         [switch]$removeServicePrincipals,
+        [switch]$removeUserAppRoleAssignments,
         [switch]$removeAll
     )
 
@@ -197,6 +198,40 @@ function Remove-GTUserEntitlements
                     else
                     {
                         Write-PSFMessage -Level Verbose -Message "No service principals found for user $($User.UserPrincipalName)"
+                    }
+                }
+
+                # 5. Remove UserAppRoleAssignment
+                if ($removeUserAppRoleAssignments -or $removeAll)
+                {
+                    $AppRoleAssignments = Get-MgBetaUserAppRoleAssignment -UserId $user.Id -All
+                    if ($null -ne $AppRoleAssignments)
+                    {
+                        $AppRoleAssignments | ForEach-Object {
+                            $action = 'RemoveUserAppRoleAssignments'
+                            $output = $outputBase + @{
+                                ResourceName = $_.ResourceDisplayName
+                                ResourceType = 'UserAppRoleAssignment'
+                                ResourceId   = $_.Id
+                                Action       = $action
+                            }
+                            
+                            try
+                            {
+                                if ($PSCmdlet.ShouldProcess($_.ResourceDisplayName, $action))
+                                {
+                                    Write-PSFMessage -Level Verbose -Message "Removing user $($User.UserPrincipalName) from AppRoleAssignments $($_.ResourceDisplayName)"
+                                    Remove-MgBetaUserAppRoleAssignment -AppRoleAssignmentID $_.Id -UserId $user.Id
+                                    $output['Status'] = 'Success'
+                                }
+                            }
+                            catch
+                            { 
+                                Write-PSFMessage -Level Error -Message "Failed to remove user $($User.UserPrincipalName) from AppRoleAssignments $($_.ResourceDisplayName)"
+                                $output['Status'] = "Failed: $($_.Exception.Message)"
+                            }
+                            $results.Add([PSCustomObject]$output)
+                        }
                     }
                 }
             }
