@@ -31,7 +31,7 @@ function Import-DuckDBRecords
     [CmdletBinding()]
     param(
         [Parameter(Mandatory = $true, ValueFromPipeline = $true)]
-        [object[]]$Records,
+        [PSObject]$InputObject,
         
         [Parameter(Mandatory = $true)]
         [string]$TableName,
@@ -51,15 +51,14 @@ function Import-DuckDBRecords
 
     begin
     {
-        # Validate at least one record
-        if ($Records.Count -eq 0)
-        {
-            throw "No records provided for processing"
-        }
+        Write-PSFMessage -Level Verbose -Message "Starting import to table $TableName"
+        # Initialize collection to hold records if processing multiple pipeline items
+        $records = @()
 
         # Create output directory and connect to DB based on parameter set
         if ($PSCmdlet.ParameterSetName -eq 'newDB')
         {
+            write-psfmessage -level verbose -message "Creating new DuckDB database at $LocalPath\$DbName"
             if (-not (Test-Path -Path $LocalPath -PathType Container))
             {
                 New-Item -Path $LocalPath -ItemType Directory -Force | Out-Null
@@ -69,6 +68,10 @@ function Import-DuckDBRecords
             $conn = New-DuckDBConnection -DB $dbPath
         }
         # For 'ExistingDB' parameter set, $conn is already provided and validated
+        else
+        {
+            Write-PSFMessage -Level Verbose -Message "Using existing DuckDB connection"
+        }
 
         # Initialize duplicate tracking
         $seenIds = [System.Collections.Generic.HashSet[string]]::new([StringComparer]::OrdinalIgnoreCase)
@@ -77,6 +80,19 @@ function Import-DuckDBRecords
 
     process
     {
+        if ($null -ne $InputObject)
+        {
+            # For single object input, add to records collection
+            $records += $InputObject
+            Write-PSFMessage -Level Verbose -Message "Added records to processing queue: $($records.count)"
+        }
+        else
+        {
+            Write-PSFMessage -Level Error -Message "Received null input object"
+            throw "Null input object"
+        }
+        
+
         # Process records and deduplicate
         foreach ($record in $Records)
         {
@@ -102,6 +118,7 @@ function Import-DuckDBRecords
             {
                 throw "No unique records found for processing"
             }
+            Write-PSFMessage -Level Verbose -Message "Validating columns for table $TableName"
             $firstRecord = $uniqueRecords[0]
             $columns = @()
 
@@ -111,49 +128,47 @@ function Import-DuckDBRecords
                 {
                     'DateTime' { 'TIMESTAMP' }
                     'Int\d{1,2}' { 'INTEGER' }
-                    'Double' { 'DOUBLE' }
+                    #'Double' { 'DOUBLE' }
                     'Boolean' { 'BOOLEAN' }
                     default { 'VARCHAR' }
                 }
-                $columns += "$($prop.Name) $duckdbType"
+                $cn = ($prop.Name).Replace(' ', '_')
+                $columns += "$($cn) $duckdbType"
             }
 
             $createTableQuery = @"
-CREATE OR REPLACE TABLE $TableName (
-    $($columns -join ", ")
-);
+CREATE OR REPLACE TABLE $TableName ($($columns -join ", "));
 "@
+            # Write-PSFMessage -Level Verbose -Message "Creating table with schema: $createTableQuery"            
             $conn.sql($createTableQuery)
-            Write-PSFMessage -Level Verbose -Message "Created table $TableName with schema: $($columns -join ', ')"
+            Write-PSFMessage -Level Verbose -Message "Created table $TableName"
 
             # Batch insert with transaction control
             $counter = 0
             $conn.sql("BEGIN TRANSACTION")
-
+            Write-PSFMessage -Level Verbose -Message "Started transaction"
             foreach ($item in $uniqueRecords)
             {
+                # Write-PSFMessage -level verbose -message "Processing record: $($item.ID)"
                 # Generate safe SQL values
-                $values = foreach ($prop in $item.PSObject.Properties)
+                $values = 
+                foreach ($prop in $item.PSObject.Properties)
                 {
-                    if ($null -eq $prop.Value)
+                    if ([string]::IsNullOrEmpty($prop.Value))
                     {
-                        "NULL"
+                        $prop.Value = 'Null'
                     }
-                    else
-                    {
-                        switch -Regex ($prop.Value.GetType().Name)
-                        {
-                            'DateTime' { "'{0:yyyy-MM-dd HH:mm:ss}'" -f $prop.Value }
-                            'String' { "'{0}'" -f ($prop.Value -replace "'", "''") }
-                            'Boolean' { if ($prop.Value) { 'TRUE' } else { 'FALSE' } }
-                            default { $prop.Value.ToString() }
-                        }
-                    }
+                    $prop.Value = $prop.Value.ToString()
+                    $p = ($prop.Value).Replace("'", "_")
+                    "`'$p`'"
                 }
-
+                
                 # Execute insert
-                write-psfmessage -level verbose -message "INSERT INTO $TableName VALUES ($($values[0] -join ', '))"
-                $conn.sql("INSERT INTO $TableName VALUES ($($values -join ', '))")
+                $InsertQuery = @"
+INSERT INTO $TableName VALUES ($($values -join ', '))
+"@
+                # Write-PSFMessage -level verbose -message "$insertQuery"
+                $conn.sql($InsertQuery)
                 $counter++
 
                 # Commit in batches
@@ -161,7 +176,7 @@ CREATE OR REPLACE TABLE $TableName (
                 {
                     $conn.sql("COMMIT")
                     $conn.sql("BEGIN TRANSACTION")
-                    Write-Verbose "Committed $counter records"
+                    Write-PSFMessage -level verbose -message "Committed $counter records"
                 }
             }
 
