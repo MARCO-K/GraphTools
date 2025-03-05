@@ -9,10 +9,10 @@ and optionally cleans up the query job.
 .PARAMETER Scopes
 Required Microsoft Graph permissions (default: AuditLogsQuery.Read.All)
 
-.PARAMETER Start
+.PARAMETER StartDays
 Number of days back to start the search (default: 7)
 
-.PARAMETER End
+.PARAMETER EndDays
 Number of days forward from start for end date (default: 1)
 
 .PARAMETER Delete
@@ -44,13 +44,18 @@ function New-AuditLogQuery
     [CmdletBinding()]
     param(
         [Parameter(Mandatory = $false)]
-        [string[]]$Scopes = @('AuditLogsQuery.Read.All'),
+        [string[]]$RequieredScopes = @('AuditLogsQuery-CRM.Read.All', 'AuditLogsQuery-Endpoint.Read.All', 'AuditLogsQuery-Exchange.Read.All', 'AuditLogsQuery-OneDrive.Read.All', 'AuditLogsQuery-SharePoint.Read.All', 'AuditLogsQuery.Read.All'),
         
         [Parameter(Mandatory = $false)]
-        [int]$Start = 7,
+        [switch]$NewSession,
+
+        [Parameter(Mandatory = $false)]
+        [ValidateRange(0, [int]::MaxValue)]
+        [int]$StartDays = 7,
         
         [Parameter(Mandatory = $false)]
-        [int]$End = 1,
+        [ValidateRange(0, [int]::MaxValue)]
+        [int]$EndDays = 0,
         
         [Parameter(Mandatory = $false)]
         [switch]$Delete,
@@ -77,22 +82,42 @@ function New-AuditLogQuery
     {
         # Module Management
         $modules = ('Microsoft.Graph.Authentication')
-        Install-GTRequiredModule -ModuleNames $modules -Verbose
+        Install-GTRequiredModule -ModuleNames $modules
 
         # Validate date range
-        if ($Start -lt 0 -or $End -lt 0)
+        if (-not $Enddays)
         {
-            throw "Start and End parameters must be positive integers"
+            $EndDays = 0
         }
+        if (-not $StartDays)
+        {
+            $StartDays = 30
+        }
+
 
         # Connect to Microsoft Graph
         try
         {
-            Connect-MgGraph -NoWelcome -Scopes $Scopes -ErrorAction Stop | Out-Null
-            Write-PSFMessage -Level Verbose -Message "Connected to Microsoft Graph with scopes: $($Scopes -join ', ')"
+            if ($NewSession) 
+            { 
+                Write-PSFMessage -Level 'Verbose' -Message 'Close existing Microsoft Graph session.'
+                Disconnect-MgGraph -ErrorAction SilentlyContinue 
+            }
+            
+            $session = Test-GTGraphScopes -RequiredScopes $RequieredScopes -Reconnect -Quiet
+            if ($session)
+            {
+                Write-PSFMessage -Level 'Verbose' -Message 'Connected to Microsoft Graph and required scopes are available.'
+            }
+            else
+            {
+                throw "Graph connection failed: $_"
+            }
+
         }
         catch
         {
+            Write-PSFMessage -Level 'Error' -Message 'Failed to connect to Microsoft Graph.'
             throw "Graph connection failed: $_"
         }
 
@@ -109,8 +134,8 @@ function New-AuditLogQuery
             $queryParams = @{
                 "@odata.type"       = "#microsoft.graph.security.auditLogQuery"
                 displayName         = "Audit Job created at $(Get-Date)"
-                filterStartDateTime = (Get-Date).AddDays(-$Start).ToString("s")
-                filterEndDateTime   = (Get-Date).AddDays($End).ToString("s")
+                filterStartDateTime = (Get-Date).AddDays(-$StartDays).ToString("s")
+                filterEndDateTime   = (Get-Date).AddDays($EndDays).ToString("s")
             }
 
             if ($Operations) { $queryParams.Add("OperationFilters", $Operations) }
@@ -119,7 +144,8 @@ function New-AuditLogQuery
             # Region: Query Execution
             # ----------------------------------
             Write-PSFMessage -Level Verbose -Message "Submitting audit query..."
-            $auditJob = Invoke-MgGraphRequest -Uri '/beta/security/auditLog/queries/' `
+            Write-PSFMessage -Level Verbose -Message "Query parameters: $($queryParams | ConvertTo-Json)"
+            $auditJob = Invoke-MgGraphRequest -Uri 'https://graph.microsoft.com/beta/security/auditLog/queries/' `
                 -Method POST `
                 -Body ($queryParams | ConvertTo-Json)
 
