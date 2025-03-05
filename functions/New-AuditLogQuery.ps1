@@ -67,9 +67,7 @@ function New-AuditLogQuery
         [array]$RecordType = @(),
         
         [Parameter(Mandatory = $false)]
-        [array]$Properties = @('Id', 'CreationTime', 'Operation', 'UserId', 'UserType', 
-            'ClientIP', 'Workload', 'RecordType', 'ClientAppId', 
-            'ResultStatus', 'ObjectId'),
+        [array]$Properties = @('Id', 'createdDateTime', 'auditLogRecordType', 'Operation', 'service', 'UserId', 'UserType', 'userPrincipalName', 'auditData'),
 
         [Parameter(Mandatory = $false)]
         [int]$maxWaitMinutes = 10,
