@@ -51,6 +51,7 @@ function Expand-GTNestedProperties
                     { 
                         $name = $_.Name 
                         $value = '' 
+                        $output[$name] = $value
                     }
                     else
                     {
@@ -61,16 +62,15 @@ function Expand-GTNestedProperties
                                 # Name/Value pair pattern (ExtendedProperties)
                                 $name = $_.Name
                                 $value = If ($_.Value -gt 0) { $_.Value } Else { '' }
+                                $output[$name] = $value
                             }
+        
                         }
-                        # add output
-                        $output[$name] = $value
                     }
+        
                 }
                 [PSCustomObject]$output
             }
-            
-            
             $processedData
         }
         catch
