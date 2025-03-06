@@ -25,40 +25,58 @@ function Expand-GTNestedProperties
 
     process
     {
-        foreach ($record in $InputObject)
+        try
         {
-            $output = [ordered]@{}
-
-            # Process base properties
-            #Write-Verbose "Processing base properties"
-            $record.PSObject.Properties | Where-Object {
-                $_.TypeNameOfValue -ne 'System.Object[]'
-            } | ForEach-Object {
-                #Write-Verbose "Processing property: $($_.Name)"
-                $output[$_.Name] = $_.Value
-            }
-
-            # Process nested array properties
-            #write-verbose "Processing nested array properties"
-            $record.PSObject.Properties | Where-Object {
-                $_.TypeNameOfValue -eq 'System.Object[]' -and $_.Value.Count -gt 0
-            } | ForEach-Object {
-                #Write-Verbose "Processing property: $($_.Name)"
-                $nestedValues = $_.Value
-                $nestedValues | ForEach-Object {
-                    # Handle different nested object types
-                    if ($_.PSObject.Properties['Name'] -and $_.PSObject.Properties['Value'])
+            $processedData = foreach ($record in $rawdata)
+            {
+                $output = [ordered]@{}
+            
+                # Process base properties
+                $record.PSObject.Properties | Where-Object {
+                    $_.TypeNameOfValue -ne 'System.Object[]' -and $_.Name -notmatch '@odata\.type'
+                } | ForEach-Object {
+                    if ($_.TypeNameOfValue -eq 'System.DateTime')
                     {
-                        # Name/Value pair pattern (ExtendedProperties)
-                        #Write-Verbose "Processing property: $($_.Name) with $($_.Value)"
-                        $name = $_.Name
-                        $value = $_.Value
+                        [string]$output[$_.Name] = $_.Value.ToString('yyyy-MM-ddTHH:mm:ss')
                     }
-                    # add output
-                    $output[$name] = $value
+                    else { $output[$_.Name] = $_.Value }
                 }
+            
+                # Process extented properties
+                $record.PSObject.Properties | Where-Object {
+                    $_.TypeNameOfValue -eq 'System.Object[]'
+                } | ForEach-Object {
+                    $nestedValues = $_.Value
+                    if ($_.Value.count -eq 0)
+                    { 
+                        $name = $_.Name 
+                        $value = '' 
+                    }
+                    else
+                    {
+                        $nestedValues | ForEach-Object {
+                            # Handle different nested object types
+                            if ($_.PSObject.Properties['Name'] -and $_.PSObject.Properties['Value'])
+                            {
+                                # Name/Value pair pattern (ExtendedProperties)
+                                $name = $_.Name
+                                $value = If ($_.Value -gt 0) { $_.Value } Else { '' }
+                            }
+                        }
+                        # add output
+                        $output[$name] = $value
+                    }
+                }
+                [PSCustomObject]$output
             }
-            [PSCustomObject]$output
+            
+            
+            $processedData
+        }
+        catch
+        {
+            Write-PSFMessage -Level Error -Message "Error processing record $($record.Id): $_"
+            continue
         }
     }
 }
