@@ -139,7 +139,7 @@ function Import-DuckDBRecords
             $createTableQuery = @"
 CREATE OR REPLACE TABLE $TableName ($($columns -join ", "));
 "@
-            # Write-PSFMessage -Level Verbose -Message "Creating table with schema: $createTableQuery"            
+            Write-PSFMessage -Level Verbose -Message "Creating table with schema: $createTableQuery"            
             $conn.sql($createTableQuery)
             Write-PSFMessage -Level Verbose -Message "Created table $TableName"
 
@@ -167,7 +167,7 @@ CREATE OR REPLACE TABLE $TableName ($($columns -join ", "));
                 $InsertQuery = @"
 INSERT INTO $TableName VALUES ($($values -join ', '))
 "@
-                # Write-PSFMessage -level verbose -message "$insertQuery"
+                Write-PSFMessage -level verbose -message "$insertQuery"
                 $conn.sql($InsertQuery)
                 $counter++
 
