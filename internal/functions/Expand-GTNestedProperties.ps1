@@ -5,7 +5,7 @@
 .DESCRIPTION
     This function takes PSObjects with nested properties and expands them into a flat structure.
     It processes both base properties and nested array properties, handling different nested object types.
-
+    It will also ensure every item has all columns (fill missing ones with $null)
 .PARAMETER InputObject
     The PSObject(s) to be processed. This parameter is mandatory and accepts input from the pipeline.
 
