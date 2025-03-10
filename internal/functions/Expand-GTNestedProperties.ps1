@@ -22,15 +22,21 @@ function Expand-GTNestedProperties
         [Parameter(ValueFromPipeline = $true, Mandatory = $true)]
         [PSObject[]]$InputObject
     )
+    begin
+    {
+        # Initialize collection variables at the function scope
+        $allColumns = [ordered]@{}
+        $processedData = @()
+        $standardizedData = @()
+    }
 
     process
     {
         try
         {
-            $processedData = foreach ($record in $rawdata)
+            foreach ($record in $InputObject)
             {
-                $output = [ordered]@{}
-            
+                $output = @{}
                 # Process base properties
                 $record.PSObject.Properties | Where-Object {
                     $_.TypeNameOfValue -ne 'System.Object[]' -and $_.Name -notmatch '@odata\.type'
@@ -69,14 +75,36 @@ function Expand-GTNestedProperties
                     }
         
                 }
-                [PSCustomObject]$output
+                $processedData += $output 
+                # Collect all possible columns across all items
+                foreach ($key in $output.Keys)
+                {
+                    $allColumns[$key] = $true
+                }
+                
             }
-            $processedData
+            
         }
         catch
         {
             Write-PSFMessage -Level Error -Message "Error processing record $($record.Id): $_"
             continue
         }
+    }
+    end
+    {
+        # Ensure every item has all columns (fill missing ones with $null)
+        $standardizedData = foreach ($item in $processedData)
+        {
+            $row = @{}
+            foreach ($col in $allColumns.Keys)
+            {
+                $row[$col] = if ($item.ContainsKey($col)) { $item[$col] } else { $null }
+            }
+            [pscustomobject]$row
+        }
+
+        # Return the final result
+        return $standardizedData
     }
 }
