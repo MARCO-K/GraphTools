@@ -91,7 +91,7 @@ function Import-GitHubCsvToDuckDB
         foreach ($file in $csvFiles)
         {
             $fileName = $file.name
-            $tableName = ($fileName.Replace('.csv', '')).Replace('-', '_')
+            $tableName = "'$($fileName -replace '\.csv$' -replace '-','_')'"
             $downloadUrl = $file.download_url
 
             try
