@@ -110,9 +110,6 @@ AS SELECT * FROM read_csv_auto('$downloadUrl');
             }
         }
 
-        # Show created tables
-        $tables = $conn.sql('SELECT * FROM pg_catalog.pg_tables;')
-        Write-PSFMessage -Level Verbose -Message "Created tables: $($tables.tablename -join ', ')"
     }
     catch
     {
