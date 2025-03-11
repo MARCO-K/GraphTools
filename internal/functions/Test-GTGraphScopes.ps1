@@ -36,7 +36,7 @@ function Test-GTGraphScopes
     if (-not $context)
     {
         if (-not $Quiet) { Write-Error "No Microsoft Graph connection found" }
-        return $false
+        #return $false
     }
 
     # Determine permission type (delegated vs application)
