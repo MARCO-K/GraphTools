@@ -1,0 +1,117 @@
+<#
+.SYNOPSIS
+    Downloads and parses the Entra roles table from the Microsoft documentation website.
+
+.DESCRIPTION
+    Connects to the Entra permissions reference page, locates the 'All roles' table, and extracts role information into PowerShell objects.
+    Useful for automation, reporting, or analysis of Entra role definitions.
+
+.PARAMETER Url
+    The URL of the Entra permissions reference page. Defaults to the official Microsoft Learn page.
+
+.EXAMPLE
+    $roles = Get-GTEntraRolesFromWeb
+    Returns all Entra roles as an array of objects from the default Microsoft Learn URL.
+
+.EXAMPLE
+    $roles = Get-GTEntraRolesFromWeb -Url "https://custom-url/permissions-reference"
+    Returns roles from a custom URL if the page structure matches the expected format.
+
+.NOTES
+    - Requires internet access.
+    - The function may break if the Microsoft documentation page structure changes.
+    - Uses System.Net.WebUtility for HTML decoding (cross-platform).
+#>
+
+function Get-GTEntraRolesFromWeb
+{
+    param(
+        [string]$Url = "https://learn.microsoft.com/en-us/entra/identity/role-based-access-control/permissions-reference"
+    )
+
+    Write-Verbose "Downloading Entra roles information from $Url"
+    try
+    {
+        $response = Invoke-WebRequest -Uri $Url -UseBasicParsing -ErrorAction Stop
+    }
+    catch
+    {
+        Write-Error "Failed to download from URL '$Url': $_"
+        return $null
+    }
+
+    # Get the HTML content
+    $htmlContent = $response.Content
+
+    # Use regex to find the first table after the 'All roles' heading for more resilience
+    $anchorPattern = '<h2[^>]*id="all-roles"[^>]*>'
+    $anchorMatch = [regex]::Match($htmlContent, $anchorPattern, 'IgnoreCase')
+    if (-not $anchorMatch.Success)
+    {
+        Write-Error "Could not find the 'All roles' section on the page. The page structure might have changed."
+        return $null
+    }
+    $anchorPos = $anchorMatch.Index
+
+    # Find the first <table> after the anchor
+    $tablePattern = '<table[\s\S]*?<\/table>'
+    $tableMatch = [regex]::Match($htmlContent.Substring($anchorPos), $tablePattern, 'IgnoreCase')
+    if (-not $tableMatch.Success)
+    {
+        Write-Error "Could not find the table after the 'All roles' heading."
+        return $null
+    }
+    $tableHtml = $tableMatch.Value
+
+    # Extract table headers
+    $headerMatches = [regex]::Matches($tableHtml, "<th.*?>(.*?)</th>", "IgnoreCase")
+    if ($headerMatches.Count -eq 0)
+    {
+        Write-Error "Could not find table headers (<th> tags)."
+        return $null
+    }
+
+    # Clean up header names for use as property names
+    $headers = $headerMatches | ForEach-Object {
+        $headerText = $_.Groups[1].Value.Trim()
+        # Remove any HTML tags within the header
+        $headerText = [regex]::Replace($headerText, "<.*?>", "").Trim()
+        # Make header suitable for property name
+        $headerText -replace '\s+', '' -replace '[^a-zA-Z0-9_]', ''
+    }
+
+    # Extract rows and data cells
+    $roles = [System.Collections.ArrayList]::new()
+    $rowMatches = [regex]::Matches($tableHtml, "<tr.*?>(.*?)</tr>", "IgnoreCase, Singleline")
+
+    # Skip the header row (first row)
+    foreach ($rowMatch in $rowMatches | Select-Object -Skip 1)
+    {
+        $rowData = [ordered]@{}
+        $cellMatches = [regex]::Matches($rowMatch.Groups[1].Value, "<td.*?>(.*?)</td>", "IgnoreCase, Singleline")
+
+        if ($cellMatches.Count -ge $headers.Count)
+        {
+            for ($i = 0; $i -lt $headers.Count; $i++)
+            {
+                # Extract text, removing any HTML tags
+                $cellContent = [regex]::Replace($cellMatches[$i].Groups[1].Value, "<.*?>", "").Trim()
+                # Decode HTML entities (use System.Net.WebUtility for cross-platform)
+                try
+                {
+                    Add-Type -AssemblyName System.Net.WebUtility -ErrorAction SilentlyContinue
+                    $cellContent = [System.Net.WebUtility]::HtmlDecode($cellContent)
+                }
+                catch
+                {
+                    Write-Verbose "HTML decoding unavailable. Content may contain HTML entities."
+                }
+                $rowData[$headers[$i]] = $cellContent
+            }
+            [void]$roles.Add([PSCustomObject]$rowData)
+        }
+    }
+
+    Write-Verbose "Successfully extracted $($roles.Count) Entra roles."
+    return $roles
+}
