@@ -113,5 +113,5 @@ function Get-GTEntraRolesFromWeb
     }
 
     Write-Verbose "Successfully extracted $($roles.Count) Entra roles."
-    return $roles
+    $roles
 }
