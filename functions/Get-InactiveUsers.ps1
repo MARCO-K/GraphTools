@@ -1,4 +1,4 @@
-function Get-InactiveUsers
+function Get-GTInactiveUser
 {
     <#
     .SYNOPSIS
@@ -20,14 +20,28 @@ function Get-InactiveUsers
     Filter for users inactive for more than X days
     
     .EXAMPLE
-    Get-InactiveUsers -InactiveDaysOlderThan 90 -Verbose
+    Get-GTInactiveUser -InactiveDaysOlderThan 90 -Verbose
     Finds users inactive for over 3 months with verbose logging
     
     .EXAMPLE
-    Get-InactiveUsers -ExternalUsersOnly -DisabledUsersOnly -Debug
+    Get-GTInactiveUser -ExternalUsersOnly -DisabledUsersOnly -Debug
     Debugs disabled external user processing
+
+    .EXAMPLE
+    Get-GTInactiveUser -NeverLoggedIn
+    Retrieves all users who have never logged in
+
+    .EXAMPLE
+    Get-GTInactiveUser -InactiveDaysOlderThan 30 -DisabledUsersOnly
+    Gets disabled users who have been inactive for more than 30 days
+
+    .NOTES
+    Requires Microsoft Graph PowerShell SDK with appropriate permissions:
+    - User.Read.All
+    - AuditLog.Read.All (for sign-in activity)
     #>
     [CmdletBinding()]
+    [OutputType([object])]
     param(
         [switch]$DisabledUsersOnly,
         [switch]$ExternalUsersOnly,
