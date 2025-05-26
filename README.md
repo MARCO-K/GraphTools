@@ -1,5 +1,7 @@
 # MS Graph tools
 
+## GraphTools: PowerShell Module for Microsoft Entra ID Management & Reporting
+
 ![GraphTools](image.png)
 
 **GraphTools** is a robust PowerShell module designed for IT security professionals focused on Entra ID and Microsoft 365.
@@ -39,8 +41,8 @@ Retrieves user accounts with advanced filtering options including inactivity day
 Import-Module GraphTools
 ```
 
-2. Run a Function: For example, to list risky users:
+1. Run a Function: For example, to list risky users:
 
 ```powershell
-Get-MFAReport -UsersWithoutMFA -NoGuestUser
+Get-GTMFAReport -UsersWithoutMFA -NoGuestUser
 ```
