@@ -75,10 +75,9 @@ Describe "Invoke-AuditLogQuery" {
         $result.UserId | Should -Be "user1@contoso.com"
     }
 
-    It "should filter by date" {
+    It "drops records older than the start date" {
         $result = Invoke-AuditLogQuery -StartDays 7
-        $result.Count | Should -Be 1
-        $result.Operation | Should -Be "FileDeleted"
+        $result.Id | Should -BeExactly 'test-record-1'
     }
 
     It "should throw an error for invalid date range" {
