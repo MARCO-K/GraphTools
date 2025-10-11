@@ -1,3 +1,5 @@
+. "$PSScriptRoot/../functions/Invoke-AuditLogQuery.ps1"
+
 BeforeAll {
     # Mock the required modules and functions
     Mock -ModuleName "Microsoft.Graph.Authentication" -CommandName "Install-GTRequiredModule" -MockWith { }
