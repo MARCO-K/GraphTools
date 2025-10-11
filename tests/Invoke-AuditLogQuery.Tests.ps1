@@ -32,14 +32,20 @@ Describe "Invoke-AuditLogQuery" {
         )
 
         Mock -ModuleName "Microsoft.Graph.Authentication" -CommandName "Invoke-MgGraphRequest" -MockWith {
-            param($Uri, $Body)
-            if ($Uri -like "*auditLog/queries*") {
+            param($Uri, $Body, $Method)
+            if ($Uri -like "*/auditLog/queries" -and $Method -eq "POST") {
                 return @{
                     Id = "test-query-id"
                     status = "succeeded"
                 }
             }
-            if ($Uri -like "*records*") {
+            if ($Uri -like "*/auditLog/queries/test-query-id" -and $Method -eq "GET") {
+                return @{
+                    Id = "test-query-id"
+                    status = "succeeded"
+                }
+            }
+            if ($Uri -like "*/auditLog/queries/test-query-id/records" -and $Method -eq "GET") {
                 $filter = $Body | ConvertFrom-Json
                 $records = $mockRecords
                 if ($filter.filter.OperationFilters) {
@@ -95,5 +101,13 @@ Describe "Invoke-AuditLogQuery" {
             $body = $Body | ConvertFrom-Json
             ($body.filter.OperationFilters -contains "FileDeleted") -and ($body.filter.userIdsFilters -contains "user1@contoso.com")
         } -Times 1
+    }
+
+    It "should call the correct URIs" {
+        Invoke-AuditLogQuery -Delete
+        Assert-MockCalled -CommandName "Invoke-MgGraphRequest" -ParameterFilter { $Uri -like "*/auditLog/queries" -and $Method -eq "POST" } -Times 1
+        Assert-MockCalled -CommandName "Invoke-MgGraphRequest" -ParameterFilter { $Uri -eq "/beta/security/auditLog/queries/test-query-id" -and $Method -eq "GET" } -Times 1
+        Assert-MockCalled -CommandName "Invoke-MgGraphRequest" -ParameterFilter { $Uri -eq "/beta/security/auditLog/queries/test-query-id/records" -and $Method -eq "GET" } -Times 1
+        Assert-MockCalled -CommandName "Invoke-MgGraphRequest" -ParameterFilter { $Uri -eq "/beta/security/auditLog/queries/test-query-id" -and $Method -eq "DELETE" } -Times 1
     }
 }
