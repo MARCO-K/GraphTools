@@ -4,40 +4,53 @@ Retrieves and processes Microsoft 365 audit logs through the Graph API.
 
 .DESCRIPTION
 This function queries Microsoft 365 audit logs, waits for completion, processes results, 
-and optionally cleans up the query job.
+and optionally cleans up the query job. It supports filtering by date range, operations,
+record types, user IDs, and IP addresses.
 
 .PARAMETER Scopes
-Required Microsoft Graph permissions (default: AuditLogsQuery.Read.All)
+Required Microsoft Graph permissions. Defaults to all AuditLogsQuery permissions.
 
 .PARAMETER StartDays
-Number of days back to start the search (default: 7)
+Number of days back to start the search. The maximum value is 30. Defaults to 7.
 
 .PARAMETER EndDays
-Number of days forward from start for end date (default: 1)
+Number of days forward from the start date to end the search. Defaults to 0.
 
 .PARAMETER Delete
-Switch to delete the audit query job after completion (default: true)
+A switch to delete the audit query job after completion. Defaults to $true.
 
 .PARAMETER Operations
-Array of operations to filter
+An array of operations to filter the audit logs.
 
 .PARAMETER RecordType
-Array of record types to filter
+An array of record types to filter the audit logs.
+
+.PARAMETER UserIds
+An array of user IDs to filter the audit logs.
+
+.PARAMETER IpAddresses
+An array of IP addresses to filter the audit logs.
 
 .PARAMETER Properties
-Array of properties to return in results
+An array of properties to return in the results.
 
 .PARAMETER maxWaitMinutes
-Maximum time to wait for query completion (default: 10)
+The maximum time in minutes to wait for the query to complete. Defaults to 10.
 
 .PARAMETER sleepSeconds
-Time to wait between query status checks (default: 30)
+The time in seconds to wait between query status checks. Defaults to 30.
 
 .EXAMPLE
-Invoke-AuditLogQuery -Start 30 -End 0 -Operations "FileDeleted" -Properties "Id","Operation","UserId"
+# Retrieve audit logs for file deletions in the last 7 days
+Invoke-AuditLogQuery -Operations "FileDeleted"
 
 .EXAMPLE
-Invoke-AuditLogQuery -Scopes "AuditLog.Read.All" -Delete:$false -Verbose
+# Retrieve audit logs for a specific user in the last 30 days and keep the query job
+Invoke-AuditLogQuery -UserIds "user@contoso.com" -StartDays 30 -Delete:$false
+
+.EXAMPLE
+# Retrieve audit logs from a specific IP address and select specific properties
+Invoke-AuditLogQuery -IpAddresses "192.168.1.1" -Properties "Id","Operation","UserId","auditData"
 #>
 function Invoke-AuditLogQuery
 {
@@ -61,13 +74,22 @@ function Invoke-AuditLogQuery
         [switch]$Delete,
         
         [Parameter(Mandatory = $false)]
-        [array]$Operations = @(),
+        [array]$Operations,
         
         [Parameter(Mandatory = $false)]
-        [array]$RecordType = @(),
+        [array]$RecordType,
+
+        [Parameter(Mandatory = $false)]
+        [array]$UserIds,
+
+        [Parameter(Mandatory = $false)]
+        [array]$IpAddresses,
         
         [Parameter(Mandatory = $false)]
         [array]$Properties = @('Id', 'createdDateTime', 'auditLogRecordType', 'Operation', 'service', 'UserId', 'UserType', 'userPrincipalName', 'auditData'),
+
+        [Parameter(Mandatory = 'False')]
+        [OutputType('PSCustomObject')]
 
         [Parameter(Mandatory = $false)]
         [int]$maxWaitMinutes = 10,
@@ -83,13 +105,13 @@ function Invoke-AuditLogQuery
         Install-GTRequiredModule -ModuleNames $modules
 
         # Validate date range
-        if (-not $Enddays)
-        {
-            $EndDays = 0
-        }
-        if (-not $StartDays)
-        {
+        if ($StartDays -gt 30) {
+            Write-Warning "The maximum value for StartDays is 30. Please select a smaller value."
             $StartDays = 30
+        }
+
+        if ($StartDays -lt $EndDays) {
+            throw "Start date must be before end date."
         }
 
 
@@ -129,15 +151,20 @@ function Invoke-AuditLogQuery
         {
             # Region: Query Setup
             # ----------------------------------
-            $queryParams = @{
-                "@odata.type"       = "#microsoft.graph.security.auditLogQuery"
-                displayName         = "Audit Job created at $(Get-Date)"
-                filterStartDateTime = (Get-Date).AddDays(-$StartDays).ToString("s")
-                filterEndDateTime   = (Get-Date).AddDays($EndDays).ToString("s")
+            $filterExpression = @{
+                "filterStartDateTime" = (Get-Date).AddDays(-$StartDays).ToString("s")
+                "filterEndDateTime"   = (Get-Date).AddDays($EndDays).ToString("s")
             }
+            if ($Operations) { $filterExpression.Add("OperationFilters", $Operations) }
+            if ($RecordType) { $filterExpression.Add("RecordTypeFilters", $RecordType) }
+            if ($UserIds) { $filterExpression.Add("userIdsFilters", $UserIds) }
+            if ($IpAddresses) { $filterExpression.Add("ipAddressFilters", $IpAddresses) }
 
-            if ($Operations) { $queryParams.Add("OperationFilters", $Operations) }
-            if ($RecordType) { $queryParams.Add("RecordTypeFilters", $RecordType) }
+            $queryParams = @{
+                "@odata.type" = "#microsoft.graph.security.auditLogQuery"
+                "displayName" = "Audit Job created at $(Get-Date)"
+                "filter"      = $filterExpression | ConvertTo-Json -Compress
+            }
 
             # Region: Query Execution
             # ----------------------------------
@@ -189,21 +216,19 @@ function Invoke-AuditLogQuery
 
             # Region: Data Transformation
             # ----------------------------------
-            $processedResults = foreach ($entry in $records)
-            {
-                $props = [ordered]@{}
-                
-                foreach ($prop in $Properties)
-                {
+            $processedResults = foreach ($entry in $records) {
+                $props = [ordered] @{}
+                foreach ($prop in $Properties) {
                     $value = $entry
-                    foreach ($segment in ($prop -split '\.'))
-                    {
+                    foreach ($segment in ($prop -split '\.')) {
                         $value = $value.$segment
                         if ($null -eq $value) { break }
                     }
                     $props[$prop] = $value
                 }
-                [PSCustomObject]$props
+                $obj = New-Object -TypeName PSCustomObject -Property $props
+                $obj.PSObject.TypeNames.Insert(0, "GraphTools.AuditLogRecord")
+                $obj
             }
 
             # Region: Cleanup
