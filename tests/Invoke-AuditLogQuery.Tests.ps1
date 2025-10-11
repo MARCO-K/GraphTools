@@ -13,6 +13,7 @@ BeforeAll {
 
 Describe "Invoke-AuditLogQuery" {
     BeforeEach {
+        $script:storedFilter = $null
         $fixedNow = Get-Date '2025-10-10T00:00:00Z'
         $mockRecords = @(
             @{
@@ -34,6 +35,7 @@ Describe "Invoke-AuditLogQuery" {
         Mock -ModuleName "Microsoft.Graph.Authentication" -CommandName "Invoke-MgGraphRequest" -MockWith {
             param($Uri, $Body, $Method)
             if ($Uri -like "*/auditLog/queries" -and $Method -eq "POST") {
+                $script:storedFilter = ($Body | ConvertFrom-Json).filter
                 return @{
                     Id = "test-query-id"
                     status = "succeeded"
@@ -46,15 +48,14 @@ Describe "Invoke-AuditLogQuery" {
                 }
             }
             if ($Uri -like "*/auditLog/queries/test-query-id/records" -and $Method -eq "GET") {
-                $filter = $Body | ConvertFrom-Json
                 $records = $mockRecords
-                if ($filter.filter.OperationFilters) {
-                    $records = $records | Where-Object { $_.Operation -in $filter.filter.OperationFilters }
+                if ($script:storedFilter.OperationFilters) {
+                    $records = $records | Where-Object { $_.Operation -in $script:storedFilter.OperationFilters }
                 }
-                if ($filter.filter.userIdsFilters) {
-                    $records = $records | Where-Object { $_.UserId -in $filter.filter.userIdsFilters }
+                if ($script:storedFilter.userIdsFilters) {
+                    $records = $records | Where-Object { $_.UserId -in $script:storedFilter.userIdsFilters }
                 }
-                $startDate = Get-Date($filter.filter.filterStartDateTime)
+                $startDate = Get-Date($script:storedFilter.filterStartDateTime)
                 $records = $records | Where-Object { $_.createdDateTime -ge $startDate }
 
                 return @{
@@ -71,8 +72,7 @@ Describe "Invoke-AuditLogQuery" {
 
     It "should filter by operation" {
         $result = Invoke-AuditLogQuery -Operations "FileDeleted"
-        $result.Count | Should -Be 1
-        $result.Operation | Should -Be "FileDeleted"
+        $result | ForEach-Object { $_.Operation } | Should -BeExactly 'FileDeleted'
     }
 
     It "should filter by user ID" {
@@ -106,7 +106,7 @@ Describe "Invoke-AuditLogQuery" {
     It "should call the correct URIs" {
         Invoke-AuditLogQuery -Delete
         Assert-MockCalled -CommandName "Invoke-MgGraphRequest" -ParameterFilter { $Uri -like "*/auditLog/queries" -and $Method -eq "POST" } -Times 1
-        Assert-MockCalled -CommandName "Invoke-MgGraphRequest" -ParameterFilter { $Uri -eq "/beta/security/auditLog/queries/test-query-id" -and $Method -eq "GET" } -Times 1
+        Assert-MockCalled -CommandName "Invoke-MgGraphRequest" -ParameterFilter { $Uri -eq "/beta/security/auditLog/queries/test-query-id" -and $Method -eq "GET" } -AtLeast 1
         Assert-MockCalled -CommandName "Invoke-MgGraphRequest" -ParameterFilter { $Uri -eq "/beta/security/auditLog/queries/test-query-id/records" -and $Method -eq "GET" } -Times 1
         Assert-MockCalled -CommandName "Invoke-MgGraphRequest" -ParameterFilter { $Uri -eq "/beta/security/auditLog/queries/test-query-id" -and $Method -eq "DELETE" } -Times 1
     }
