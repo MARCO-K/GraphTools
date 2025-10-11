@@ -5,24 +5,29 @@ BeforeAll {
     Mock -ModuleName "Microsoft.Graph.Authentication" -CommandName "Install-GTRequiredModule" -MockWith { }
     Mock -ModuleName "Microsoft.Graph.Authentication" -CommandName "Test-GTGraphScopes" -MockWith { $true }
     Mock -ModuleName "Microsoft.Graph.Authentication" -CommandName "Set-MgRequestContext" -MockWith { }
+
+    # Mock Get-Date to return a fixed timestamp
+    $fixedNow = Get-Date '2025-10-10T00:00:00Z'
+    Mock Get-Date { $fixedNow }
 }
 
 Describe "Invoke-AuditLogQuery" {
     BeforeEach {
+        $fixedNow = Get-Date '2025-10-10T00:00:00Z'
         $mockRecords = @(
             @{
                 Id = "test-record-1"
                 Operation = "FileDeleted"
                 UserId = "user1@contoso.com"
                 auditData = "{'some':'data'}"
-                createdDateTime = (Get-Date).AddDays(-1)
+                createdDateTime = $fixedNow.AddDays(-1)
             },
             @{
                 Id = "test-record-2"
                 Operation = "FileModified"
                 UserId = "user2@contoso.com"
                 auditData = "{'other':'data'}"
-                createdDateTime = (Get-Date).AddDays(-8)
+                createdDateTime = $fixedNow.AddDays(-8)
             }
         )
 
@@ -54,7 +59,7 @@ Describe "Invoke-AuditLogQuery" {
     }
 
     It "should return all audit log records when no filters are applied" {
-        $result = Invoke-AuditLogQuery
+        $result = Invoke-AuditLogQuery -StartDays 30
         $result.Count | Should -Be 2
     }
 
