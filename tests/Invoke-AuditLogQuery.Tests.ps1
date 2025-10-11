@@ -14,21 +14,20 @@ BeforeAll {
 Describe "Invoke-AuditLogQuery" {
     BeforeEach {
         $script:storedFilter = $null
-        $fixedNow = Get-Date '2025-10-10T00:00:00Z'
         $mockRecords = @(
             @{
                 Id = "test-record-1"
                 Operation = "FileDeleted"
                 UserId = "user1@contoso.com"
                 auditData = "{'some':'data'}"
-                createdDateTime = $fixedNow.AddDays(-1)
+                createdDateTime = (Get-Date).AddDays(-1)
             },
             @{
                 Id = "test-record-2"
                 Operation = "FileModified"
                 UserId = "user2@contoso.com"
                 auditData = "{'other':'data'}"
-                createdDateTime = $fixedNow.AddDays(-8)
+                createdDateTime = (Get-Date).AddDays(-8)
             }
         )
 
