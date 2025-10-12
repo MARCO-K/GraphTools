@@ -115,4 +115,10 @@ Describe "Invoke-AuditLogQuery" {
         $result = Invoke-AuditLogQuery -Operations 'NonExistentOp'
         $result | Should -BeEmpty
     }
+
+    It 'preserves the GraphTools.AuditLogRecord type on an empty array' {
+        Mock Invoke-MgGraphRequest { @{ value = @() } }
+        $result = Invoke-AuditLogQuery
+        $result.GetType().Name | Should -Be 'Object[]'
+    }
 }
