@@ -34,6 +34,7 @@ function Get-M365LicenseOverview
         [string]$FilterServicePlan,
 
         [Parameter(ParameterSetName = "User", Mandatory = $false)]
+        [ValidateScript({$_ -like '*@*'})]
         [string]$FilterUser,
 
         [Parameter(ParameterSetName = "User", Mandatory = $false)]
