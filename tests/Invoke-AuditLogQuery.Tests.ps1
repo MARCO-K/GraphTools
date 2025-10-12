@@ -121,4 +121,9 @@ Describe "Invoke-AuditLogQuery" {
         $result = Invoke-AuditLogQuery
         $result.GetType().Name | Should -Be 'Object[]'
     }
+
+    It 'still makes exactly the POST, status-GET, and records-GET calls' {
+        Invoke-AuditLogQuery
+        Assert-MockCalled Invoke-MgGraphRequest -Times 3
+    }
 }
