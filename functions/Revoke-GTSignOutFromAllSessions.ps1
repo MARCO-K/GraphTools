@@ -6,10 +6,10 @@
 .PARAMETER UPN
     The User Principal Name of the user to sign out.
 .EXAMPLE
-    PS C:\> Invoke-GTSignOutFromAllSessions -UPN "test.user@example.com"
+    PS C:\> Revoke-GTSignOutFromAllSessions -UPN "test.user@example.com"
     This command signs out the user with the UPN "test.user@example.com" from all sessions.
 #>
-function Invoke-GTSignOutFromAllSessions
+function Revoke-GTSignOutFromAllSessions
 {
     [CmdletBinding()]
     param

@@ -1,6 +1,6 @@
-. "$PSScriptRoot/../functions/Invoke-GTSignOutFromAllSessions.ps1"
+. "$PSScriptRoot/../functions/Revoke-GTSignOutFromAllSessions.ps1"
 
-Describe "Invoke-GTSignOutFromAllSessions" {
+Describe "Revoke-GTSignOutFromAllSessions" {
     BeforeAll {
         # Mock the required modules and functions
         Mock -ModuleName "Microsoft.Graph.Users" -CommandName "Get-MgUser" -MockWith {
@@ -13,7 +13,7 @@ Describe "Invoke-GTSignOutFromAllSessions" {
 
     Context "Happy Path" {
         It "should call Revoke-MgUserSignInSession with the correct UserId" {
-            Invoke-GTSignOutFromAllSessions -UPN "test.user@example.com"
+            Revoke-GTSignOutFromAllSessions -UPN "test.user@example.com"
             Assert-MockCalled -CommandName "Revoke-MgUserSignInSession" -Times 1 -ParameterFilter {
                 $UserId -eq "mock-user-id"
             }
@@ -23,12 +23,12 @@ Describe "Invoke-GTSignOutFromAllSessions" {
     Context "Error Handling" {
         It "should not call Revoke-MgUserSignInSession if Get-MgUser returns null" {
             Mock -ModuleName "Microsoft.Graph.Users" -CommandName "Get-MgUser" -MockWith { $null }
-            Invoke-GTSignOutFromAllSessions -UPN "non.existent.user@example.com"
+            Revoke-GTSignOutFromAllSessions -UPN "non.existent.user@example.com"
             Assert-MockCalled -CommandName "Revoke-MgUserSignInSession" -Times 0
         }
 
         It "should throw an error for an invalid UPN" {
-            { Invoke-GTSignOutFromAllSessions -UPN "invalid-upn" } | Should -Throw
+            { Revoke-GTSignOutFromAllSessions -UPN "invalid-upn" } | Should -Throw
         }
     }
 }
