@@ -5,12 +5,27 @@ function Get-GTServicePrincipalReport
     Retrieves a report of Service Principals from Microsoft Entra ID.
 
     .DESCRIPTION
-    Connects to Microsoft Graph to fetch all Service Principals and reports key details
-    including App ID, owners, sign-in activity, and credential expiry dates.
+    Connects to Microsoft Graph to fetch all Service Principals or a filtered subset
+    and reports key details including App ID, owners, sign-in activity, and credential expiry dates.
+    Supports pipeline input for AppId and DisplayName.
+
+    .PARAMETER AppId
+    The Application (client) ID of the service principal to retrieve. Can be provided via pipeline.
+
+    .PARAMETER DisplayName
+    The display name of the service principal to retrieve. Can be provided via pipeline.
 
     .EXAMPLE
     Get-GTServicePrincipalReport -Verbose
     Retrieves a report for all Service Principals with verbose logging.
+
+    .EXAMPLE
+    "d4a2b2b2-2b2b-4b2b-8b2b-2b2b2b2b2b2b" | Get-GTServicePrincipalReport
+    Retrieves the service principal with the specified App ID.
+
+    .EXAMPLE
+    "My App", "Another App" | Get-GTServicePrincipalReport -DisplayName
+    Retrieves the service principals with the specified display names.
 
     .NOTES
     Requires Microsoft Graph PowerShell SDK with appropriate permissions:
@@ -23,6 +38,12 @@ function Get-GTServicePrincipalReport
     [OutputType([object])]
     param
     (
+        [Parameter(ValueFromPipeline = $true, ParameterSetName = 'ByAppId')]
+        [string[]]$AppId,
+
+        [Parameter(ValueFromPipeline = $true, ParameterSetName = 'ByDisplayName')]
+        [string[]]$DisplayName,
+
         # Switch to force a new Graph session
         [switch]$NewSession,
 
@@ -32,6 +53,9 @@ function Get-GTServicePrincipalReport
 
     begin
     {
+        $appIdList = [System.Collections.Generic.List[string]]::new()
+        $displayNameList = [System.Collections.Generic.List[string]]::new()
+
         # Module Management
         $requiredModules = @('Microsoft.Graph.Authentication', 'Microsoft.Graph.Beta.Applications') # Corrected: Get-MgBetaServicePrincipal is in Microsoft.Graph.Beta.Applications
         Install-GTRequiredModule -ModuleNames $requiredModules -Verbose:$VerbosePreference
@@ -61,10 +85,32 @@ function Get-GTServicePrincipalReport
 
     process
     {
+        if ($AppId) {
+            $appIdList.AddRange($AppId)
+        }
+        if ($DisplayName) {
+            $displayNameList.AddRange($DisplayName)
+        }
+    }
+
+    end
+    {
         try
         {
-            Write-PSFMessage -Level Verbose -Message "Fetching Service Principals from Microsoft Graph..."
-            $servicePrincipals = Get-MgBetaServicePrincipal -All -Property ('id,appId,displayName,servicePrincipalType,accountEnabled,signInActivity,keyCredentials,passwordCredentials') -ExpandProperty 'owners' -ErrorAction Stop
+            $filter = ""
+            if ($appIdList.Count -gt 0) {
+                $filter = "appId in ('" + ($appIdList -join "','") + "')"
+            } elseif ($displayNameList.Count -gt 0) {
+                $filter = "displayName in ('" + ($displayNameList -join "','") + "')"
+            }
+
+            if ($filter) {
+                Write-PSFMessage -Level Verbose -Message "Fetching Service Principals from Microsoft Graph with filter: $filter"
+                $servicePrincipals = Get-MgBetaServicePrincipal -Filter $filter -Property ('id,appId,displayName,servicePrincipalType,accountEnabled,signInActivity,keyCredentials,passwordCredentials') -ExpandProperty 'owners' -ErrorAction Stop
+            } else {
+                Write-PSFMessage -Level Verbose -Message "Fetching all Service Principals from Microsoft Graph..."
+                $servicePrincipals = Get-MgBetaServicePrincipal -All -Property ('id,appId,displayName,servicePrincipalType,accountEnabled,signInActivity,keyCredentials,passwordCredentials') -ExpandProperty 'owners' -ErrorAction Stop
+            }
         }
         catch
         {
@@ -106,10 +152,5 @@ function Get-GTServicePrincipalReport
 
         Write-PSFMessage -Level Verbose -Message "Successfully processed $($report.Count) Service Principals."
         return $report
-    }
-
-    end
-    {
-        # No specific end processing needed for this function
     }
 }
