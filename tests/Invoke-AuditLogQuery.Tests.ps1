@@ -109,4 +109,10 @@ Describe "Invoke-AuditLogQuery" {
         Assert-MockCalled -CommandName "Invoke-MgGraphRequest" -ParameterFilter { $Uri -eq "/beta/security/auditLog/queries/test-query-id/records" -and $Method -eq "GET" } -Times 1
         Assert-MockCalled -CommandName "Invoke-MgGraphRequest" -ParameterFilter { $Uri -eq "/beta/security/auditLog/queries/test-query-id" -and $Method -eq "DELETE" } -Times 1
     }
+
+    Context "Parameter Validation" {
+        It "should throw an error for an invalid UserIds" {
+            { Invoke-AuditLogQuery -UserIds "invalid-user" } | Should -Throw
+        }
+    }
 }

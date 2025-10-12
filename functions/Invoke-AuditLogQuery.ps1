@@ -80,6 +80,7 @@ function Invoke-AuditLogQuery
         [array]$RecordType,
 
         [Parameter(Mandatory = $false)]
+        [ValidateScript({$_ -like '*@*'})]
         [array]$UserIds,
 
         [Parameter(Mandatory = $false)]
