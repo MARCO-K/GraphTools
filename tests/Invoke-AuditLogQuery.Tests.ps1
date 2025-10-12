@@ -105,7 +105,7 @@ Describe "Invoke-AuditLogQuery" {
     It "should call the correct URIs" {
         Invoke-AuditLogQuery -Delete
         Assert-MockCalled -CommandName "Invoke-MgGraphRequest" -ParameterFilter { $Uri -like "*/auditLog/queries" -and $Method -eq "POST" } -Times 1
-        Assert-MockCalled -CommandName "Invoke-MgGraphRequest" -ParameterFilter { $Uri -eq "/beta/security/auditLog/queries/test-query-id" -and $Method -eq "GET" } -AtLeast 1
+        Assert-MockCalled -CommandName "Invoke-MgGraphRequest" -ParameterFilter { $Uri -eq "/beta/security/auditLog/queries/test-query-id" -and $Method -eq "GET" } -Times 1
         Assert-MockCalled -CommandName "Invoke-MgGraphRequest" -ParameterFilter { $Uri -eq "/beta/security/auditLog/queries/test-query-id/records" -and $Method -eq "GET" } -Times 1
         Assert-MockCalled -CommandName "Invoke-MgGraphRequest" -ParameterFilter { $Uri -eq "/beta/security/auditLog/queries/test-query-id" -and $Method -eq "DELETE" } -Times 1
     }
