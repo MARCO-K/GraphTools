@@ -34,6 +34,7 @@ function Import-ModuleFile
 #endregion Helper function
 
 # Perform Actions before loading the rest of the content
+. Import-ModuleFile -Path "$ModuleRoot\internal\functions\GTValidation.ps1"
 #. Import-ModuleFile -Path "$ModuleRoot\internal\scripts\preimport.ps1"
 
 #region Load functions

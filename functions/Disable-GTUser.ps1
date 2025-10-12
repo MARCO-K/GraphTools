@@ -3,7 +3,7 @@ Function Disable-GTUser
     param
     (
         [Parameter(Mandatory = $true)]
-        [ValidateScript({$_ -like '*@*'})]
+        [ValidateScript({$_ -match $script:GTValidationRegex.UPN})]
         [string[]]$UPN
     )
 

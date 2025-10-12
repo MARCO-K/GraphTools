@@ -7,8 +7,16 @@ Describe "Disable-GTUser" {
     }
 
     Context "Parameter Validation" {
-        It "should throw an error for an invalid UPN" {
+        It "should throw an error for an invalid UPN (no @ symbol)" {
             { Disable-GTUser -UPN "invalid-user" } | Should -Throw
+        }
+
+        It "should throw an error for an invalid UPN (empty local part)" {
+            { Disable-GTUser -UPN "@domain.com" } | Should -Throw
+        }
+
+        It "should throw an error for an invalid UPN (empty domain part)" {
+            { Disable-GTUser -UPN "user@" } | Should -Throw
         }
     }
 }

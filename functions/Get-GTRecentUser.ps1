@@ -49,7 +49,7 @@ function Get-GTRecentUser {
 
         [Parameter(Mandatory = $true,
                    ParameterSetName = 'ByUPN')]
-        [ValidateScript({$_ -like '*@*'})]
+        [ValidateScript({$_ -match $script:GTValidationRegex.UPN})]
         [string]$UserPrincipalName
     )
 

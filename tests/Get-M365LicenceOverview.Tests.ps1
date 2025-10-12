@@ -8,8 +8,16 @@ Describe "Get-M365LicenseOverview" {
     }
 
     Context "Parameter Validation" {
-        It "should throw an error for an invalid FilterUser" {
+        It "should throw an error for an invalid FilterUser (no @ symbol)" {
             { Get-M365LicenseOverview -FilterUser "invalid-user" } | Should -Throw
+        }
+
+        It "should throw an error for an invalid FilterUser (empty local part)" {
+            { Get-M365LicenseOverview -FilterUser "@domain.com" } | Should -Throw
+        }
+
+        It "should throw an error for an invalid FilterUser (empty domain part)" {
+            { Get-M365LicenseOverview -FilterUser "user@" } | Should -Throw
         }
     }
 }

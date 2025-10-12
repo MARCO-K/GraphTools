@@ -80,7 +80,7 @@ function Invoke-AuditLogQuery
         [array]$RecordType,
 
         [Parameter(Mandatory = $false)]
-        [ValidateScript({$_ -like '*@*'})]
+        [ValidateScript({$_ -match $script:GTValidationRegex.UPN})]
         [array]$UserIds,
 
         [Parameter(Mandatory = $false)]

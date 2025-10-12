@@ -7,8 +7,16 @@ Describe "Get-GTRecentUser" {
     }
 
     Context "Parameter Validation" {
-        It "should throw an error for an invalid UserPrincipalName" {
+        It "should throw an error for an invalid UPN (no @ symbol)" {
             { Get-GTRecentUser -UserPrincipalName "invalid-user" } | Should -Throw
+        }
+
+        It "should throw an error for an invalid UPN (empty local part)" {
+            { Get-GTRecentUser -UserPrincipalName "@domain.com" } | Should -Throw
+        }
+
+        It "should throw an error for an invalid UPN (empty domain part)" {
+            { Get-GTRecentUser -UserPrincipalName "user@" } | Should -Throw
         }
     }
 }
