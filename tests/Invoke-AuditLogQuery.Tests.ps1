@@ -111,8 +111,16 @@ Describe "Invoke-AuditLogQuery" {
     }
 
     Context "Parameter Validation" {
-        It "should throw an error for an invalid UserIds" {
+        It "should throw an error for an invalid UserIds (no @ symbol)" {
             { Invoke-AuditLogQuery -UserIds "invalid-user" } | Should -Throw
+        }
+
+        It "should throw an error for an invalid UserIds (empty local part)" {
+            { Invoke-AuditLogQuery -UserIds "@domain.com" } | Should -Throw
+        }
+
+        It "should throw an error for an invalid UserIds (empty domain part)" {
+            { Invoke-AuditLogQuery -UserIds "user@" } | Should -Throw
         }
     }
 }
