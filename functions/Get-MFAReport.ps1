@@ -3,6 +3,8 @@
     Retrieves and analyzes Multi-Factor Authentication (MFA) registration details for users.
 .DESCRIPTION
     This function collects MFA registration details from Microsoft Graph and provides filtering options for analysis.
+.PARAMETER UserPrincipalName
+    Accepts one or more User Principal Names from the pipeline or as an argument.
 .PARAMETER NewSession
     Establishes a fresh Microsoft Graph connection
 .PARAMETER AdminsOnly
@@ -25,12 +27,17 @@
     Get-MFAReport -AdminsOnly -MarkMethods
 .EXAMPLE
     Get-MFAReport -UsersWithoutMFA -NoGuestUser
+.EXAMPLE
+    'adele.vance@contoso.com', 'grad.y@contoso.com' | Get-MFAReport
 #>
 function Get-MFAReport
 {
     [CmdletBinding()]
     [OutputType([PSObject])]
     param(
+        [Parameter(ValueFromPipeline = $true, Position = 0)]
+        [string[]]$UserPrincipalName,
+
         [Switch]$NewSession,
         [Switch]$AdminsOnly,
         [Switch]$UsersWithoutMFA,
@@ -70,20 +77,36 @@ function Get-MFAReport
             throw "Graph connection failed: $_"
         }
 
+        $UPNList = [System.Collections.Generic.List[string]]::new()
+    }
+
+    process
+    {
+        if ($UserPrincipalName) {
+            foreach($upn in $UserPrincipalName) {
+                $UPNList.Add($upn)
+            }
+        }
+    }
+
+    end
+    {
         # Data Collection
         try
         {
-            $report = Get-MgBetaReportAuthenticationMethodUserRegistrationDetail -All -ErrorAction Stop
+            $params = @{ All = $true; ErrorAction = 'Stop' }
+            if ($UPNList.Count -gt 0) {
+                $filterString = "userPrincipalName in ('" + ($UPNList -join "','") + "')"
+                $params.Filter = $filterString
+            }
+            $report = Get-MgBetaReportAuthenticationMethodUserRegistrationDetail @params
         }
         catch
         {
             Write-PSFMessage -Level 'Error' -Message 'Failed to retrieve MFA report from Microsoft Graph.'
             throw "Failed to retrieve MFA data: $_"
         }
-    }
 
-    process
-    {
         # Data Transformation
         $MFAList = foreach ($item in $report)
         {
@@ -121,10 +144,6 @@ function Get-MFAReport
         }
 
         $filtered
-    }
-
-    end
-    {
-        Write-PSFMessage -Level 'Verbose' -Message 'MFA report collected successfully. The report contains $($MFAList.Count) entries.'    
+        Write-PSFMessage -Level 'Verbose' -Message 'MFA report collected successfully. The report contains $($MFAList.Count) entries.'
     }
 }

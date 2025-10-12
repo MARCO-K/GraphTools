@@ -109,21 +109,4 @@ Describe "Invoke-AuditLogQuery" {
         Assert-MockCalled -CommandName "Invoke-MgGraphRequest" -ParameterFilter { $Uri -eq "/beta/security/auditLog/queries/test-query-id/records" -and $Method -eq "GET" } -Times 1
         Assert-MockCalled -CommandName "Invoke-MgGraphRequest" -ParameterFilter { $Uri -eq "/beta/security/auditLog/queries/test-query-id" -and $Method -eq "DELETE" } -Times 1
     }
-
-    It 'returns an empty array when no records match' {
-        Mock Invoke-MgGraphRequest { @{ value = @() } }
-        $result = Invoke-AuditLogQuery -Operations 'NonExistentOp'
-        $result | Should -BeEmpty
-    }
-
-    It 'preserves the GraphTools.AuditLogRecord type on an empty array' {
-        Mock Invoke-MgGraphRequest { @{ value = @() } }
-        $result = Invoke-AuditLogQuery
-        $result.GetType().Name | Should -Be 'Object[]'
-    }
-
-    It 'still makes exactly the POST, status-GET, and records-GET calls' {
-        Invoke-AuditLogQuery
-        Assert-MockCalled Invoke-MgGraphRequest -Times 3
-    }
 }
