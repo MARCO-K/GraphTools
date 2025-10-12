@@ -93,4 +93,12 @@ Describe "Get-MFAReport" {
         $result.UPN | Should -NotContain 'guest@contoso.com'
         $result.Count | Should -Be 2
     }
+
+    It "should throw an error for invalid UPN format" {
+        { 'invalid-upn' | Get-MFAReport } | Should -Throw "Invalid UserPrincipalName format: invalid-upn"
+    }
+
+    It "should throw an error for conflicting parameters" {
+        { Get-MFAReport -AdminsOnly -UsersWithoutMFA } | Should -Throw "You cannot use -AdminsOnly and -UsersWithoutMFA together."
+    }
 }

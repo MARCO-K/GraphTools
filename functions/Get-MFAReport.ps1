@@ -36,6 +36,13 @@ function Get-MFAReport
     [OutputType([PSObject])]
     param(
         [Parameter(ValueFromPipeline = $true, Position = 0)]
+        [ValidateScript({
+            if ($_ -match '.*@.*\..*') {
+                return $true
+            } else {
+                throw "Invalid UserPrincipalName format: $_"
+            }
+        })]
         [string[]]$UserPrincipalName,
 
         [Switch]$NewSession,
@@ -51,6 +58,9 @@ function Get-MFAReport
 
     begin
     {
+        if ($AdminsOnly -and $UsersWithoutMFA) {
+            throw "You cannot use -AdminsOnly and -UsersWithoutMFA together."
+        }
         # Module Management
         $modules = ('Microsoft.Graph.Authentication', 'Microsoft.Graph.Beta.Reports')
         Install-GTRequiredModule -ModuleNames $modules -Verbose
