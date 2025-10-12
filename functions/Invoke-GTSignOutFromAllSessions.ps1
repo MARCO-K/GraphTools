@@ -15,6 +15,7 @@ function Invoke-GTSignOutFromAllSessions
     param
     (
         [Parameter(Mandatory = $true, ValueFromPipeline = $true)]
+        [ValidateScript({ Test-GTUPN -UPN $_ })]
         [string]$UPN
     )
 

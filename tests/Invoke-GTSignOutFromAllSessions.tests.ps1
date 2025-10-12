@@ -26,5 +26,9 @@ Describe "Invoke-GTSignOutFromAllSessions" {
             Invoke-GTSignOutFromAllSessions -UPN "non.existent.user@example.com"
             Assert-MockCalled -CommandName "Revoke-MgUserSignInSession" -Times 0
         }
+
+        It "should throw an error for an invalid UPN" {
+            { Invoke-GTSignOutFromAllSessions -UPN "invalid-upn" } | Should -Throw
+        }
     }
 }
