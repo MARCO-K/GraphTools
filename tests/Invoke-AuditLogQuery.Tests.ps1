@@ -109,4 +109,18 @@ Describe "Invoke-AuditLogQuery" {
         Assert-MockCalled -CommandName "Invoke-MgGraphRequest" -ParameterFilter { $Uri -eq "/beta/security/auditLog/queries/test-query-id/records" -and $Method -eq "GET" } -Times 1
         Assert-MockCalled -CommandName "Invoke-MgGraphRequest" -ParameterFilter { $Uri -eq "/beta/security/auditLog/queries/test-query-id" -and $Method -eq "DELETE" } -Times 1
     }
+
+    Context "Parameter Validation" {
+        It "should throw an error for an invalid UserIds (no @ symbol)" {
+            { Invoke-AuditLogQuery -UserIds "invalid-user" } | Should -Throw
+        }
+
+        It "should throw an error for an invalid UserIds (empty local part)" {
+            { Invoke-AuditLogQuery -UserIds "@domain.com" } | Should -Throw
+        }
+
+        It "should throw an error for an invalid UserIds (empty domain part)" {
+            { Invoke-AuditLogQuery -UserIds "user@" } | Should -Throw
+        }
+    }
 }
