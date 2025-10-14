@@ -5,18 +5,22 @@
     This function revokes all refresh tokens for a user, effectively signing them out from all applications and devices.
 .PARAMETER UPN
     The User Principal Name of the user to sign out.
+.PARAMETER NewSession
+    If specified, a new Microsoft Graph session will be created.
 .EXAMPLE
-    PS C:\> Invoke-GTSignOutFromAllSessions -UPN "test.user@example.com"
+    PS C:\> Revoke-GTSignOutFromAllSessions -UPN "test.user@example.com"
     This command signs out the user with the UPN "test.user@example.com" from all sessions.
 #>
-function Invoke-GTSignOutFromAllSessions
+function Revoke-GTSignOutFromAllSessions
 {
     [CmdletBinding()]
     param
     (
         [Parameter(Mandatory = $true, ValueFromPipeline = $true)]
         [ValidateScript({ Test-GTUPN -UPN $_ })]
-        [string]$UPN
+        [string]$UPN,
+
+        [Switch]$NewSession
     )
 
     Begin {
