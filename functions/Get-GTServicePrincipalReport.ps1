@@ -44,11 +44,20 @@ function Get-GTServicePrincipalReport
         [Parameter(ValueFromPipeline = $true, ParameterSetName = 'ByDisplayName')]
         [string[]]$DisplayName,
 
+        # Include sign-in activity in the report
+        [switch]$IncludeSignInActivity,
+
+        # Include credential expiry dates and counts in the report
+        [switch]$IncludeCredentials,
+
+        # Expand owner information in the report
+        [switch]$ExpandOwners,
+
         # Switch to force a new Graph session
         [switch]$NewSession,
 
         # Scopes for Graph Connection
-        [string[]]$Scope = @('Application.Read.All', 'Directory.Read.All', 'AuditLog.Read.All')
+        [string[]]$Scope
     )
 
     begin
@@ -59,6 +68,25 @@ function Get-GTServicePrincipalReport
         # Module Management
         $requiredModules = @('Microsoft.Graph.Authentication', 'Microsoft.Graph.Beta.Applications') # Confirm module location for your SDK version
         Install-GTRequiredModule -ModuleNames $requiredModules -Verbose:$VerbosePreference
+
+        # Dynamically build scopes
+        $requiredScopes = [System.Collections.Generic.List[string]]::new()
+        $requiredScopes.Add('Application.Read.All') # Base permission
+        if ($ExpandOwners) { $requiredScopes.Add('Directory.Read.All') }
+        if ($IncludeSignInActivity) { $requiredScopes.Add('AuditLog.Read.All') }
+
+        if ($Scope) {
+            # If user provides scopes, ensure they include what's needed
+            foreach ($s in $requiredScopes) {
+                if ($s -notin $Scope) {
+                    Write-PSFMessage -Level Warning -Message "Provided scopes do not include '$s', which is required for the requested data."
+                }
+            }
+            $connectScopes = $Scope
+        } else {
+            $connectScopes = $requiredScopes
+        }
+
 
         # Graph Connection Handling
         try
@@ -73,7 +101,7 @@ function Get-GTServicePrincipalReport
             if (-not $context)
             {
                 Write-PSFMessage -Level 'Verbose' -Message 'No Microsoft Graph context found. Attempting to connect.'
-                Connect-MgGraph -Scopes $Scope -NoWelcome -ErrorAction Stop
+                Connect-MgGraph -Scopes $connectScopes -NoWelcome -ErrorAction Stop
             }
         }
         catch
@@ -117,23 +145,37 @@ function Get-GTServicePrincipalReport
                 $fallbackFilter = $orFilter
             }
 
-            # Properties to request (keep minimal by default)
-            $properties = 'id,appId,displayName,servicePrincipalType,accountEnabled,signInActivity,keyCredentials,passwordCredentials'
-            $expand = @('owners')  # expand owners when available
+            # Dynamically build the property and expand lists
+            $properties = [System.Collections.Generic.List[string]]::new(@('id', 'appId', 'displayName', 'servicePrincipalType', 'accountEnabled'))
+            $expand = [System.Collections.Generic.List[string]]::new()
+
+            if ($IncludeSignInActivity) { $properties.Add('signInActivity') }
+            if ($IncludeCredentials) { $properties.AddRange(@('keyCredentials', 'passwordCredentials')) }
+            if ($ExpandOwners) { $expand.Add('owners') }
+
+            $invokeMgGraphSplat = @{
+                All = $true
+                Property = $properties
+                ErrorAction = 'Stop'
+            }
+            if ($expand.Count -gt 0) { $invokeMgGraphSplat['ExpandProperty'] = $expand }
+
 
             if ($filter) {
                 Write-PSFMessage -Level Verbose -Message "Fetching Service Principals from Microsoft Graph with filter: $filter"
+                $invokeMgGraphSplat['Filter'] = $filter
                 try {
                     # request all pages when filtering
-                    $servicePrincipals = Get-MgBetaServicePrincipal -Filter $filter -All -Property $properties -ExpandProperty $expand -ErrorAction Stop
+                    $servicePrincipals = Get-MgBetaServicePrincipal @invokeMgGraphSplat
                 }
                 catch {
                     # If Graph rejects the 'in' operator or the filter, retry with OR-based filter
                     $errMsg = $_.Exception.Message
                     if ($fallbackFilter -and ($errMsg -match 'Invalid|unsupported|not supported|Bad Request|400')) {
                         Write-PSFMessage -Level Warning -Message "Graph rejected the 'in' filter. Retrying with OR-based filter."
+                        $invokeMgGraphSplat['Filter'] = $fallbackFilter
                         try {
-                            $servicePrincipals = Get-MgBetaServicePrincipal -Filter $fallbackFilter -All -Property $properties -ExpandProperty $expand -ErrorAction Stop
+                            $servicePrincipals = Get-MgBetaServicePrincipal @invokeMgGraphSplat
                         }
                         catch {
                             Stop-PSFFunction -Message "Failed to retrieve Service Principals (after fallback): $($_.Exception.Message)" -ErrorRecord $_ -EnableException $true
@@ -147,7 +189,7 @@ function Get-GTServicePrincipalReport
                 }
             } else {
                 Write-PSFMessage -Level Verbose -Message "Fetching all Service Principals from Microsoft Graph..."
-                $servicePrincipals = Get-MgBetaServicePrincipal -All -Property $properties -ExpandProperty $expand -ErrorAction Stop
+                $servicePrincipals = Get-MgBetaServicePrincipal @invokeMgGraphSplat
             }
         }
         catch
@@ -160,47 +202,53 @@ function Get-GTServicePrincipalReport
         
         $report = foreach ($sp in $servicePrincipals)
         {
-            # Null-safe sign-in activity
-            $lastSignInDateTime = $null
-            $lastSignInRequestId = $null
-            if ($sp.SignInActivity) {
-                $lastSignInDateTime = $sp.SignInActivity.LastSignInDateTime
-                $lastSignInRequestId = $sp.SignInActivity.LastSignInRequestId
+            $reportObject = [ordered]@{
+                DisplayName          = $sp.DisplayName
+                ObjectId             = $sp.Id
+                AppId                = $sp.AppId
+                ServicePrincipalType = $sp.ServicePrincipalType
+                AccountEnabled       = $sp.AccountEnabled
             }
 
-            $ownerDisplayNames = @()
-            if ($sp.Owners) {
-                # owners expanded might provide AdditionalProperties or direct properties
-                $ownerDisplayNames = $sp.Owners | ForEach-Object {
-                    if ($_.AdditionalProperties.ContainsKey('displayName')) { $_.AdditionalProperties['displayName'] }
-                    elseif ($_.DisplayName) { $_.DisplayName }
-                    else { $null }
-                } | Where-Object { $_ }
+            if ($IncludeSignInActivity) {
+                $lastSignInDateTime = $null
+                $lastSignInRequestId = $null
+                if ($sp.SignInActivity) {
+                    $lastSignInDateTime = $sp.SignInActivity.LastSignInDateTime
+                    $lastSignInRequestId = $sp.SignInActivity.LastSignInRequestId
+                }
+                $reportObject['LastSignInDateTime'] = $lastSignInDateTime
+                $reportObject['LastSignInRequestId'] = $lastSignInRequestId
             }
 
-            $keyCredentialExpiryDates = @()
-            if ($sp.KeyCredentials) {
-                $keyCredentialExpiryDates = $sp.KeyCredentials | ForEach-Object { if ($_.EndDateTime) { [datetime]$_.EndDateTime } } | Where-Object { $_ }
-            }
-            $passwordCredentialExpiryDates = @()
-            if ($sp.PasswordCredentials) {
-                $passwordCredentialExpiryDates = $sp.PasswordCredentials | ForEach-Object { if ($_.EndDateTime) { [datetime]$_.EndDateTime } } | Where-Object { $_ }
+            if ($ExpandOwners) {
+                $ownerDisplayNames = @()
+                if ($sp.Owners) {
+                    $ownerDisplayNames = $sp.Owners | ForEach-Object {
+                        if ($_.AdditionalProperties.ContainsKey('displayName')) { $_.AdditionalProperties['displayName'] }
+                        elseif ($_.DisplayName) { $_.DisplayName }
+                        else { $null }
+                    } | Where-Object { $_ }
+                }
+                $reportObject['OwnerDisplayNames'] = $ownerDisplayNames -join '; '
             }
 
-            [PSCustomObject]@{
-                DisplayName                   = $sp.DisplayName
-                ObjectId                      = $sp.Id
-                AppId                         = $sp.AppId
-                ServicePrincipalType          = $sp.ServicePrincipalType
-                AccountEnabled                = $sp.AccountEnabled
-                LastSignInDateTime            = $lastSignInDateTime
-                LastSignInRequestId           = $lastSignInRequestId
-                OwnerDisplayNames             = ($ownerDisplayNames -join '; ')
-                KeyCredentialExpiryDates      = ($keyCredentialExpiryDates | Sort-Object) | ForEach-Object { $_.ToString('yyyy-MM-dd HH:mm:ss') }
-                PasswordCredentialExpiryDates = ($passwordCredentialExpiryDates | Sort-Object) | ForEach-Object { $_.ToString('yyyy-MM-dd HH:mm:ss') }
-                KeyCredentialsCount           = ($sp.KeyCredentials | Measure-Object).Count
-                PasswordCredentialsCount      = ($sp.PasswordCredentials | Measure-Object).Count
+            if ($IncludeCredentials) {
+                $keyCredentialExpiryDates = @()
+                if ($sp.KeyCredentials) {
+                    $keyCredentialExpiryDates = $sp.KeyCredentials | ForEach-Object { if ($_.EndDateTime) { [datetime]$_.EndDateTime } } | Where-Object { $_ }
+                }
+                $passwordCredentialExpiryDates = @()
+                if ($sp.PasswordCredentials) {
+                    $passwordCredentialExpiryDates = $sp.PasswordCredentials | ForEach-Object { if ($_.EndDateTime) { [datetime]$_.EndDateTime } } | Where-Object { $_ }
+                }
+                $reportObject['KeyCredentialExpiryDates'] = ($keyCredentialExpiryDates | Sort-Object) | ForEach-Object { $_.ToString('yyyy-MM-dd HH:mm:ss') }
+                $reportObject['PasswordCredentialExpiryDates'] = ($passwordCredentialExpiryDates | Sort-Object) | ForEach-Object { $_.ToString('yyyy-MM-dd HH:mm:ss') }
+                $reportObject['KeyCredentialsCount'] = ($sp.KeyCredentials | Measure-Object).Count
+                $reportObject['PasswordCredentialsCount'] = ($sp.PasswordCredentials | Measure-Object).Count
             }
+
+            [PSCustomObject]$reportObject
         }
 
         Write-PSFMessage -Level Verbose -Message "Successfully processed $($report.Count) Service Principals."
