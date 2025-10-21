@@ -172,7 +172,7 @@ function Get-GTServicePrincipalReport
                 catch {
                     # If Graph rejects the 'in' operator or the filter, retry with OR-based filter
                     $errMsg = $_.Exception.Message
-                    if ($fallbackFilter -and ($errMsg -match 'Invalid|unsupported|not supported|Bad Request|400')) {
+                    if ($fallbackFilter -and ($errMsg -match "does not support the operator|Operator 'in' is not supported|Unsupported filter operator|The property '[^']+' does not support the operator")) {
                         Write-PSFMessage -Level Warning -Message "Graph rejected the 'in' filter. Retrying with OR-based filter."
                         $invokeMgGraphSplat['Filter'] = $fallbackFilter
                         try {
