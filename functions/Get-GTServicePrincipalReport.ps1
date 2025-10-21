@@ -154,6 +154,7 @@ function Get-GTServicePrincipalReport
             if ($IncludeCredentials) { $properties.AddRange(@('keyCredentials', 'passwordCredentials')) }
             if ($ExpandOwners) { $expand.Add('owners') }
 
+            # Convert the property list to a comma-separated string as required by the Microsoft Graph SDK for the 'Property' parameter.
             $invokeMgGraphSplat = @{
                 All = $true
                 Property = $properties -join ','
