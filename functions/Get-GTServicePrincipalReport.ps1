@@ -139,9 +139,9 @@ function Get-GTServicePrincipalReport
                 $fallbackFilter = $orFilter
             }
             elseif ($displayNameList.Count -gt 0) {
-                $safeNames = $displayNameList | ForEach-Object { ($_ -replace "'", "''") }
-                $inFilter = "displayName in ('" + ($safeNames -join "','") + "')"
-                $orFilter = ($safeNames | ForEach-Object { "displayName eq '$_'" }) -join ' or '
+                $escapedNames = $displayNameList | ForEach-Object { ($_ -replace "'", "''") }
+                $inFilter = "displayName in ('" + ($escapedNames -join "','") + "')"
+                $orFilter = ($escapedNames | ForEach-Object { "displayName eq '$_'" }) -join ' or '
                 $filter = $inFilter
                 $fallbackFilter = $orFilter
             }
