@@ -130,10 +130,10 @@ function Get-GTServicePrincipalReport
             $fallbackFilter = $null
 
             if ($appIdList.Count -gt 0) {
-                $safeAppIds = $appIdList | ForEach-Object { ($_ -replace "'", "''") }
+                $escapedAppIds = $appIdList | ForEach-Object { ($_ -replace "'", "''") }
                 # Prefer 'in' for readability; not all endpoints support it, so prepare an OR-based fallback
-                $inFilter = "appId in ('" + ($safeAppIds -join "','") + "')"
-                $orFilter = ($safeAppIds | ForEach-Object { "appId eq '$_'" }) -join ' or '
+                $inFilter = "appId in ('" + ($escapedAppIds -join "','") + "')"
+                $orFilter = ($escapedAppIds | ForEach-Object { "appId eq '$_'" }) -join ' or '
                 $filter = $inFilter
                 $fallbackFilter = $orFilter
             }
