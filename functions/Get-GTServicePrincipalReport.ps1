@@ -246,8 +246,8 @@ function Get-GTServicePrincipalReport
                 }
                 $reportObject['KeyCredentialExpiryDates'] = ($keyCredentialExpiryDates | Sort-Object) | ForEach-Object { $_.ToString('yyyy-MM-dd HH:mm:ss') }
                 $reportObject['PasswordCredentialExpiryDates'] = ($passwordCredentialExpiryDates | Sort-Object) | ForEach-Object { $_.ToString('yyyy-MM-dd HH:mm:ss') }
-                $reportObject['KeyCredentialsCount'] = ($sp.KeyCredentials | Measure-Object).Count
-                $reportObject['PasswordCredentialsCount'] = ($sp.PasswordCredentials | Measure-Object).Count
+                $reportObject['KeyCredentialsCount'] = $sp.KeyCredentials.Count
+                $reportObject['PasswordCredentialsCount'] = $sp.PasswordCredentials.Count
             }
 
             [PSCustomObject]$reportObject
