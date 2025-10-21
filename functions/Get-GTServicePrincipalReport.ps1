@@ -82,7 +82,8 @@ function Get-GTServicePrincipalReport
                     Write-PSFMessage -Level Warning -Message "Provided scopes do not include '$s', which is required for the requested data."
                 }
             }
-            $connectScopes = $Scope
+            # Merge required scopes with user-provided scopes, ensuring uniqueness
+            $connectScopes = @($Scope + $requiredScopes) | Select-Object -Unique
         } else {
             $connectScopes = $requiredScopes
         }
