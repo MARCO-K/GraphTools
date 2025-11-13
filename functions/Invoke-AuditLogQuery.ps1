@@ -28,6 +28,8 @@ An array of record types to filter the audit logs.
 .PARAMETER UserIds
 An array of user IDs to filter the audit logs.
 
+Aliases: Users, UPN, UserPrincipalName, UserName, UPNName
+
 .PARAMETER IpAddresses
 An array of IP addresses to filter the audit logs.
 
@@ -47,6 +49,14 @@ Invoke-AuditLogQuery -Operations "FileDeleted"
 .EXAMPLE
 # Retrieve audit logs for a specific user in the last 30 days and keep the query job
 Invoke-AuditLogQuery -UserIds "user@contoso.com" -StartDays 30 -Delete:$false
+
+.EXAMPLE
+# Retrieve audit logs for a user using the UPN alias
+Invoke-AuditLogQuery -UPN "user@contoso.com" -StartDays 7
+
+.EXAMPLE
+# Retrieve audit logs for multiple users using the Users alias
+Invoke-AuditLogQuery -Users "user1@contoso.com","user2@contoso.com" -StartDays 14
 
 .EXAMPLE
 # Retrieve audit logs from a specific IP address and select specific properties
@@ -81,6 +91,7 @@ function Invoke-AuditLogQuery
 
         [Parameter(Mandatory = $false)]
         [ValidateScript({$_ -match $script:GTValidationRegex.UPN})]
+        [Alias('Users','UPN','UserPrincipalName','UserName','UPNName')]
         [array]$UserIds,
 
         [Parameter(Mandatory = $false)]

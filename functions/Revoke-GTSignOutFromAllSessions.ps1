@@ -5,11 +5,22 @@
     This function revokes all refresh tokens for a user, effectively signing them out from all applications and devices.
 .PARAMETER UPN
     The User Principal Name of the user to sign out.
+    
+    Aliases: UserPrincipalName, Users, UserName, UPNName
 .PARAMETER NewSession
     If specified, a new Microsoft Graph session will be created.
 .EXAMPLE
-    PS C:\> Revoke-GTSignOutFromAllSessions -UPN "test.user@example.com"
-    This command signs out the user with the UPN "test.user@example.com" from all sessions.
+    Revoke-GTSignOutFromAllSessions -UPN "test.user@example.com"
+    
+    Signs out the user from all sessions using the UPN parameter.
+.EXAMPLE
+    Revoke-GTSignOutFromAllSessions -UserPrincipalName "test.user@example.com"
+    
+    Signs out the user from all sessions using the UserPrincipalName alias.
+.EXAMPLE
+    Revoke-GTSignOutFromAllSessions -UserName "test.user@example.com"
+    
+    Signs out the user from all sessions using the UserName alias.
 #>
 function Revoke-GTSignOutFromAllSessions
 {
@@ -18,6 +29,7 @@ function Revoke-GTSignOutFromAllSessions
     (
         [Parameter(Mandatory = $true, ValueFromPipeline = $true)]
         [ValidateScript({$_ -match $script:GTValidationRegex.UPN})]
+        [Alias('UserPrincipalName','Users','UserName','UPNName')]
         [string]$UPN,
 
         [Switch]$NewSession

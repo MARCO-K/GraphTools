@@ -15,6 +15,9 @@
     - Delegated permission grants (OAuth2 permissions granted to apps on behalf of user)
 .PARAMETER UserUPNs
     Array of user principal names to process. Must be valid email format (e.g., user@domain.com)
+    
+    Note: This parameter does not have aliases since it's specifically named to distinguish between
+    user UPNs (input) and internal User objects used by helper functions.
 .PARAMETER removeGroups
     Remove user from all group memberships
 .PARAMETER removeGroupOwners

@@ -8,7 +8,9 @@
 .PARAMETER FilterServicePlan
     Filters results by service plan name
 .PARAMETER FilterUser
-    Filters results by user principal name
+    Filters results by user principal name.
+    
+    Aliases: User, UPN, UserPrincipalName, UserName, UPNName
 .PARAMETER LastLogin
     Filters users by last login date (days since last login)
 .PARAMETER NewSession
@@ -19,6 +21,23 @@
     Get-M365LicenseOverview -FilterLicenseSKU "ENTERPRISE"
 .EXAMPLE
     Get-M365LicenseOverview -FilterServicePlan "EXCHANGE" -LastLogin 90
+
+    Gets license overview filtered by Exchange service plan for users inactive for 90 days.
+
+.EXAMPLE
+    Get-M365LicenseOverview -FilterUser "john.doe@contoso.com"
+
+    Gets license overview for a specific user using the FilterUser parameter.
+
+.EXAMPLE
+    Get-M365LicenseOverview -UPN "john.doe@contoso.com"
+
+    Gets license overview for a specific user using the UPN alias.
+
+.EXAMPLE
+    Get-M365LicenseOverview -UserName "john.doe@contoso.com"
+
+    Gets license overview for a specific user using the UserName alias.
 #>
 function Get-M365LicenseOverview
 {
@@ -35,6 +54,7 @@ function Get-M365LicenseOverview
 
         [Parameter(ParameterSetName = "User", Mandatory = $false)]
         [ValidateScript({$_ -match $script:GTValidationRegex.UPN})]
+        [Alias('User','UPN','UserPrincipalName','UserName','UPNName')]
         [string]$FilterUser,
 
         [Parameter(ParameterSetName = "User", Mandatory = $false)]

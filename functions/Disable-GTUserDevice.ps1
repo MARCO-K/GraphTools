@@ -8,20 +8,30 @@
     It validates UPN format and manages Microsoft Graph connection automatically.
 .PARAMETER UPN
     One or more User Principal Names (UPNs) whose devices should be disabled. Must be in valid email format.
+    
+    Aliases: UserPrincipalName, Users, UserName, UPNName
 .PARAMETER NewSession
     If specified, creates a new Microsoft Graph session by disconnecting any existing session first.
 .EXAMPLE
     Disable-GTUserDevice -UPN 'user1@contoso.com'
 
-    Disables all devices registered to a single user
+    Disables all devices registered to a single user using the UPN parameter.
+.EXAMPLE
+    Disable-GTUserDevice -UserName 'user1@contoso.com'
+
+    Disables all devices registered to a single user using the UserName alias.
 .EXAMPLE
     Disable-GTUserDevice -UPN 'user1@contoso.com','user2@contoso.com'
 
-    Disables devices for multiple users
+    Disables devices for multiple users.
+.EXAMPLE
+    Disable-GTUserDevice -Users 'user1@contoso.com','user2@contoso.com'
+
+    Disables devices for multiple users using the Users alias.
 .EXAMPLE
     $users | Disable-GTUserDevice
 
-    Disables devices for users from pipeline input
+    Disables devices for users from pipeline input.
 #>
 Function Disable-GTUserDevice
 {
@@ -30,6 +40,7 @@ Function Disable-GTUserDevice
     (
         [Parameter(Mandatory = $true, ValueFromPipeline = $true)]
         [ValidateScript({$_ -match $script:GTValidationRegex.UPN})]
+        [Alias('UserPrincipalName','Users','UserName','UPNName')]
         [string[]]$UPN,
 
         [Switch]$NewSession
