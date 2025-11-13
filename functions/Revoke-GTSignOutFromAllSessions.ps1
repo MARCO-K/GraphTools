@@ -17,7 +17,7 @@ function Revoke-GTSignOutFromAllSessions
     param
     (
         [Parameter(Mandatory = $true, ValueFromPipeline = $true)]
-        [ValidateScript({ Test-GTUPN -UPN $_ })]
+        [ValidateScript({$_ -match $script:GTValidationRegex.UPN})]
         [string]$UPN,
 
         [Switch]$NewSession
