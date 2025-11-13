@@ -6,6 +6,7 @@
 
 [![PowerShell](https://img.shields.io/badge/PowerShell-5.1%2B%20%7C%207%2B-blue.svg)](https://github.com/PowerShell/PowerShell)
 [![License](https://img.shields.io/badge/License-MIT-green.svg)](LICENSE)
+[![PSScriptAnalyzer](https://github.com/MARCO-K/GraphTools/actions/workflows/powershell.yml/badge.svg)](https://github.com/MARCO-K/GraphTools/actions/workflows/powershell.yml)
 
 ## 📋 Table of Contents
 
