@@ -49,12 +49,6 @@ jobs:
         shell: pwsh
         run: |
           $ErrorActionPreference = 'Stop'
-          # Force TLS 1.2 for gallery access
-          try {
-            [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12
-          } catch {
-            Write-Host "Could not set TLS explicitly; continuing."
-          }
 
           # Ensure NuGet provider is available (required by Install-Module on non-Windows)
           if (-not (Get-PackageProvider -Name NuGet -ErrorAction SilentlyContinue)) {
