@@ -3,12 +3,27 @@ function Remove-GTUserLicenses
     <#
     .SYNOPSIS
         Removes all licenses from a user
+    .DESCRIPTION
+        Removes all Microsoft 365 licenses assigned to a user. This revokes access to
+        licensed services such as Exchange Online, SharePoint, Teams, and other
+        Microsoft 365 applications.
+        
+        This is typically used during offboarding or security incident response.
+        
+        This is an internal helper function used by Remove-GTUserEntitlements.
     .PARAMETER User
         The user object (must have Id and UserPrincipalName properties)
     .PARAMETER OutputBase
         Base output object for logging
     .PARAMETER Results
         Results collection to add output to
+    .EXAMPLE
+        $user = Get-MgBetaUser -UserId 'user@contoso.com'
+        $outputBase = @{ UserPrincipalName = $user.UserPrincipalName }
+        $results = [System.Collections.Generic.List[PSObject]]::new()
+        Remove-GTUserLicenses -User $user -OutputBase $outputBase -Results $results
+        
+        Removes all licenses from the user and adds results to the collection
     #>
     [CmdletBinding(SupportsShouldProcess)]
     param(

@@ -3,12 +3,24 @@ function Remove-GTUserGroupMemberships
     <#
     .SYNOPSIS
         Removes user from all group memberships
+    .DESCRIPTION
+        Removes the user from all group memberships (excluding dynamic groups which cannot be manually managed).
+        This is typically used during offboarding or security incident response to revoke access granted through group membership.
+        
+        This is an internal helper function used by Remove-GTUserEntitlements.
     .PARAMETER User
         The user object (must have Id and UserPrincipalName properties)
     .PARAMETER OutputBase
         Base output object for logging
     .PARAMETER Results
         Results collection to add output to
+    .EXAMPLE
+        $user = Get-MgBetaUser -UserId 'user@contoso.com'
+        $outputBase = @{ UserPrincipalName = $user.UserPrincipalName }
+        $results = [System.Collections.Generic.List[PSObject]]::new()
+        Remove-GTUserGroupMemberships -User $user -OutputBase $outputBase -Results $results
+        
+        Removes the user from all group memberships and adds results to the collection
     #>
     [CmdletBinding(SupportsShouldProcess)]
     param(

@@ -12,6 +12,13 @@ function Remove-GTUserAppRoleAssignments
         Base output object for logging
     .PARAMETER Results
         Results collection to add output to
+    .EXAMPLE
+        $user = Get-MgBetaUser -UserId 'user@contoso.com'
+        $outputBase = @{ UserPrincipalName = $user.UserPrincipalName }
+        $results = [System.Collections.Generic.List[PSObject]]::new()
+        Remove-GTUserAppRoleAssignments -User $user -OutputBase $outputBase -Results $results
+        
+        Removes all app role assignments from the user and adds results to the collection
     #>
     [CmdletBinding(SupportsShouldProcess)]
     param(
