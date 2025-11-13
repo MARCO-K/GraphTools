@@ -126,7 +126,7 @@ To improve usability and reduce confusion, the GraphTools module supports multip
 
 - **Use `-UPN`** for pipeline-style operations and batch processing where you need to act on multiple user accounts
 - **Use `-UserPrincipalName`** for single-user lookups or when you prefer more explicit parameter names
-- **Use `-UserName`** or `-UPNName`** as convenient alternatives that may be more familiar
+- **Use `-UserName` or `-UPNName` as convenient alternatives that may be more familiar**
 - **Use `-Users` or `-User`** as convenient shortcuts that match your mental model
 
 All aliases are functionally equivalent - choose the one that makes your code most readable. The canonical parameter name is preserved for backwards compatibility.
