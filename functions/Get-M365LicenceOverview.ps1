@@ -97,15 +97,17 @@ function Get-M365LicenseOverview
 
         # Build lookup tables for better performance
         Write-PSFMessage -Level 'Verbose' -Message 'Build lookup tables.'
+        # Use Group-Object for more efficient grouping
+        $skuGroups = $skuTable | Group-Object -Property GUID -AsHashTable -AsString
+        
+        # Build separate lookups - first item for SKU info, all items for service plans
         $skuLookup = @{}
         $servicePlanLookup = @{}
-        $skuTable | ForEach-Object {
-            $skuLookup[$_.GUID] = $_
-            if (-not $servicePlanLookup.ContainsKey($_.GUID))
-            {
-                $servicePlanLookup[$_.GUID] = [Collections.Generic.List[object]]::new()
-            }
-            $servicePlanLookup[$_.GUID].Add($_)
+        foreach ($guid in $skuGroups.Keys)
+        {
+            $items = $skuGroups[$guid]
+            $skuLookup[$guid] = $items[0]  # First item has the SKU info
+            $servicePlanLookup[$guid] = [Collections.Generic.List[object]]::new($items)  # All items for service plans
         }
     }
 
