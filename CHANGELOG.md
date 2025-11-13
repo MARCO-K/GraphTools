@@ -51,13 +51,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Microsoft.Graph.Beta.Reports (>= 2.25.0)
 - Various Microsoft Graph PowerShell SDK modules (loaded on-demand)
 
-## [Earlier Versions]
-
-### Initial Development
-- Project inception and core module structure
-- Basic Microsoft Graph API integration
-- Foundation for security and reporting features
-
 ---
 
 [Unreleased]: https://github.com/MARCO-K/GraphTools/compare/v0.0.5...HEAD
