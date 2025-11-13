@@ -148,11 +148,14 @@ function Get-M365LicenseOverview
                 {
                     $skuData = $skuLookup[$license.SkuId]
                     if (-not $skuData) { continue }
+                    
+                    # Apply SKU filter early to skip entire license if it doesn't match
+                    if ($FilterLicenseSKU -and $skuData.String_Id -notmatch $FilterLicenseSKU) { continue }
+                    
                     $servicePlans = $servicePlanLookup[$license.SkuId]
                     foreach ($plan in $servicePlans)
                     {
-                        # Apply filters early in pipeline
-                        if ($FilterLicenseSKU -and $skuData.String_Id -notmatch $FilterLicenseSKU) { continue }
+                        # Apply service plan filter
                         if ($FilterServicePlan -and $plan.Service_Plans_Included_Friendly_Names -notmatch $FilterServicePlan) { continue }
 
                         # Create output object
