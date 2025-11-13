@@ -50,7 +50,7 @@ GraphTools/
 
 **Reporting & Analytics** (9 cmdlets):
 - `Get-MFAReport` - MFA status and methods
-- `Get-M365LicenceOverview` - License utilization
+- `Get-M365LicenseOverview` - License utilization
 - `Invoke-AuditLogQuery` - Audit log queries
 - `Get-GTInactiveUsers` - Dormant accounts
 - `Get-GTRecentUser` - Recently created accounts
