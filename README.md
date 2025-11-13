@@ -20,6 +20,12 @@ GraphTools provides comprehensive security incident response capabilities for us
 - **Disable-GTUser**: Disable user accounts to prevent new sign-in attempts
 - **Reset-GTUserPassword**: Reset passwords to terminate CAE-enabled sessions
 - **Disable-GTUserDevice**: Disable all devices registered to a user account
+- **Remove-GTUserEntitlements**: Comprehensive removal of user entitlements including:
+  - Group memberships and ownerships
+  - Microsoft 365 licenses
+  - Service principal ownerships
+  - Application role assignments
+  - Directory role assignments (privileged roles like Global Administrator)
 
 See [User Security Response Documentation](docs/User-Security-Response.md) for detailed usage examples.
 
@@ -53,16 +59,33 @@ Get-GTMFAReport -UsersWithoutMFA -NoGuestUser
 
 ### Complete security response workflow
 
+```powershell
 $user = 'compromised@contoso.com'
 
 Revoke-GTSignOutFromAllSessions -UPN $user  # Invalidate tokens
-
 Disable-GTUser -UPN $user                    # Block sign-ins
-
 Reset-GTUserPassword -UPN $user              # Terminate CAE sessions
-
 Disable-GTUserDevice -UPN $user              # Disable registered devices
+
+# Remove all entitlements to ensure complete access revocation
+Remove-GTUserEntitlements -UserUPNs $user -removeAll
+```
+
+### Selective entitlement removal
+
+```powershell
+# Remove only specific entitlements
+Remove-GTUserEntitlements -UserUPNs 'user@contoso.com' -removeGroups -removeLicenses
+
+# Remove privileged role assignments
+Remove-GTUserEntitlements -UserUPNs 'admin@contoso.com' -removeRoleAssignments
+
+# Process multiple users
+'user1@contoso.com','user2@contoso.com' | Remove-GTUserEntitlements -removeAll
+```
 
 ### Batch operations supported via pipeline
 
+```powershell
 $users | Disable-GTUserDevice
+```
