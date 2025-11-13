@@ -10,23 +10,25 @@ It provides a suite of efficient, forward-thinking cmdlets that simplify complex
 
 By leveraging Microsoft Graph, GraphTools enables proactive identity protection and streamlined security management. Whether you're automating routine security checks or responding to emerging threats, this module empowers you to secure your environment with precision and confidence.
 
-## New Features
+## Features
 
-### Get-M365LicenseOverview
+### User Security Response Functions
 
-This function provides a comprehensive view of user licenses and service plans across the organization
+GraphTools provides comprehensive security incident response capabilities for user accounts:
 
-### Get-MFAReport
+- **Revoke-GTSignOutFromAllSessions**: Revoke refresh tokens to sign out users from all sessions
+- **Disable-GTUser**: Disable user accounts to prevent new sign-in attempts
+- **Reset-GTUserPassword**: Reset passwords to terminate CAE-enabled sessions
+- **Disable-GTUserDevice**: Disable all devices registered to a user account
 
-This function collects MFA registration details from Microsoft Graph and provides filtering options for analysis.
+See [User Security Response Documentation](docs/User-Security-Response.md) for detailed usage examples.
 
-### Invoke-AuditLogQuery
+### Reporting and Analysis
 
-This function queries Microsoft 365 audit logs, waits for completion, processes results. You can filter by different Operations or RecordTypes.
-
-### Get-InactiveUsers
-
-Retrieves user accounts with advanced filtering options including inactivity days.
+- **Get-M365LicenseOverview**: Comprehensive view of user licenses and service plans across the organization
+- **Get-MFAReport**: Collects MFA registration details from Microsoft Graph with filtering options
+- **Invoke-AuditLogQuery**: Query Microsoft 365 audit logs with filtering by Operations or RecordTypes
+- **Get-GTInactiveUsers**: Retrieve user accounts with advanced filtering options including inactivity days
 
 ## Manual Installation
 
