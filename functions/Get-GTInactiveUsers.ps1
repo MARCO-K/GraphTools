@@ -19,6 +19,12 @@ function Get-GTInactiveUser
     .PARAMETER InactiveDaysOlderThan
     Filter for users inactive for more than X days
 
+    .PARAMETER NewSession
+    Switch to force a new Graph session
+
+    .PARAMETER Scope
+    Scopes for Graph Connection. Default includes User.Read.All and AuditLog.Read.All
+
     .EXAMPLE
     Get-GTInactiveUser -InactiveDaysOlderThan 90 -Verbose
     Finds users inactive for over 3 months with verbose logging
@@ -47,7 +53,13 @@ function Get-GTInactiveUser
         [switch]$ExternalUsersOnly,
         [switch]$NeverLoggedIn,
         [ValidateRange(1, [int]::MaxValue)]
-        [int]$InactiveDaysOlderThan
+        [int]$InactiveDaysOlderThan,
+
+        # Switch to force a new Graph session
+        [switch]$NewSession,
+
+        # Scopes for Graph Connection
+        [string[]]$Scope = @('User.Read.All', 'AuditLog.Read.All')
     )
 
     begin
