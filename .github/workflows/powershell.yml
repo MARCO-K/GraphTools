@@ -31,12 +31,48 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      - name: Cache PowerShell modules
+        uses: actions/cache@v4
+        with:
+          # Common module locations for PowerShell Core and older PowerShell paths to be robust.
+          path: |
+            ~/.local/share/powershell/Modules
+            ~/.config/powershell/Modules
+            ~/.powershell/Modules
+            ~/Documents/PowerShell/Modules
+          # Key is based on runner OS + module manifest; cache is invalidated only when module dependencies change.
+          key: ${{ runner.os }}-pwsh-modules-${{ hashFiles('GraphTools.psd1') }}
+          restore-keys: |
+            ${{ runner.os }}-pwsh-modules-
+
+      - name: Ensure PowerShell modules can be installed and install PSFramework
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+
+          # Ensure NuGet provider is available (required by Install-Module on non-Windows)
+          if (-not (Get-PackageProvider -Name NuGet -ErrorAction SilentlyContinue)) {
+            Install-PackageProvider -Name NuGet -Force -Scope CurrentUser
+          }
+
+          # Ensure PowerShellGet exists (Install-Module depends on it)
+
+          # Make sure PSGallery is registered and trusted
+          if (-not (Get-PSRepository -Name PSGallery -ErrorAction SilentlyContinue)) {
+            Register-PSRepository -Name PSGallery -SourceLocation "https://www.powershellgallery.com/api/v2" -InstallationPolicy Trusted
+          } else {
+            Set-PSRepository -Name PSGallery -InstallationPolicy Trusted
+          }
+
+          # Install the module into CurrentUser scope so no admin rights required
+          Install-Module -Name PSFramework -Force -Scope CurrentUser -SkipPublisherCheck -AllowClobber
+
       - name: Run PSScriptAnalyzer
         uses: microsoft/psscriptanalyzer-action@6b2948b1944407914a58661c49941824d149734f
         with:
           # Check https://github.com/microsoft/action-psscriptanalyzer for more info about the options.
           # The below set up runs PSScriptAnalyzer to your entire repository and runs some basic security rules.
-          path: .\
+          path: ./
           recurse: true
           # Include your own basic security rules. Removing this option will run all the rules
           includeRule: '"PSAvoidGlobalAliases", "PSAvoidUsingConvertToSecureStringWithPlainText"'
