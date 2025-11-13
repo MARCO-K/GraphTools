@@ -40,8 +40,8 @@ jobs:
             ~/.config/powershell/Modules
             ~/.powershell/Modules
             ~/Documents/PowerShell/Modules
-          # Key is based on runner OS + this workflow file; change to a modules lockfile if you prefer cache invalidation when module list changes.
-          key: ${{ runner.os }}-pwsh-modules-${{ hashFiles('.github/workflows/powershell.yml') }}
+          # Key is based on runner OS + module manifest; cache is invalidated only when module dependencies change.
+          key: ${{ runner.os }}-pwsh-modules-${{ hashFiles('GraphTools.psd1') }}
           restore-keys: |
             ${{ runner.os }}-pwsh-modules-
 
