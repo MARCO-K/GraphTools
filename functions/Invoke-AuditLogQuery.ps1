@@ -134,7 +134,7 @@ function Invoke-AuditLogQuery
             Disconnect-MgGraph -ErrorAction SilentlyContinue
         }
 
-        $session = Test-GTGraphScopes -RequiredScopes $RequieredScopes -Reconnect -Quiet
+        $session = Test-GTGraphScopes -RequiredScopes $RequiredScopes -Reconnect -Quiet
         if (-not $session)
         {
             throw "Graph connection failed: Required scopes not available"
