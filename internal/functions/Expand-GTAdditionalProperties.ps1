@@ -33,60 +33,52 @@ function Expand-GTAdditionalProperties
     {
         if ($InputObject.AdditionalProperties -is [System.Collections.IDictionary])
         {
+            # Pre-check existing properties to avoid exception overhead
+            $existingProps = @{}
+            if (-not $Force)
+            {
+                $InputObject.PSObject.Properties | ForEach-Object { $existingProps[$_.Name] = $true }
+            }
+            
             foreach ($item in $InputObject.AdditionalProperties.GetEnumerator())
             {
                 $key = $item.Key
                 $value = $item.Value
 
                 # Add properties from AdditionalProperties
+                # Skip if property exists and Force is not set (avoid exception)
+                if (-not $Force -and $existingProps.ContainsKey($key))
+                {
+                    Write-Verbose "Property '$key' already exists. Use -Force to overwrite."
+                    continue
+                }
+                
                 $params = @{
                     MemberType  = 'NoteProperty'
                     Name        = $key
                     Value       = $value
-                    ErrorAction = 'Stop'
                 }
                 if ($Force) { $params['Force'] = $true }
 
-                try
-                {
-                    $InputObject | Add-Member @params
-                    Write-Verbose "Added property '$key' to the pipeline object"
-                }
-                catch
-                {
-                    if ($_.Exception.Message -like "*already exists*")
-                    {
-                        Write-Verbose "Property '$key' already exists. Use -Force to overwrite."
-                    }
-                    else
-                    {
-                        Write-Error $_
-                    }
-                }
+                $InputObject | Add-Member @params
+                Write-Verbose "Added property '$key' to the pipeline object"
 
                 # Handle '@odata.type' to extract ObjectType
                 if ($key -eq '@odata.type')
                 {
                     $objectTypeValue = $value -replace '^#microsoft\.graph\.', ''
+                    
+                    if (-not $Force -and $existingProps.ContainsKey('ObjectType'))
+                    {
+                        Write-Verbose "Property 'ObjectType' already exists. Use -Force to overwrite."
+                        continue
+                    }
+                    
                     $params['Name'] = 'ObjectType'
                     $params['Value'] = $objectTypeValue
 
-                    try
-                    {
-                        $InputObject | Add-Member @params
-                        Write-Verbose "Added property 'ObjectType' to the pipeline object"
-                    }
-                    catch
-                    {
-                        if ($_.Exception.Message -like "*already exists*")
-                        {
-                            Write-Verbose "Property 'ObjectType' already exists. Use -Force to overwrite."
-                        }
-                        else
-                        {
-                            Write-Error $_
-                        }
-                    }
+                    $InputObject | Add-Member @params
+                    Write-Verbose "Added property 'ObjectType' to the pipeline object"
                 }
             }
 

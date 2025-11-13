@@ -203,13 +203,13 @@ function Invoke-AuditLogQuery
             # Region: Results Processing
             # ----------------------------------
             Write-PSFMessage -Level Verbose -Message "Collecting results..."
-            $records = @()
+            $records = [System.Collections.Generic.List[object]]::new()
             $resultsUri = "/beta/security/auditLog/queries/$($auditJob.Id)/records"
             
             do
             {
                 $response = Invoke-MgGraphRequest -Uri $resultsUri -Method GET
-                $records += $response.value
+                $records.AddRange($response.value)
                 $resultsUri = $response.'@odata.nextLink'
                 
                 Write-PSFMessage -Level Verbose -Message "Retrieved $($records.Count) records so far..."

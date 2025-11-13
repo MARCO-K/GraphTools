@@ -142,9 +142,33 @@ function Get-MFAReport
         # Method Analysis
         if ($MarkMethods)
         {
+            # Convert to hashtables for faster lookups
+            $weakMethodsSet = @{}
+            $WeakMethods | ForEach-Object { $weakMethodsSet[$_] = $true }
+            $strongMethodsSet = @{}
+            $StrongMethods | ForEach-Object { $strongMethodsSet[$_] = $true }
+            
             $filtered = $filtered | Select-Object *, 
-            @{Name = 'WeakMethod'; Expression = { [bool]($_.RegisteredMethods | Where-Object { $_ -in $WeakMethods }) } },
-            @{Name = 'StrongMethod'; Expression = { [bool]($_.RegisteredMethods | Where-Object { $_ -in $StrongMethods }) } }
+            @{Name = 'WeakMethod'; Expression = { 
+                $hasWeak = $false
+                foreach ($method in $_.RegisteredMethods) {
+                    if ($weakMethodsSet.ContainsKey($method)) {
+                        $hasWeak = $true
+                        break
+                    }
+                }
+                $hasWeak
+            }},
+            @{Name = 'StrongMethod'; Expression = { 
+                $hasStrong = $false
+                foreach ($method in $_.RegisteredMethods) {
+                    if ($strongMethodsSet.ContainsKey($method)) {
+                        $hasStrong = $true
+                        break
+                    }
+                }
+                $hasStrong
+            }}
         }
 
         $filtered

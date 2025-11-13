@@ -94,10 +94,12 @@ function Expand-GTNestedProperties
     end
     {
         # Ensure every item has all columns (fill missing ones with $null)
+        # Use ordered hashtable for consistent property order across objects
+        $columnKeys = $allColumns.Keys
         $standardizedData = foreach ($item in $processedData)
         {
-            $row = @{}
-            foreach ($col in $allColumns.Keys)
+            $row = [ordered]@{}
+            foreach ($col in $columnKeys)
             {
                 $row[$col] = if ($item.ContainsKey($col)) { $item[$col] } else { $null }
             }

@@ -141,11 +141,8 @@ function Get-GTInactiveUser
         {
             Write-PSFMessage -Level Verbose -Message "Applying filters to $($allUsers.Count) processed users"
             
-            # Convert to List for better performance
-            $userList = [System.Collections.Generic.List[object]]::new()
-            $userList.AddRange($allUsers)
-
-            $filteredUsers = $userList | Where-Object {
+            # Filter directly on array - no need for list conversion just for filtering
+            $filteredUsers = $allUsers | Where-Object {
                 # NeverLoggedIn condition
                 (-not $NeverLoggedIn -or (-not $_.MaxDate)) -and
                 

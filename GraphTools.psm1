@@ -38,12 +38,13 @@ function Import-ModuleFile
 #. Import-ModuleFile -Path "$ModuleRoot\internal\scripts\preimport.ps1"
 
 #region Load functions
-foreach ($function in (Get-ChildItem "$ModuleRoot\internal\functions" -Recurse -File -Filter "*.ps1"))
+# No subdirectories exist, so -Recurse is not needed and can slow down module loading
+foreach ($function in (Get-ChildItem "$ModuleRoot\internal\functions" -File -Filter "*.ps1"))
 {
 	. Import-ModuleFile -Path $function.FullName
 }
 
-foreach ($function in (Get-ChildItem "$ModuleRoot\functions" -Recurse -File -Filter "*.ps1"))
+foreach ($function in (Get-ChildItem "$ModuleRoot\functions" -File -Filter "*.ps1"))
 {
 	. Import-ModuleFile -Path $function.FullName
 }
