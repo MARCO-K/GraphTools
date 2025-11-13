@@ -11,7 +11,7 @@
     - Directory role assignments (privileged roles)
     - Administrative unit memberships (scoped administrative rights)
 .PARAMETER UserUPNs
-    Array of user principal names to process
+    Array of user principal names to process. Must be valid email format (e.g., user@domain.com)
 .PARAMETER removeGroups
     Remove user from all group memberships
 .PARAMETER removeGroupOwners
@@ -42,6 +42,7 @@ function Remove-GTUserEntitlements
     [CmdletBinding(SupportsShouldProcess, ConfirmImpact = 'High')]
     param(
         [Parameter(Mandatory = $true, ValueFromPipeline = $true)]
+        [ValidateScript({$_ -match $script:GTValidationRegex.UPN})]
         [string[]]$UserUPNs,
         [switch]$removeGroups,
         [switch]$removeGroupOwners,
