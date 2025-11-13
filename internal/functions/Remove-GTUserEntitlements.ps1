@@ -11,6 +11,7 @@
     - User app role assignments (application access)
     - Directory role assignments (privileged roles)
     - Administrative unit memberships (scoped administrative rights)
+    - Access package assignments (Entitlement Management)
 .PARAMETER UserUPNs
     Array of user principal names to process. Must be valid email format (e.g., user@domain.com)
 .PARAMETER removeGroups
@@ -29,6 +30,8 @@
     Remove all directory role assignments (privileged roles like Global Administrator)
 .PARAMETER removeAdministrativeUnitMemberships
     Remove all administrative unit memberships to revoke scoped administrative rights
+.PARAMETER removeAccessPackageAssignments
+    Remove all access package assignments to revoke access granted through Entitlement Management
 .PARAMETER removeAll
     Remove all types of entitlements
 .EXAMPLE
@@ -55,6 +58,7 @@ function Remove-GTUserEntitlements
         [switch]$removeUserAppRoleAssignments,
         [switch]$removeRoleAssignments,
         [switch]$removeAdministrativeUnitMemberships,
+        [switch]$removeAccessPackageAssignments,
         [switch]$removeAll
     )
 
@@ -63,7 +67,7 @@ function Remove-GTUserEntitlements
         $results = [System.Collections.Generic.List[PSObject]]::new()
         
         # check for required scopes
-        $RequieredScopes = @('GroupMember.ReadWrite.All', 'Group.ReadWrite.All', 'Directory.ReadWrite.All', 'RoleManagement.ReadWrite.Directory', 'AdministrativeUnit.ReadWrite.All')
+        $RequieredScopes = @('GroupMember.ReadWrite.All', 'Group.ReadWrite.All', 'Directory.ReadWrite.All', 'RoleManagement.ReadWrite.Directory', 'AdministrativeUnit.ReadWrite.All', 'EntitlementManagement.ReadWrite.All')
         $missingScopes = $RequieredScopes | Where-Object { $_ -notin (Get-MgContext).Scopes }
         if ($missingScopes)
         {
@@ -136,6 +140,12 @@ function Remove-GTUserEntitlements
                 if ($removeAdministrativeUnitMemberships -or $removeAll)
                 {
                     Remove-GTUserAdministrativeUnitMemberships -User $User -OutputBase $outputBase -Results $results
+                }
+
+                # 9. Remove Access Package Assignments
+                if ($removeAccessPackageAssignments -or $removeAll)
+                {
+                    Remove-GTUserAccessPackageAssignments -User $User -OutputBase $outputBase -Results $results
                 }
             }
             catch
