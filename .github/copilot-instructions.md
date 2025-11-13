@@ -16,7 +16,7 @@
 GraphTools/
 ├── GraphTools.psd1          # Module manifest (version, dependencies, metadata)
 ├── GraphTools.psm1          # Module loader (dot-sources all functions)
-├── functions/               # 14 public cmdlets (exported to users)
+├── functions/               # 15 public cmdlets (exported to users; note: one file, Get-GTEntraRolesFromWeb, is missing the standard .ps1 extension)
 ├── internal/
 │   └── functions/          # 22 internal helper functions (not exported)
 ├── tests/                   # 14 Pester test files (.Tests.ps1)
