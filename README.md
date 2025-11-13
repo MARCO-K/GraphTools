@@ -32,6 +32,10 @@ GraphTools provides comprehensive security incident response capabilities for us
 
 See [User Security Response Documentation](docs/User-Security-Response.md) for detailed usage examples.
 
+**Parameter Flexibility**: All user-related functions support multiple parameter aliases for convenience:
+- `-UPN`, `-UserPrincipalName`, `-UserName`, `-UPNName`, `-User`, `-Users` can be used interchangeably
+- Choose the parameter name that makes your code most readable
+
 ### Reporting and Analysis
 
 - **Get-M365LicenseOverview**: Comprehensive view of user licenses and service plans across the organization
@@ -92,3 +96,21 @@ Remove-GTUserEntitlements -UserUPNs 'admin@contoso.com' -removeRoleAssignments -
 ```powershell
 $users | Disable-GTUserDevice
 ```
+
+## Parameter Aliases
+
+All functions that accept user identifiers support multiple parameter aliases for flexibility and ease of use:
+
+```powershell
+# All of these are equivalent:
+Disable-GTUser -UPN 'user@contoso.com'
+Disable-GTUser -UserPrincipalName 'user@contoso.com'
+Disable-GTUser -UserName 'user@contoso.com'
+Disable-GTUser -UPNName 'user@contoso.com'
+
+# For multiple users:
+Reset-GTUserPassword -Users 'user1@contoso.com', 'user2@contoso.com'
+Reset-GTUserPassword -UPN 'user1@contoso.com', 'user2@contoso.com'
+```
+
+This flexibility reduces confusion and allows you to use the parameter name that best fits your coding style. See the [User Security Response Documentation](docs/User-Security-Response.md) for complete details on all supported aliases.

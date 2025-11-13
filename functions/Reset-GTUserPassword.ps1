@@ -30,7 +30,7 @@ Function Reset-GTUserPassword
     (
         [Parameter(Mandatory = $true, ValueFromPipeline = $true)]
         [ValidateScript({$_ -match $script:GTValidationRegex.UPN})]
-        [Alias('UserPrincipalName','Users')]
+        [Alias('UserPrincipalName','Users','UserName','UPNName')]
         [string[]]$UPN,
 
         [Switch]$NewSession

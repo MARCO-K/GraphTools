@@ -35,7 +35,7 @@ function Get-M365LicenseOverview
 
         [Parameter(ParameterSetName = "User", Mandatory = $false)]
         [ValidateScript({$_ -match $script:GTValidationRegex.UPN})]
-        [Alias('User','UPN','UserPrincipalName')]
+        [Alias('User','UPN','UserPrincipalName','UserName','UPNName')]
         [string]$FilterUser,
 
         [Parameter(ParameterSetName = "User", Mandatory = $false)]
