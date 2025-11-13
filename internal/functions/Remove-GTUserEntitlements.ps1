@@ -6,7 +6,8 @@
     - Group memberships
     - Group ownerships
     - Licenses
-    - Service principal ownerships
+    - Service principal ownerships (deprecated - use removeEnterpriseAppOwnership)
+    - Enterprise Applications and App Registrations ownerships
     - User app role assignments (application access)
     - Directory role assignments (privileged roles)
     - Administrative unit memberships (scoped administrative rights)
@@ -19,7 +20,9 @@
 .PARAMETER removeLicenses
     Remove all licenses from the user
 .PARAMETER removeServicePrincipals
-    Remove user from service principal ownerships
+    Remove user from service principal ownerships (deprecated - use removeEnterpriseAppOwnership)
+.PARAMETER removeEnterpriseAppOwnership
+    Remove user from Enterprise Applications and App Registrations ownerships (recommended)
 .PARAMETER removeUserAppRoleAssignments
     Remove all user app role assignments to revoke access to specific applications
 .PARAMETER removeRoleAssignments
@@ -48,6 +51,7 @@ function Remove-GTUserEntitlements
         [switch]$removeGroupOwners,
         [switch]$removeLicenses,
         [switch]$removeServicePrincipals,
+        [switch]$removeEnterpriseAppOwnership,
         [switch]$removeUserAppRoleAssignments,
         [switch]$removeRoleAssignments,
         [switch]$removeAdministrativeUnitMemberships,
@@ -104,25 +108,31 @@ function Remove-GTUserEntitlements
                     Remove-GTUserLicenses -User $User -OutputBase $outputBase -Results $results
                 }
 
-                # 4. Remove Service Principal Ownerships
+                # 4. Remove Service Principal Ownerships (deprecated)
                 if ($removeServicePrincipals -or $removeAll)
                 {
                     Remove-GTUserServicePrincipalOwnerships -User $User -OutputBase $outputBase -Results $results
                 }
 
-                # 5. Remove UserAppRoleAssignment
+                # 5. Remove Enterprise Applications and App Registrations Ownerships
+                if ($removeEnterpriseAppOwnership -or $removeAll)
+                {
+                    Remove-GTUserEnterpriseAppOwnership -User $User -OutputBase $outputBase -Results $results
+                }
+
+                # 6. Remove UserAppRoleAssignment
                 if ($removeUserAppRoleAssignments -or $removeAll)
                 {
                     Remove-GTUserAppRoleAssignments -User $User -OutputBase $outputBase -Results $results
                 }
 
-                # 6. Remove Role Assignments (Privileged Roles)
+                # 7. Remove Role Assignments (Privileged Roles)
                 if ($removeRoleAssignments -or $removeAll)
                 {
                     Remove-GTUserRoleAssignments -User $User -OutputBase $outputBase -Results $results
                 }
 
-                # 7. Remove Administrative Unit Memberships
+                # 8. Remove Administrative Unit Memberships
                 if ($removeAdministrativeUnitMemberships -or $removeAll)
                 {
                     Remove-GTUserAdministrativeUnitMemberships -User $User -OutputBase $outputBase -Results $results

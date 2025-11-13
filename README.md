@@ -23,7 +23,7 @@ GraphTools provides comprehensive security incident response capabilities for us
 - **Remove-GTUserEntitlements**: Comprehensive removal of user entitlements including:
   - Group memberships and ownerships
   - Microsoft 365 licenses
-  - Service principal ownerships
+  - Enterprise Applications and App Registrations ownerships (with last-owner protection)
   - Application role assignments
   - Directory role assignments (privileged roles like Global Administrator)
   - Administrative unit memberships (scoped administrative rights)
@@ -78,8 +78,8 @@ Remove-GTUserEntitlements -UserUPNs $user -removeAll
 # Remove only specific entitlements
 Remove-GTUserEntitlements -UserUPNs 'user@contoso.com' -removeGroups -removeLicenses
 
-# Remove privileged role assignments and administrative unit memberships
-Remove-GTUserEntitlements -UserUPNs 'admin@contoso.com' -removeRoleAssignments -removeAdministrativeUnitMemberships
+# Remove privileged roles, admin units, and app ownerships
+Remove-GTUserEntitlements -UserUPNs 'admin@contoso.com' -removeRoleAssignments -removeAdministrativeUnitMemberships -removeEnterpriseAppOwnership
 
 # Process multiple users
 'user1@contoso.com','user2@contoso.com' | Remove-GTUserEntitlements -removeAll
