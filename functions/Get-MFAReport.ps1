@@ -37,6 +37,7 @@ function Get-MFAReport
     param(
         [Parameter(ValueFromPipeline = $true, Position = 0)]
         [ValidateScript({$_ -match $script:GTValidationRegex.UPN})]
+        [Alias('UPN','Users','User')]
         [string[]]$UserPrincipalName,
 
         [Switch]$NewSession,

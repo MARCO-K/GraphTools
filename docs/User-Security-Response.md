@@ -103,7 +103,33 @@ $compromisedUsers | Disable-GTUserDevice
 All functions support the following common parameters:
 
 - **UPN** (Mandatory): User Principal Name(s) in valid email format
+  - Aliases: `UserPrincipalName`, `Users` (for functions accepting multiple users)
+  - Aliases: `UserPrincipalName`, `Users`, `User` (for Disable-GTUser)
 - **NewSession** (Optional): Creates a new Microsoft Graph session by disconnecting any existing session first
+
+### Parameter Name Conventions and Aliases
+
+To improve usability and reduce confusion, the GraphTools module supports multiple parameter names through aliases:
+
+#### User Identity Parameters
+
+| Canonical Parameter | Accepted Aliases | Usage Context | Example Functions |
+|---------------------|------------------|---------------|-------------------|
+| `-UPN` | `-UserPrincipalName`, `-Users`, `-User` | Pipeline-style commands accepting multiple users (string[]) | Disable-GTUser |
+| `-UPN` | `-UserPrincipalName`, `-Users` | Pipeline-style commands accepting multiple users (string[]) | Reset-GTUserPassword, Disable-GTUserDevice |
+| `-UPN` | `-UserPrincipalName`, `-Users` | Single user commands (string) | Revoke-GTSignOutFromAllSessions |
+| `-UserPrincipalName` | `-UPN` | Single user lookup commands (string) | Get-GTRecentUser |
+| `-UserPrincipalName` | `-UPN`, `-Users`, `-User` | Report generation accepting multiple users (string[]) | Get-MFAReport |
+| `-FilterUser` | `-User`, `-UPN`, `-UserPrincipalName` | Filter parameters for license queries | Get-M365LicenceOverview |
+| `-UserIds` | `-Users`, `-UPN`, `-UserPrincipalName` | Audit log queries accepting user arrays | Invoke-AuditLogQuery |
+
+#### When to Use Which Parameter
+
+- **Use `-UPN`** for pipeline-style operations and batch processing where you need to act on multiple user accounts
+- **Use `-UserPrincipalName`** for single-user lookups or when you prefer more explicit parameter names
+- **Use `-Users` or `-User`** as convenient shortcuts that match your mental model
+
+All aliases are functionally equivalent - choose the one that makes your code most readable. The canonical parameter name is preserved for backwards compatibility.
 
 ## Notes
 

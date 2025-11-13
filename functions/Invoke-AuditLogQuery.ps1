@@ -81,6 +81,7 @@ function Invoke-AuditLogQuery
 
         [Parameter(Mandatory = $false)]
         [ValidateScript({$_ -match $script:GTValidationRegex.UPN})]
+        [Alias('Users','UPN','UserPrincipalName')]
         [array]$UserIds,
 
         [Parameter(Mandatory = $false)]

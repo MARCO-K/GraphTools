@@ -30,6 +30,7 @@ Function Disable-GTUserDevice
     (
         [Parameter(Mandatory = $true, ValueFromPipeline = $true)]
         [ValidateScript({$_ -match $script:GTValidationRegex.UPN})]
+        [Alias('UserPrincipalName','Users')]
         [string[]]$UPN,
 
         [Switch]$NewSession

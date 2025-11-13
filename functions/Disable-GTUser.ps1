@@ -27,6 +27,7 @@ Function Disable-GTUser
     (
         [Parameter(Mandatory = $true, ValueFromPipeline = $true)]
         [ValidateScript({$_ -match $script:GTValidationRegex.UPN})]
+        [Alias('UserPrincipalName','Users','User')]
         [string[]]$UPN
     )
 
