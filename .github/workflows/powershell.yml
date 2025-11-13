@@ -62,9 +62,6 @@ jobs:
           }
 
           # Ensure PowerShellGet exists (Install-Module depends on it)
-          if (-not (Get-Command -Name Install-Module -ErrorAction SilentlyContinue)) {
-            Install-Module -Name PowerShellGet -Force -Scope CurrentUser -AllowClobber
-          }
 
           # Make sure PSGallery is registered and trusted
           if (-not (Get-PSRepository -Name PSGallery -ErrorAction SilentlyContinue)) {
