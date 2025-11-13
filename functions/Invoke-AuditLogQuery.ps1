@@ -128,30 +128,18 @@ function Invoke-AuditLogQuery
 
 
         # Connect to Microsoft Graph
-        try
+        if ($NewSession)
         {
-            if ($NewSession) 
-            { 
-                Write-PSFMessage -Level 'Verbose' -Message 'Close existing Microsoft Graph session.'
-                Disconnect-MgGraph -ErrorAction SilentlyContinue 
-            }
-            
-            $session = Test-GTGraphScopes -RequiredScopes $RequieredScopes -Reconnect -Quiet
-            if ($session)
-            {
-                Write-PSFMessage -Level 'Verbose' -Message 'Connected to Microsoft Graph and required scopes are available.'
-            }
-            else
-            {
-                throw "Graph connection failed: $_"
-            }
-
+            Write-PSFMessage -Level 'Verbose' -Message 'Closing existing Microsoft Graph session.'
+            Disconnect-MgGraph -ErrorAction SilentlyContinue
         }
-        catch
+        
+        $session = Test-GTGraphScopes -RequiredScopes $RequieredScopes -Reconnect -Quiet
+        if (-not $session)
         {
-            Write-PSFMessage -Level 'Error' -Message 'Failed to connect to Microsoft Graph.'
-            throw "Graph connection failed: $_"
+            throw "Graph connection failed: Required scopes not available"
         }
+        Write-PSFMessage -Level 'Verbose' -Message 'Connected to Microsoft Graph and required scopes are available.'
 
         # Configure request context
         Set-MgRequestContext -MaxRetry 10 -RetryDelay 15

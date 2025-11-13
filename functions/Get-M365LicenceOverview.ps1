@@ -77,26 +77,7 @@ function Get-M365LicenseOverview
         Install-GTRequiredModules -RequiredModules $requiredModules
 
         # Handle Graph connection
-        try
-        {
-            if ($NewSession)
-            { 
-                Write-PSFMessage -Level 'Verbose' -Message 'Close existing Microsoft Graph session.'
-                Disconnect-MgGraph -ErrorAction SilentlyContinue 
-            }
-            
-            $ctx = Get-MgContext
-            if (-not $ctx)
-            {
-                Write-PSFMessage -Level 'Verbose' -Message 'No Microsoft Graph context found. Attempting to connect.'
-                Connect-MgGraph -Scopes $Scopes -NoWelcome -ErrorAction Stop
-            }
-        }
-        catch
-        {
-            Write-PSFMessage -Level 'Error' -Message 'Failed to connect to Microsoft Graph.'
-            throw "Graph connection failed: $_"
-        }
+        Initialize-GTGraphConnection -Scopes $Scopes -NewSession:$NewSession
 
         # Load service plan data
         try

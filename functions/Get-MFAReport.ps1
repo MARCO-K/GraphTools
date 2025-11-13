@@ -75,26 +75,7 @@ function Get-MFAReport
         Install-GTRequiredModule -ModuleNames $modules -Verbose
 
         # Graph Connection Handling
-        try
-        {
-            if ($NewSession) 
-            { 
-                Write-PSFMessage -Level 'Verbose' -Message 'Close existing Microsoft Graph session.'
-                Disconnect-MgGraph -ErrorAction SilentlyContinue 
-            }
-            
-            $context = Get-MgContext
-            if (-not $context)
-            {
-                Write-PSFMessage -Level 'Verbose' -Message 'No Microsoft Graph context found. Attempting to connect.'
-                Connect-MgGraph -Scopes $Scope -NoWelcome -ErrorAction Stop
-            }
-        }
-        catch
-        {
-            Write-PSFMessage -Level 'Error' -Message 'Failed to connect to Microsoft Graph.'
-            throw "Graph connection failed: $_"
-        }
+        Initialize-GTGraphConnection -Scopes $Scope -NewSession:$NewSession
 
         $UPNList = [System.Collections.Generic.List[string]]::new()
     }
