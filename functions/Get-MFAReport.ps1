@@ -75,7 +75,10 @@ function Get-MFAReport
         Install-GTRequiredModule -ModuleNames $modules -Verbose
 
         # Graph Connection Handling
-        Initialize-GTGraphConnection -Scopes $Scope -NewSession:$NewSession
+        $graphConnected = Initialize-GTGraphConnection -Scopes $Scope -NewSession:$NewSession
+        if (-not $graphConnected) {
+            throw "Failed to establish Microsoft Graph connection. Aborting Get-MFAReport."
+        }
 
         $UPNList = [System.Collections.Generic.List[string]]::new()
     }

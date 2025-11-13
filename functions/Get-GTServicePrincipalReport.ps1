@@ -90,7 +90,11 @@ function Get-GTServicePrincipalReport
 
 
         # Graph Connection Handling
-        Initialize-GTGraphConnection -Scopes $connectScopes -NewSession:$NewSession
+        $graphConnected = Initialize-GTGraphConnection -Scopes $connectScopes -NewSession:$NewSession
+        if (-not $graphConnected) {
+            Write-Error "Failed to initialize Microsoft Graph connection. Aborting execution."
+            return
+        }
     }
 
     process

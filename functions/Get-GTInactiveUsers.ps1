@@ -69,8 +69,11 @@ function Get-GTInactiveUser
         Install-GTRequiredModule -ModuleNames $modules -Verbose
 
         # Graph Connection Handling
-        Initialize-GTGraphConnection -Scopes $Scope -NewSession:$NewSession
-
+        $graphConnected = Initialize-GTGraphConnection -Scopes 'User.Read.All'
+        if (-not $graphConnected) {
+            Write-Error "Failed to initialize Microsoft Graph connection. Aborting Get-GTInactiveUser."
+            return
+        }
     }
 
     process

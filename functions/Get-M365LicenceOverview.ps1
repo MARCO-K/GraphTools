@@ -77,7 +77,11 @@ function Get-M365LicenseOverview
         Install-GTRequiredModules -RequiredModules $requiredModules
 
         # Handle Graph connection
-        Initialize-GTGraphConnection -Scopes $Scopes -NewSession:$NewSession
+        $graphConnected = Initialize-GTGraphConnection -Scopes $Scopes -NewSession:$NewSession
+        if (-not $graphConnected) {
+            Write-PSFMessage -Level 'Error' -Message 'Failed to establish Microsoft Graph connection. Aborting execution.'
+            return
+        }
 
         # Load service plan data
         try

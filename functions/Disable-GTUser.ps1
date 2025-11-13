@@ -48,7 +48,11 @@ Function Disable-GTUser
         Install-GTRequiredModule -ModuleNames $modules -Verbose
 
         # Graph Connection Handling
-        Initialize-GTGraphConnection -Scopes 'User.ReadWrite.All'
+        $connectionResult = Initialize-GTGraphConnection -Scopes 'User.ReadWrite.All'
+        if (-not $connectionResult) {
+            Write-PSFMessage -Level Error -Message "Failed to initialize Microsoft Graph connection. Aborting user disable operation."
+            return
+        }
 
     }
     process
