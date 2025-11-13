@@ -7,6 +7,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+- Made `Remove-GTUserEntitlements` a public function for direct use by module consumers
+
+## [0.8.1] - 2025-01-13
+
+### Added
+- Made `Remove-GTUserEntitlements` a public function for direct use by module consumers
+
 ## [0.0.5] - 2025-01-13
 
 ### Added
