@@ -303,6 +303,7 @@ Functions will prompt for necessary permissions during execution.
 
 ## 📚 Documentation
 
+- **[Changelog](CHANGELOG.md)** - Version history and release notes
 - **[User Security Response Guide](docs/User-Security-Response.md)** - Detailed incident response procedures
 - **Function Help** - Use `Get-Help <Function-Name> -Full` for detailed documentation
 - **Examples** - Use `Get-Help <Function-Name> -Examples` for usage examples
