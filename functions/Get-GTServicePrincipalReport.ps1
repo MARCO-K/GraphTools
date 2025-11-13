@@ -131,17 +131,17 @@ function Get-GTServicePrincipalReport
             $fallbackFilter = $null
 
             if ($appIdList.Count -gt 0) {
-                $escapedAppIds = $appIdList | ForEach-Object { ($_ -replace "'", "''") }
+                $safeAppIds = $appIdList | ForEach-Object { ($_ -replace "'", "''") }
                 # Prefer 'in' for readability; not all endpoints support it, so prepare an OR-based fallback
-                $inFilter = "appId in ('" + ($escapedAppIds -join "','") + "')"
-                $orFilter = ($escapedAppIds | ForEach-Object { "appId eq '$_'" }) -join ' or '
+                $inFilter = "appId in ('" + ($safeAppIds -join "','") + "')"
+                $orFilter = ($safeAppIds | ForEach-Object { "appId eq '$_'" }) -join ' or '
                 $filter = $inFilter
                 $fallbackFilter = $orFilter
             }
             elseif ($displayNameList.Count -gt 0) {
-                $escapedNames = $displayNameList | ForEach-Object { ($_ -replace "'", "''") }
-                $inFilter = "displayName in ('" + ($escapedNames -join "','") + "')"
-                $orFilter = ($escapedNames | ForEach-Object { "displayName eq '$_'" }) -join ' or '
+                $safeNames = $displayNameList | ForEach-Object { ($_ -replace "'", "''") }
+                $inFilter = "displayName in ('" + ($safeNames -join "','") + "')"
+                $orFilter = ($safeNames | ForEach-Object { "displayName eq '$_'" }) -join ' or '
                 $filter = $inFilter
                 $fallbackFilter = $orFilter
             }
@@ -154,13 +154,12 @@ function Get-GTServicePrincipalReport
             if ($IncludeCredentials) { $properties.AddRange(@('keyCredentials', 'passwordCredentials')) }
             if ($ExpandOwners) { $expand.Add('owners') }
 
-            # Convert the property list to a comma-separated string as required by the Microsoft Graph SDK for the 'Property' parameter.
             $invokeMgGraphSplat = @{
                 All = $true
-                Property = $properties -join ','
+                Property = $properties
                 ErrorAction = 'Stop'
             }
-            if ($expand.Count -gt 0) { $invokeMgGraphSplat['ExpandProperty'] = $expand -join ',' }
+            if ($expand.Count -gt 0) { $invokeMgGraphSplat['ExpandProperty'] = $expand }
 
 
             if ($filter) {
@@ -173,7 +172,7 @@ function Get-GTServicePrincipalReport
                 catch {
                     # If Graph rejects the 'in' operator or the filter, retry with OR-based filter
                     $errMsg = $_.Exception.Message
-                    if ($fallbackFilter -and ($errMsg -match "does not support the operator|Operator 'in' is not supported|Unsupported filter operator|The property '[^']+' does not support the operator")) {
+                    if ($fallbackFilter -and ($errMsg -match 'Invalid|unsupported|not supported|Bad Request|400')) {
                         Write-PSFMessage -Level Warning -Message "Graph rejected the 'in' filter. Retrying with OR-based filter."
                         $invokeMgGraphSplat['Filter'] = $fallbackFilter
                         try {
@@ -246,8 +245,8 @@ function Get-GTServicePrincipalReport
                 }
                 $reportObject['KeyCredentialExpiryDates'] = ($keyCredentialExpiryDates | Sort-Object) | ForEach-Object { $_.ToString('yyyy-MM-dd HH:mm:ss') }
                 $reportObject['PasswordCredentialExpiryDates'] = ($passwordCredentialExpiryDates | Sort-Object) | ForEach-Object { $_.ToString('yyyy-MM-dd HH:mm:ss') }
-                $reportObject['KeyCredentialsCount'] = $sp.KeyCredentials.Count
-                $reportObject['PasswordCredentialsCount'] = $sp.PasswordCredentials.Count
+                $reportObject['KeyCredentialsCount'] = ($sp.KeyCredentials | Measure-Object).Count
+                $reportObject['PasswordCredentialsCount'] = ($sp.PasswordCredentials | Measure-Object).Count
             }
 
             [PSCustomObject]$reportObject
