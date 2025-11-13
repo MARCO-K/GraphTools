@@ -46,3 +46,21 @@ Import-Module GraphTools
 ```powershell
 Get-GTMFAReport -UsersWithoutMFA -NoGuestUser
 ```
+
+## Immediate Steps to Revoke Access
+
+### Complete security response workflow
+
+$user = 'compromised@contoso.com'
+
+Revoke-GTSignOutFromAllSessions -UPN $user  # Invalidate tokens
+
+Disable-GTUser -UPN $user                    # Block sign-ins
+
+Reset-GTUserPassword -UPN $user              # Terminate CAE sessions
+
+Disable-GTUserDevice -UPN $user              # Disable registered devices
+
+### Batch operations supported via pipeline
+
+$users | Disable-GTUserDevice
