@@ -3,12 +3,27 @@ function Remove-GTUserGroupOwnerships
     <#
     .SYNOPSIS
         Removes user from all group ownerships
+    .DESCRIPTION
+        Removes the user from ownership of all groups they own. Group owners have
+        administrative control over group membership and settings.
+        
+        The function skips groups where the user is the last owner to prevent orphaned groups.
+        This is typically used during offboarding or security incident response.
+        
+        This is an internal helper function used by Remove-GTUserEntitlements.
     .PARAMETER User
         The user object (must have Id and UserPrincipalName properties)
     .PARAMETER OutputBase
         Base output object for logging
     .PARAMETER Results
         Results collection to add output to
+    .EXAMPLE
+        $user = Get-MgBetaUser -UserId 'user@contoso.com'
+        $outputBase = @{ UserPrincipalName = $user.UserPrincipalName }
+        $results = [System.Collections.Generic.List[PSObject]]::new()
+        Remove-GTUserGroupOwnerships -User $user -OutputBase $outputBase -Results $results
+        
+        Removes the user from all group ownerships and adds results to the collection
     #>
     [CmdletBinding(SupportsShouldProcess)]
     param(

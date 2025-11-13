@@ -15,6 +15,13 @@ function Remove-GTUserEnterpriseAppOwnership
         Base output object for logging
     .PARAMETER Results
         Results collection to add output to
+    .EXAMPLE
+        $user = Get-MgBetaUser -UserId 'user@contoso.com'
+        $outputBase = @{ UserPrincipalName = $user.UserPrincipalName }
+        $results = [System.Collections.Generic.List[PSObject]]::new()
+        Remove-GTUserEnterpriseAppOwnership -User $user -OutputBase $outputBase -Results $results
+        
+        Removes the user from Enterprise Applications and App Registrations ownerships and adds results to the collection
     #>
     [CmdletBinding(SupportsShouldProcess)]
     param(

@@ -13,6 +13,13 @@ function Remove-GTUserAdministrativeUnitMemberships
         Base output object for logging
     .PARAMETER Results
         Results collection to add output to
+    .EXAMPLE
+        $user = Get-MgBetaUser -UserId 'user@contoso.com'
+        $outputBase = @{ UserPrincipalName = $user.UserPrincipalName }
+        $results = [System.Collections.Generic.List[PSObject]]::new()
+        Remove-GTUserAdministrativeUnitMemberships -User $user -OutputBase $outputBase -Results $results
+        
+        Removes the user from all administrative unit memberships and adds results to the collection
     #>
     [CmdletBinding(SupportsShouldProcess)]
     param(

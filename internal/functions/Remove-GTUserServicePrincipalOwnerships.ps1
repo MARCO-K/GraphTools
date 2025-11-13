@@ -3,12 +3,27 @@ function Remove-GTUserServicePrincipalOwnerships
     <#
     .SYNOPSIS
         Removes user from service principal ownerships
+    .DESCRIPTION
+        Removes the user from ownership of service principals (Enterprise Applications).
+        Service principal owners have administrative control over the application's configuration.
+        
+        Note: This function is deprecated. Use Remove-GTUserEnterpriseAppOwnership instead,
+        which provides better error handling and covers both App Registrations and Service Principals.
+        
+        This is an internal helper function used by Remove-GTUserEntitlements.
     .PARAMETER User
         The user object (must have Id and UserPrincipalName properties)
     .PARAMETER OutputBase
         Base output object for logging
     .PARAMETER Results
         Results collection to add output to
+    .EXAMPLE
+        $user = Get-MgBetaUser -UserId 'user@contoso.com'
+        $outputBase = @{ UserPrincipalName = $user.UserPrincipalName }
+        $results = [System.Collections.Generic.List[PSObject]]::new()
+        Remove-GTUserServicePrincipalOwnerships -User $user -OutputBase $outputBase -Results $results
+        
+        Removes the user from service principal ownerships and adds results to the collection
     #>
     [CmdletBinding(SupportsShouldProcess)]
     param(
