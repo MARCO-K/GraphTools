@@ -36,13 +36,7 @@ function Get-MFAReport
     [OutputType([PSObject])]
     param(
         [Parameter(ValueFromPipeline = $true, Position = 0)]
-        [ValidateScript({
-            if ($_ -match '.*@.*\..*') {
-                return $true
-            } else {
-                throw "Invalid UserPrincipalName format: $_"
-            }
-        })]
+        [ValidateScript({$_ -match $script:GTValidationRegex.UPN})]
         [string[]]$UserPrincipalName,
 
         [Switch]$NewSession,
