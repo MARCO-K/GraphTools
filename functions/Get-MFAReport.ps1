@@ -5,6 +5,8 @@
     This function collects MFA registration details from Microsoft Graph and provides filtering options for analysis.
 .PARAMETER UserPrincipalName
     Accepts one or more User Principal Names from the pipeline or as an argument.
+    
+    Aliases: UPN, Users, User, UserName, UPNName
 .PARAMETER NewSession
     Establishes a fresh Microsoft Graph connection
 .PARAMETER AdminsOnly
@@ -29,6 +31,18 @@
     Get-MFAReport -UsersWithoutMFA -NoGuestUser
 .EXAMPLE
     'adele.vance@contoso.com', 'grad.y@contoso.com' | Get-MFAReport
+
+    Gets MFA report for specific users using pipeline input.
+
+.EXAMPLE
+    Get-MFAReport -UPN 'user@contoso.com'
+
+    Gets MFA report for a single user using the UPN alias.
+
+.EXAMPLE
+    Get-MFAReport -Users 'user1@contoso.com', 'user2@contoso.com'
+
+    Gets MFA report for multiple users using the Users alias.
 #>
 function Get-MFAReport
 {

@@ -8,20 +8,30 @@
     The password reset signals applications supporting Continuous Access Evaluation (CAE) to terminate active sessions.
 .PARAMETER UPN
     One or more User Principal Names (UPNs) to reset passwords for. Must be in valid email format.
+    
+    Aliases: UserPrincipalName, Users, UserName, UPNName
 .PARAMETER NewSession
     If specified, creates a new Microsoft Graph session by disconnecting any existing session first.
 .EXAMPLE
     Reset-GTUserPassword -UPN 'user1@contoso.com'
 
-    Resets password for a single user account
+    Resets password for a single user account using the UPN parameter.
+.EXAMPLE
+    Reset-GTUserPassword -UserPrincipalName 'user1@contoso.com'
+
+    Resets password for a single user account using the UserPrincipalName alias.
 .EXAMPLE
     Reset-GTUserPassword -UPN 'user1@contoso.com','user2@contoso.com'
 
-    Resets passwords for multiple user accounts
+    Resets passwords for multiple user accounts.
+.EXAMPLE
+    Reset-GTUserPassword -Users 'user1@contoso.com','user2@contoso.com'
+
+    Resets passwords for multiple user accounts using the Users alias.
 .EXAMPLE
     $users | Reset-GTUserPassword
 
-    Resets passwords for users from pipeline input
+    Resets passwords for users from pipeline input.
 #>
 Function Reset-GTUserPassword
 {

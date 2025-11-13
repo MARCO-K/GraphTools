@@ -13,6 +13,8 @@
 
 .PARAMETER UserPrincipalName
     The User Principal Name (UPN) of the user to retrieve.
+    
+    Aliases: UPN, UserName, UPNName
 
 .OUTPUTS
     Microsoft.Graph.PowerShell.Models.IMicrosoftGraphUser
@@ -31,7 +33,17 @@
 .EXAMPLE
     PS C:\> Get-GTRecentUser -UserPrincipalName "user@contoso.com"
 
-    Retrieves the specified user.
+    Retrieves the specified user using the UserPrincipalName parameter.
+
+.EXAMPLE
+    PS C:\> Get-GTRecentUser -UPN "user@contoso.com"
+
+    Retrieves the specified user using the UPN alias.
+
+.EXAMPLE
+    PS C:\> Get-GTRecentUser -UserName "user@contoso.com"
+
+    Retrieves the specified user using the UserName alias.
 
 .NOTES
     Ensure you have the necessary permissions (e.g., User.Read.All, AuditLog.Read.All)
