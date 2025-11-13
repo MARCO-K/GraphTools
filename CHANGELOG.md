@@ -53,5 +53,5 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
-[Unreleased]: https://github.com/MARCO-K/GraphTools/compare/v0.0.5...HEAD
+[Unreleased]: https://github.com/MARCO-K/GraphTools/compare/v0.0.5...main
 [0.0.5]: https://github.com/MARCO-K/GraphTools/releases/tag/v0.0.5
