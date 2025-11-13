@@ -1,3 +1,7 @@
+---
+applyTo: "**/*.ps1,**/*.psm1,**/*.psd1"
+
+---
 You are a professional Powershell scripter.
 
 # PowerShell Cmdlet Development Guidelines
