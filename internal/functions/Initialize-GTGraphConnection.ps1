@@ -76,6 +76,20 @@ function Initialize-GTGraphConnection
         else
         {
             Write-PSFMessage -Level Verbose -Message "Using existing Microsoft Graph context. Current scopes: $($context.Scopes -join ', ')"
+
+            if ($Scopes) {
+                # Check if all required scopes are present in the current context
+                $missingScopes = @()
+                foreach ($scope in $Scopes) {
+                    if ($context.Scopes -notcontains $scope) {
+                        $missingScopes += $scope
+                    }
+                }
+                if ($missingScopes.Count -gt 0) {
+                    Write-PSFMessage -Level Warning -Message "Existing Microsoft Graph context is missing required scopes: $($missingScopes -join ', ')"
+                    return $false
+                }
+            }
         }
 
         return $true
