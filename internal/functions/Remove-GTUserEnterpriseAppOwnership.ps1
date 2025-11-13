@@ -6,7 +6,7 @@ function Remove-GTUserEnterpriseAppOwnership
     .DESCRIPTION
         Removes the user from ownerships of Enterprise Applications (Service Principals) and App Registrations (Applications).
         This is critical as ownership grants significant control over application configurations and permissions.
-        
+
         Note: This function will skip removing the user if they are the last owner. Best practice is to transfer
         ownership to an appropriate individual or group before removing the user's access.
     .PARAMETER User
@@ -37,9 +37,9 @@ function Remove-GTUserEnterpriseAppOwnership
     # Process App Registrations (Applications)
     try
     {
-        $ownedApplications = Get-MgBetaUserOwnedObject -UserId $User.Id -All -ErrorAction Stop | 
+        $ownedApplications = Get-MgBetaUserOwnedObject -UserId $User.Id -All -ErrorAction Stop |
             Where-Object { $_.AdditionalProperties.'@odata.type' -eq '#microsoft.graph.application' }
-        
+
         if ($ownedApplications)
         {
             foreach ($app in $ownedApplications)
@@ -100,9 +100,9 @@ function Remove-GTUserEnterpriseAppOwnership
     # Process Enterprise Applications (Service Principals)
     try
     {
-        $ownedServicePrincipals = Get-MgBetaUserOwnedObject -UserId $User.Id -All -ErrorAction Stop | 
+        $ownedServicePrincipals = Get-MgBetaUserOwnedObject -UserId $User.Id -All -ErrorAction Stop |
             Where-Object { $_.AdditionalProperties.'@odata.type' -eq '#microsoft.graph.servicePrincipal' }
-        
+
         if ($ownedServicePrincipals)
         {
             foreach ($sp in $ownedServicePrincipals)

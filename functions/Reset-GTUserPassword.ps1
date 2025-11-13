@@ -8,7 +8,7 @@
     The password reset signals applications supporting Continuous Access Evaluation (CAE) to terminate active sessions.
 .PARAMETER UPN
     One or more User Principal Names (UPNs) to reset passwords for. Must be in valid email format.
-    
+
     Aliases: UserPrincipalName, Users, UserName, UPNName
 .PARAMETER NewSession
     If specified, creates a new Microsoft Graph session by disconnecting any existing session first.
@@ -35,7 +35,7 @@
 #>
 Function Reset-GTUserPassword
 {
-    [CmdletBinding()]
+    [CmdletBinding(SupportsShouldProcess)]
     param
     (
         [Parameter(Mandatory = $true, ValueFromPipeline = $true)]
@@ -60,21 +60,24 @@ Function Reset-GTUserPassword
     {
         foreach ($User in $UPN)
         {
-            try
+            if ($PSCmdlet.ShouldProcess($User, "Reset password"))
             {
-                $Password = New-GTPassword
+                try
+                {
+                    $Password = New-GTPassword
 
-                $Passwordprofile = @{
-                    forceChangePasswordNextSignIn = $true
-                    password                      = $Password
+                    $Passwordprofile = @{
+                        forceChangePasswordNextSignIn = $true
+                        password                      = $Password
+                    }
+
+                    Update-MgBetaUser -UserId $User -PasswordProfile $Passwordprofile -ErrorAction Stop
+                    Write-PSFMessage -Level Verbose -Message "$User - Reset Password Action - Password reset to random value"
                 }
-
-                Update-MgBetaUser -UserId $User -PasswordProfile $Passwordprofile -ErrorAction Stop
-                Write-PSFMessage -Level Verbose -Message "$User - Reset Password Action - Password reset to random value"
-            }
-            catch
-            {
-                Write-PSFMessage -Level Error -Message "$User - Reset Password Action - $($_.Exception.Message)"
+                catch
+                {
+                    Write-PSFMessage -Level Error -Message "$User - Reset Password Action - $($_.Exception.Message)"
+                }
             }
         }
     }

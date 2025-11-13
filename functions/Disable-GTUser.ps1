@@ -7,27 +7,27 @@
     It validates UPN format and manages Microsoft Graph connection automatically.
 .PARAMETER UPN
     One or more User Principal Names (UPNs) to disable. Must be in valid email format.
-    
+
     Aliases: UserPrincipalName, Users, User, UserName, UPNName
 .EXAMPLE
     Disable-GTUser -UPN 'user1@contoso.com'
-    
+
     Disables a single user account using the UPN parameter.
 .EXAMPLE
     Disable-GTUser -UserName 'user1@contoso.com'
-    
+
     Disables a single user account using the UserName alias.
 .EXAMPLE
     Disable-GTUser -UPN 'user1@contoso.com','user2@contoso.com'
-    
+
     Disables multiple user accounts.
 .EXAMPLE
     Disable-GTUser -Users 'user1@contoso.com','user2@contoso.com'
-    
+
     Disables multiple user accounts using the Users alias.
 .EXAMPLE
     $users | Disable-GTUser
-    
+
     Disables users from pipeline input.
 #>
 Function Disable-GTUser

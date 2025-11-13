@@ -3,16 +3,16 @@ function Open-JsonFile
     <#
     .SYNOPSIS
     Opens and parses JSON files with validation and error handling
-    
+
     .DESCRIPTION
     Accepts file paths or FileInfo objects, validates JSON structure, and returns parsed objects
-    
+
     .PARAMETER InputObject
     Path to JSON file or FileInfo object
-    
+
     .EXAMPLE
     Get-ChildItem config.json | Open-JsonFile
-    
+
     .EXAMPLE
     Open-JsonFile -InputObject "C:\data\settings.json"
     #>
@@ -22,7 +22,7 @@ function Open-JsonFile
         [Parameter(Mandatory, ValueFromPipeline)]
         [Alias("FullName")]
         [ValidateScript({
-                if ($_ -is [string]) { Test-Path $_ } 
+                if ($_ -is [string]) { Test-Path $_ }
                 else { $_.Exists }
             })]
         [ValidatePattern('\.json$')]
@@ -42,12 +42,12 @@ function Open-JsonFile
         {
             # Resolve file path
             $filePath = if ($InputObject -is [string])
-            { 
-                $InputObject 
+            {
+                $InputObject
             }
             else
-            { 
-                $InputObject.FullName 
+            {
+                $InputObject.FullName
             }
 
             # Validate file type
@@ -69,7 +69,7 @@ function Open-JsonFile
             # Parse JSON
             Write-PSFMessage -Level Verbose -Message "Parsing JSON content"
             $parsedData = $jsonContent | ConvertFrom-Json -Depth 10
-            
+
             Write-PSFMessage -Level Verbose -Message "Returning $($parsedData.Count) objects"
             return $parsedData
         }

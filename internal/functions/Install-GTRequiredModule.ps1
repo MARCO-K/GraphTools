@@ -20,10 +20,10 @@ function Install-GTRequiredModule
     param(
         [Parameter(Mandatory = $true)]
         [string[]]$ModuleNames,
-        
+
         [ValidateSet('CurrentUser', 'AllUsers')]
         [string]$Scope = 'CurrentUser',
-        
+
         [switch]$AllowPrerelease
     )
 
@@ -68,7 +68,7 @@ function Install-GTRequiredModule
 
                     Write-PSFMessage -Level Verbose -Message "Installing module: $module"
                     Install-Module @installParams
-                    
+
                     # Verify installation
                     if (-not (Get-Module -Name $module -ListAvailable -ErrorAction SilentlyContinue))
                     {

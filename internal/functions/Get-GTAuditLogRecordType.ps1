@@ -36,7 +36,7 @@ function Get-GTAuditLogRecordTypes
             # Retrieve documentation page
             Write-PSFMessage -Level Verbose -Message "Fetching documentation from: $DocUrl"
             $response = Invoke-WebRequest -Uri $DocUrl -UseBasicParsing -ErrorAction Stop
-            
+
             if ($response.StatusCode -ne 200)
             {
                 throw "Unexpected status code: $($response.StatusCode)"
@@ -56,7 +56,7 @@ function Get-GTAuditLogRecordTypes
             {
                 throw "Table structure not found in documentation section"
             }
-            
+
             $tableContent = $matches[1]
             Write-PSFMessage -Level Verbose -Message "Successfully extracted table content"
 
@@ -69,14 +69,14 @@ function Get-GTAuditLogRecordTypes
 
             # Extract headers
             $headerRow = $rows[0].Groups[1].Value
-            $headers = [regex]::Matches($headerRow, $patterns.CellPattern) | 
+            $headers = [regex]::Matches($headerRow, $patterns.CellPattern) |
             ForEach-Object { ($_.Groups[2].Value -replace '<.*?>', '').Trim() }
 
             # Process data rows
             $results = for ($i = 1; $i -lt $rows.Count; $i++)
             {
                 $rowCells = [regex]::Matches($rows[$i].Groups[1].Value, $patterns.CellPattern)
-                
+
                 if ($rowCells.Count -eq 0) { continue }
 
                 $rowData = [ordered]@{}

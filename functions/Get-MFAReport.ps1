@@ -5,7 +5,7 @@
     This function collects MFA registration details from Microsoft Graph and provides filtering options for analysis.
 .PARAMETER UserPrincipalName
     Accepts one or more User Principal Names from the pipeline or as an argument.
-    
+
     Aliases: UPN, Users, User, UserName, UPNName
 .PARAMETER NewSession
     Establishes a fresh Microsoft Graph connection
@@ -143,9 +143,9 @@ function Get-MFAReport
             $WeakMethods | ForEach-Object { $weakMethodsSet[$_] = $true }
             $strongMethodsSet = @{}
             $StrongMethods | ForEach-Object { $strongMethodsSet[$_] = $true }
-            
-            $filtered = $filtered | Select-Object *, 
-            @{Name = 'WeakMethod'; Expression = { 
+
+            $filtered = $filtered | Select-Object *,
+            @{Name = 'WeakMethod'; Expression = {
                 $hasWeak = $false
                 foreach ($method in $_.RegisteredMethods) {
                     if ($weakMethodsSet.ContainsKey($method)) {
@@ -155,7 +155,7 @@ function Get-MFAReport
                 }
                 $hasWeak
             }},
-            @{Name = 'StrongMethod'; Expression = { 
+            @{Name = 'StrongMethod'; Expression = {
                 $hasStrong = $false
                 foreach ($method in $_.RegisteredMethods) {
                     if ($strongMethodsSet.ContainsKey($method)) {

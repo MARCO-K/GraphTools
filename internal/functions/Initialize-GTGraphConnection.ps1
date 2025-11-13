@@ -19,15 +19,15 @@ function Initialize-GTGraphConnection
         Useful for functions that expect user to connect first.
     .EXAMPLE
         Initialize-GTGraphConnection -Scopes 'User.Read.All'
-        
+
         Ensures Graph connection with User.Read.All scope
     .EXAMPLE
         Initialize-GTGraphConnection -Scopes 'User.ReadWrite.All' -NewSession
-        
+
         Closes existing session and connects with User.ReadWrite.All scope
     .EXAMPLE
         Initialize-GTGraphConnection -SkipConnect
-        
+
         Only checks if connection exists, returns $true or $false
     #>
     [CmdletBinding()]
@@ -35,14 +35,14 @@ function Initialize-GTGraphConnection
     param(
         [Parameter(Mandatory = $false)]
         [string[]]$Scopes,
-        
+
         [Parameter(Mandatory = $false)]
         [switch]$NewSession,
-        
+
         [Parameter(Mandatory = $false)]
         [switch]$SkipConnect
     )
-    
+
     try
     {
         # Close existing session if requested
@@ -51,16 +51,16 @@ function Initialize-GTGraphConnection
             Write-PSFMessage -Level Verbose -Message 'Closing existing Microsoft Graph session.'
             Disconnect-MgGraph -ErrorAction SilentlyContinue
         }
-        
+
         # Check for existing context
         $context = Get-MgContext
-        
+
         if ($SkipConnect)
         {
             # Just return whether context exists
             return ($null -ne $context)
         }
-        
+
         if (-not $context)
         {
             if (-not $Scopes)
@@ -68,7 +68,7 @@ function Initialize-GTGraphConnection
                 Write-PSFMessage -Level Warning -Message 'No Microsoft Graph context found and no scopes provided.'
                 return $false
             }
-            
+
             Write-PSFMessage -Level Verbose -Message 'No Microsoft Graph context found. Attempting to connect.'
             Connect-MgGraph -Scopes $Scopes -NoWelcome -ErrorAction Stop
             Write-PSFMessage -Level Verbose -Message "Successfully connected to Microsoft Graph with scopes: $($Scopes -join ', ')"
@@ -77,7 +77,7 @@ function Initialize-GTGraphConnection
         {
             Write-PSFMessage -Level Verbose -Message "Using existing Microsoft Graph context. Current scopes: $($context.Scopes -join ', ')"
         }
-        
+
         return $true
     }
     catch

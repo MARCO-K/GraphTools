@@ -66,7 +66,7 @@ function Get-GTOrphanedGroup
         }
 
         Write-PSFMessage -Level Debug -Message "Processing $($groups.Count) Groups."
-        
+
         foreach ($group in $groups)
         {
             # Ensure the group is not soft-deleted (deletedDateTime will be set if it is)

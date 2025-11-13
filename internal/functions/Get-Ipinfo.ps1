@@ -19,7 +19,7 @@ function Get-Ipinfo
 
     .EXAMPLE
     Get-Ipinfo -Token 'your-api-token' -AddressList '8.8.8.8', '1.1.1.1'
-    
+
     .EXAMPLE
     '8.8.8.8', '1.1.1.1' | Get-Ipinfo -Token 'your-api-token'
     #>
@@ -40,7 +40,7 @@ function Get-Ipinfo
 
         [string]$Fields = 'ip,hostname,anycast,city,region,country,country_name,loc,org,postal,timezone'
     )
-    
+
     begin
     {
         # Initialize counters and containers
@@ -49,17 +49,17 @@ function Get-Ipinfo
         $results = [System.Collections.Generic.List[PSObject]]::new()
 
 
-    
+
         $ipinfoPath = "$env:LOCALAPPDATA\ipinfo\ipinfo.exe"
         if (-not (Test-Path $ipinfoPath))
         {
             Write-PSFMessage -Level Error -Message "IPInfo executable not found: $ipinfoPath"
             throw "IPInfo executable not found: $ipinfoPath"
         }
-    
+
         Write-PSFMessage -Level Verbose -Message "Starting IP info retrieval for $($AddressList.Count) unique IP addresses"
     }
-    
+
     process
     {
         try
@@ -103,7 +103,7 @@ function Get-Ipinfo
                     Timezone     = $data.timezone
                     Latitude     = ($data.loc -split ',')[0] -as [double]
                     Longitude    = ($data.loc -split ',')[1] -as [double]
-                } 
+                }
             }
         }
         catch
@@ -112,7 +112,7 @@ function Get-Ipinfo
             continue
         }
     }
-    
+
     end
     {
         Write-PSFMessage -Level Verbose -Message "IP info retrieval completed successfully"

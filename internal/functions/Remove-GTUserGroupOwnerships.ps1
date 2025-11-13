@@ -28,9 +28,9 @@ function Remove-GTUserGroupOwnerships
         [System.Collections.Generic.List[PSObject]]$Results
     )
 
-    $OwnedGroups = Get-MgBetaUserOwnedObject -UserId $User.Id -All | 
+    $OwnedGroups = Get-MgBetaUserOwnedObject -UserId $User.Id -All |
     Where-Object { $_.AdditionalProperties.'@odata.type' -eq '#microsoft.graph.group' }
-    
+
     foreach ($Group in $OwnedGroups)
     {
         $action = 'RemoveGroupOwnership'

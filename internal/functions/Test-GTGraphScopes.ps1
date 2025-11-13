@@ -3,23 +3,23 @@ function Test-GTGraphScopes
     <#
     .SYNOPSIS
     Validates Microsoft Graph authentication context and required permissions
-    
+
     .DESCRIPTION
     Checks if the current session has the required Graph API permissions/scopes
     and optionally reconnects with missing permissions
-    
+
     .PARAMETER RequiredScopes
     Array of required permission strings (scopes or app roles)
-    
+
     .PARAMETER Reconnect
     Attempt automatic reconnection when missing permissions
-    
+
     .PARAMETER Quiet
     Suppress all output and return boolean only
-    
+
     .EXAMPLE
     Test-GraphScopes -RequiredScopes "User.Read.All","Group.ReadWrite.All"
-    
+
     .EXAMPLE
     Test-GraphScopes -RequiredScopes "Directory.Read.All" -Reconnect -Quiet
     #>
@@ -56,7 +56,7 @@ function Test-GTGraphScopes
         {
             Write-Error "Missing scopes: $($missing -join ', ')" -ErrorAction Continue
         }
-        
+
         if ($Reconnect)
         {
             try
@@ -73,7 +73,7 @@ function Test-GTGraphScopes
                     }
                     return $false
                 }
-                
+
                 if (-not $Quiet) { Write-Verbose "Successfully reconnected" }
                 return $true
             }

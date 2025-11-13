@@ -8,7 +8,7 @@
     It validates UPN format and manages Microsoft Graph connection automatically.
 .PARAMETER UPN
     One or more User Principal Names (UPNs) whose devices should be disabled. Must be in valid email format.
-    
+
     Aliases: UserPrincipalName, Users, UserName, UPNName
 .PARAMETER NewSession
     If specified, creates a new Microsoft Graph session by disconnecting any existing session first.

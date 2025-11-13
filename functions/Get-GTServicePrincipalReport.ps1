@@ -181,7 +181,7 @@ function Get-GTServicePrincipalReport
         }
 
         Write-PSFMessage -Level Debug -Message "Processing $($servicePrincipals.Count) Service Principals."
-        
+
         $report = foreach ($sp in $servicePrincipals)
         {
             $reportObject = [ordered]@{

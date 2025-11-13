@@ -3,7 +3,7 @@
 Imports records into DuckDB with automatic schema creation and deduplication.
 
 .DESCRIPTION
-This function creates a DuckDB table from input records, handles duplicates, 
+This function creates a DuckDB table from input records, handles duplicates,
 and performs efficient batch inserts with transaction control.
 
 .PARAMETER Records
@@ -32,10 +32,10 @@ function Import-DuckDBRecords
     param(
         [Parameter(Mandatory = $true, ValueFromPipeline = $true)]
         [PSObject]$InputObject,
-        
+
         [Parameter(Mandatory = $true)]
         [string]$TableName,
-        
+
         [Parameter(Mandatory = $false, ParameterSetName = 'newDB')]
         [ValidateScript({ Test-Path $_ -IsValid })]
         [string]$LocalPath,
@@ -44,7 +44,7 @@ function Import-DuckDBRecords
         [Parameter(Mandatory = $false, ParameterSetName = 'ExistingDB')]
         [ValidateScript({ $_ })]
         [Object]$DBConn,
-        
+
         [Parameter(Mandatory = $false)]
         [int]$BatchSize = 10000
     )
@@ -91,7 +91,7 @@ function Import-DuckDBRecords
             Write-PSFMessage -Level Error -Message "Received null input object"
             throw "Null input object"
         }
-        
+
 
         # Process records and deduplicate
         foreach ($record in $Records)
@@ -101,7 +101,7 @@ function Import-DuckDBRecords
                 Write-PSFMessage -Level Warning -Message "Skipping record: missing ID field"
                 continue
             }
-            
+
             if ($seenIds.Add($record.ID))
             {
                 $uniqueRecords.Add($record)
@@ -139,7 +139,7 @@ function Import-DuckDBRecords
             $createTableQuery = @"
 CREATE OR REPLACE TABLE $TableName ($($columns -join ", "));
 "@
-            Write-PSFMessage -Level Verbose -Message "Creating table with schema: $createTableQuery"            
+            Write-PSFMessage -Level Verbose -Message "Creating table with schema: $createTableQuery"
             $conn.sql($createTableQuery)
             Write-PSFMessage -Level Verbose -Message "Created table $TableName"
 
@@ -151,7 +151,7 @@ CREATE OR REPLACE TABLE $TableName ($($columns -join ", "));
             {
                 # Write-PSFMessage -level verbose -message "Processing record: $($item.ID)"
                 # Generate safe SQL values
-                $values = 
+                $values =
                 foreach ($prop in $item.PSObject.Properties)
                 {
                     if ([string]::IsNullOrEmpty($prop.Value))
@@ -162,7 +162,7 @@ CREATE OR REPLACE TABLE $TableName ($($columns -join ", "));
                     $p = ($prop.Value).Replace("'", "_")
                     "`'$p`'"
                 }
-                
+
                 # Execute insert
                 $InsertQuery = @"
 INSERT INTO $TableName VALUES ($($values -join ', '))
