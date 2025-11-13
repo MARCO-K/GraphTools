@@ -7,7 +7,7 @@
 - **Repository Size**: ~936KB with 64 files
 - **Primary Language**: PowerShell (50 .ps1 files)
 - **Module Type**: PowerShell Script Module (.psm1 with .psd1 manifest)
-- **Target Platforms**: PowerShell 5.1+ and PowerShell 7+
+- **Target Platforms**: PowerShell 5.0+ and PowerShell 7+
 - **Main Dependencies**: PSFramework (≥1.9.270), Microsoft.Graph.Beta.Reports (≥2.25.0), Microsoft Graph SDK modules
 
 ## Project Structure
