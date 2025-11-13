@@ -90,25 +90,10 @@ function Get-GTServicePrincipalReport
 
 
         # Graph Connection Handling
-        try
-        {
-            if ($NewSession) 
-            { 
-                Write-PSFMessage -Level 'Verbose' -Message 'Closing existing Microsoft Graph session.'
-                Disconnect-MgGraph -ErrorAction SilentlyContinue 
-            }
-            
-            $context = Get-MgContext
-            if (-not $context)
-            {
-                Write-PSFMessage -Level 'Verbose' -Message 'No Microsoft Graph context found. Attempting to connect.'
-                Connect-MgGraph -Scopes $connectScopes -NoWelcome -ErrorAction Stop
-            }
-        }
-        catch
-        {
-            Write-PSFMessage -Level 'Error' -Message "Failed to connect to Microsoft Graph: $($_.Exception.Message)"
-            throw "Graph connection failed: $_" # Re-throw to stop execution
+        $graphConnected = Initialize-GTGraphConnection -Scopes $connectScopes -NewSession:$NewSession
+        if (-not $graphConnected) {
+            Write-Error "Failed to initialize Microsoft Graph connection. Aborting execution."
+            return
         }
     }
 
@@ -200,7 +185,7 @@ function Get-GTServicePrincipalReport
         }
 
         Write-PSFMessage -Level Debug -Message "Processing $($servicePrincipals.Count) Service Principals."
-        
+
         $report = foreach ($sp in $servicePrincipals)
         {
             $reportObject = [ordered]@{

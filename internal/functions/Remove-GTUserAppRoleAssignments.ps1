@@ -4,7 +4,7 @@ function Remove-GTUserAppRoleAssignments
     .SYNOPSIS
         Removes all app role assignments from a user
     .DESCRIPTION
-        Explicitly removes any direct or group-based application role assignments to ensure 
+        Explicitly removes any direct or group-based application role assignments to ensure
         the user loses access to specific applications and their functionalities.
     .PARAMETER User
         The user object (must have Id and UserPrincipalName properties)
@@ -34,7 +34,7 @@ function Remove-GTUserAppRoleAssignments
     try
     {
         $AppRoleAssignments = Get-MgBetaUserAppRoleAssignment -UserId $user.Id -All -ErrorAction Stop
-        
+
         if ($null -ne $AppRoleAssignments)
         {
             $AppRoleAssignments | ForEach-Object {
@@ -45,7 +45,7 @@ function Remove-GTUserAppRoleAssignments
                     ResourceId   = $_.Id
                     Action       = $action
                 }
-                
+
                 try
                 {
                     if ($PSCmdlet.ShouldProcess($_.ResourceDisplayName, $action))
@@ -56,7 +56,7 @@ function Remove-GTUserAppRoleAssignments
                     }
                 }
                 catch
-                { 
+                {
                     Write-PSFMessage -Level Error -Message "Failed to remove user $($User.UserPrincipalName) from AppRoleAssignments $($_.ResourceDisplayName)"
                     $output['Status'] = "Failed: $($_.Exception.Message)"
                 }

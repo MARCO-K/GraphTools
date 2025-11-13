@@ -34,7 +34,7 @@ function Remove-GTUserRoleAssignments
     try
     {
         $roleAssignments = Get-MgBetaRoleManagementDirectoryRoleAssignment -Filter "principalId eq '$($User.Id)'" -ExpandProperty roleDefinition -All -ErrorAction Stop
-        
+
         if ($roleAssignments)
         {
             foreach ($roleAssignment in $roleAssignments)

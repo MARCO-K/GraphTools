@@ -8,7 +8,7 @@
     It validates UPN format and manages Microsoft Graph connection automatically.
 .PARAMETER UPN
     One or more User Principal Names (UPNs) whose devices should be disabled. Must be in valid email format.
-    
+
     Aliases: UserPrincipalName, Users, UserName, UPNName
 .PARAMETER NewSession
     If specified, creates a new Microsoft Graph session by disconnecting any existing session first.
@@ -53,26 +53,7 @@ Function Disable-GTUserDevice
         Install-GTRequiredModule -ModuleNames $modules -Verbose
 
         # Graph Connection Handling
-        try
-        {
-            if ($NewSession)
-            {
-                Write-PSFMessage -Level 'Verbose' -Message 'Close existing Microsoft Graph session.'
-                Disconnect-MgGraph -ErrorAction SilentlyContinue
-            }
-
-            $context = Get-MgContext
-            if (-not $context)
-            {
-                Write-PSFMessage -Level 'Verbose' -Message 'No Microsoft Graph context found. Attempting to connect.'
-                Connect-MgGraph -Scopes 'Directory.AccessAsUser.All' -NoWelcome -ErrorAction Stop
-            }
-        }
-        catch
-        {
-            Write-PSFMessage -Level 'Error' -Message 'Failed to connect to Microsoft Graph.'
-            throw "Graph connection failed: $_"
-        }
+        Initialize-GTGraphConnection -Scopes 'Directory.AccessAsUser.All' -NewSession:$NewSession
     }
 
     process

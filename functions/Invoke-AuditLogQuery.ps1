@@ -3,7 +3,7 @@
 Retrieves and processes Microsoft 365 audit logs through the Graph API.
 
 .DESCRIPTION
-This function queries Microsoft 365 audit logs, waits for completion, processes results, 
+This function queries Microsoft 365 audit logs, waits for completion, processes results,
 and optionally cleans up the query job. It supports filtering by date range, operations,
 record types, user IDs, and IP addresses.
 
@@ -68,24 +68,24 @@ function Invoke-AuditLogQuery
     param(
         [Parameter(Mandatory = $false)]
         [string[]]$RequieredScopes = @('AuditLogsQuery-CRM.Read.All', 'AuditLogsQuery-Endpoint.Read.All', 'AuditLogsQuery-Exchange.Read.All', 'AuditLogsQuery-OneDrive.Read.All', 'AuditLogsQuery-SharePoint.Read.All', 'AuditLogsQuery.Read.All'),
-        
+
         [Parameter(Mandatory = $false)]
         [switch]$NewSession,
 
         [Parameter(Mandatory = $false)]
         [ValidateRange(0, [int]::MaxValue)]
         [int]$StartDays = 7,
-        
+
         [Parameter(Mandatory = $false)]
         [ValidateRange(0, [int]::MaxValue)]
         [int]$EndDays = 0,
-        
+
         [Parameter(Mandatory = $false)]
         [switch]$Delete,
-        
+
         [Parameter(Mandatory = $false)]
         [array]$Operations,
-        
+
         [Parameter(Mandatory = $false)]
         [array]$RecordType,
 
@@ -96,7 +96,7 @@ function Invoke-AuditLogQuery
 
         [Parameter(Mandatory = $false)]
         [array]$IpAddresses,
-        
+
         [Parameter(Mandatory = $false)]
         [array]$Properties = @('Id', 'createdDateTime', 'auditLogRecordType', 'Operation', 'service', 'UserId', 'UserType', 'userPrincipalName', 'auditData'),
 
@@ -128,30 +128,18 @@ function Invoke-AuditLogQuery
 
 
         # Connect to Microsoft Graph
-        try
+        if ($NewSession)
         {
-            if ($NewSession) 
-            { 
-                Write-PSFMessage -Level 'Verbose' -Message 'Close existing Microsoft Graph session.'
-                Disconnect-MgGraph -ErrorAction SilentlyContinue 
-            }
-            
-            $session = Test-GTGraphScopes -RequiredScopes $RequieredScopes -Reconnect -Quiet
-            if ($session)
-            {
-                Write-PSFMessage -Level 'Verbose' -Message 'Connected to Microsoft Graph and required scopes are available.'
-            }
-            else
-            {
-                throw "Graph connection failed: $_"
-            }
+            Write-PSFMessage -Level 'Verbose' -Message 'Closing existing Microsoft Graph session.'
+            Disconnect-MgGraph -ErrorAction SilentlyContinue
+        }
 
-        }
-        catch
+        $session = Test-GTGraphScopes -RequiredScopes $RequiredScopes -Reconnect -Quiet
+        if (-not $session)
         {
-            Write-PSFMessage -Level 'Error' -Message 'Failed to connect to Microsoft Graph.'
-            throw "Graph connection failed: $_"
+            throw "Graph connection failed: Required scopes not available"
         }
+        Write-PSFMessage -Level 'Verbose' -Message 'Connected to Microsoft Graph and required scopes are available.'
 
         # Configure request context
         Set-MgRequestContext -MaxRetry 10 -RetryDelay 15
@@ -196,9 +184,9 @@ function Invoke-AuditLogQuery
             {
                 $response = Invoke-MgGraphRequest -Uri $uri -Method GET
                 $status = $response.status
-                
+
                 Write-PSFMessage -Level Verbose -Message "Query status: $status (Attempt $attempt)"
-                
+
                 if ($status -ne 'succeeded')
                 {
                     $attempt++
@@ -216,13 +204,13 @@ function Invoke-AuditLogQuery
             Write-PSFMessage -Level Verbose -Message "Collecting results..."
             $records = [System.Collections.Generic.List[object]]::new()
             $resultsUri = "/beta/security/auditLog/queries/$($auditJob.Id)/records"
-            
+
             do
             {
                 $response = Invoke-MgGraphRequest -Uri $resultsUri -Method GET
                 $records.AddRange($response.value)
                 $resultsUri = $response.'@odata.nextLink'
-                
+
                 Write-PSFMessage -Level Verbose -Message "Retrieved $($records.Count) records so far..."
             } while ($null -ne $resultsUri)
 

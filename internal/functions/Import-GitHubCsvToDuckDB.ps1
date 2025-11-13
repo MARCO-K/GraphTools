@@ -98,7 +98,7 @@ function Import-GitHubCsvToDuckDB
             {
                 # Create table from CSV
                 $query = @"
-CREATE OR REPLACE TABLE $tableName 
+CREATE OR REPLACE TABLE $tableName
 AS SELECT * FROM read_csv_auto('$downloadUrl');
 "@
                 $conn.sql($query)

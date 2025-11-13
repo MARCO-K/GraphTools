@@ -37,26 +37,7 @@ function Get-GTOrphanedGroup
         Install-GTRequiredModule -ModuleNames $requiredModules -Verbose:$VerbosePreference
 
         # Graph Connection Handling
-        try
-        {
-            if ($NewSession) 
-            { 
-                Write-PSFMessage -Level 'Verbose' -Message 'Closing existing Microsoft Graph session.'
-                Disconnect-MgGraph -ErrorAction SilentlyContinue 
-            }
-            
-            $context = Get-MgContext
-            if (-not $context)
-            {
-                Write-PSFMessage -Level 'Verbose' -Message 'No Microsoft Graph context found. Attempting to connect.'
-                Connect-MgGraph -Scopes $Scope -NoWelcome -ErrorAction Stop
-            }
-        }
-        catch
-        {
-            Write-PSFMessage -Level 'Error' -Message "Failed to connect to Microsoft Graph: $($_.Exception.Message)"
-            throw "Graph connection failed: $_" # Re-throw to stop execution
-        }
+        Initialize-GTGraphConnection -Scopes $Scope -NewSession:$NewSession
     }
 
     process
@@ -85,7 +66,7 @@ function Get-GTOrphanedGroup
         }
 
         Write-PSFMessage -Level Debug -Message "Processing $($groups.Count) Groups."
-        
+
         foreach ($group in $groups)
         {
             # Ensure the group is not soft-deleted (deletedDateTime will be set if it is)

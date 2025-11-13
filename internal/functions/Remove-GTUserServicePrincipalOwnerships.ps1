@@ -29,7 +29,7 @@ function Remove-GTUserServicePrincipalOwnerships
     )
 
     $servicePrincipals = Get-MgBetaServicePrincipal -Filter "owners/`$count eq 1" -CountVariable CountVar -Property 'id,displayName,owners' -ConsistencyLevel 'eventual'
-    
+
     if ($global:CountVar -gt 0)
     {
         foreach ($sp in $servicePrincipals)

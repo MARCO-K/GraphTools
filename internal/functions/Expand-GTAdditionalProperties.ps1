@@ -39,7 +39,7 @@ function Expand-GTAdditionalProperties
             {
                 $InputObject.PSObject.Properties | ForEach-Object { $existingProps[$_.Name] = $true }
             }
-            
+
             foreach ($item in $InputObject.AdditionalProperties.GetEnumerator())
             {
                 $key = $item.Key
@@ -52,7 +52,7 @@ function Expand-GTAdditionalProperties
                     Write-Verbose "Property '$key' already exists. Use -Force to overwrite."
                     continue
                 }
-                
+
                 $params = @{
                     MemberType  = 'NoteProperty'
                     Name        = $key
@@ -67,13 +67,13 @@ function Expand-GTAdditionalProperties
                 if ($key -eq '@odata.type')
                 {
                     $objectTypeValue = $value -replace '^#microsoft\.graph\.', ''
-                    
+
                     if (-not $Force -and $existingProps.ContainsKey('ObjectType'))
                     {
                         Write-Verbose "Property 'ObjectType' already exists. Use -Force to overwrite."
                         continue
                     }
-                    
+
                     $params['Name'] = 'ObjectType'
                     $params['Value'] = $objectTypeValue
 

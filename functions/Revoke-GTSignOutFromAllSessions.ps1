@@ -5,21 +5,21 @@
     This function revokes all refresh tokens for a user, effectively signing them out from all applications and devices.
 .PARAMETER UPN
     The User Principal Name of the user to sign out.
-    
+
     Aliases: UserPrincipalName, Users, UserName, UPNName
 .PARAMETER NewSession
     If specified, a new Microsoft Graph session will be created.
 .EXAMPLE
     Revoke-GTSignOutFromAllSessions -UPN "test.user@example.com"
-    
+
     Signs out the user from all sessions using the UPN parameter.
 .EXAMPLE
     Revoke-GTSignOutFromAllSessions -UserPrincipalName "test.user@example.com"
-    
+
     Signs out the user from all sessions using the UserPrincipalName alias.
 .EXAMPLE
     Revoke-GTSignOutFromAllSessions -UserName "test.user@example.com"
-    
+
     Signs out the user from all sessions using the UserName alias.
 #>
 function Revoke-GTSignOutFromAllSessions
@@ -41,25 +41,8 @@ function Revoke-GTSignOutFromAllSessions
         Install-GTRequiredModule -ModuleNames $modules -Verbose
 
         # Graph Connection Handling
-        try
-        {
-            if ($NewSession)
-            {
-                Write-PSFMessage -Level 'Verbose' -Message 'Close existing Microsoft Graph session.'
-                Disconnect-MgGraph -ErrorAction SilentlyContinue
-            }
-
-            $context = Get-MgContext
-            if (-not $context)
-            {
-                Write-PSFMessage -Level 'Verbose' -Message 'No Microsoft Graph context found. Attempting to connect.'
-                Connect-MgGraph -Scopes 'User.ReadWrite.All' -NoWelcome -ErrorAction Stop
-            }
-        }
-        catch
-        {
-            Write-PSFMessage -Level 'Error' -Message 'Failed to connect to Microsoft Graph.'
-            throw "Graph connection failed: $_"
+        if (-not (Initialize-GTGraphConnection -Scopes 'User.ReadWrite.All' -NewSession:$NewSession)) {
+            throw "Failed to establish Microsoft Graph connection"
         }
     }
     Process {

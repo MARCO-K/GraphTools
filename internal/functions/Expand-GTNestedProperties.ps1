@@ -47,16 +47,16 @@ function Expand-GTNestedProperties
                     }
                     else { $output[$_.Name] = $_.Value }
                 }
-            
+
                 # Process extented properties
                 $record.PSObject.Properties | Where-Object {
                     $_.TypeNameOfValue -eq 'System.Object[]'
                 } | ForEach-Object {
                     $nestedValues = $_.Value
                     if ($_.Value.count -eq 0)
-                    { 
-                        $name = $_.Name 
-                        $value = '' 
+                    {
+                        $name = $_.Name
+                        $value = ''
                         $output[$name] = $value
                     }
                     else
@@ -70,20 +70,20 @@ function Expand-GTNestedProperties
                                 $value = If ($_.Value -gt 0) { $_.Value } Else { '' }
                                 $output[$name] = $value
                             }
-        
+
                         }
                     }
-        
+
                 }
-                $processedData += $output 
+                $processedData += $output
                 # Collect all possible columns across all items
                 foreach ($key in $output.Keys)
                 {
                     $allColumns[$key] = $true
                 }
-                
+
             }
-            
+
         }
         catch
         {

@@ -35,9 +35,9 @@ function Remove-GTUserAdministrativeUnitMemberships
     try
     {
         # Get all administrative units where the user is a member
-        $adminUnits = Get-MgBetaUserMemberOf -UserId $User.Id -All -ErrorAction Stop | 
+        $adminUnits = Get-MgBetaUserMemberOf -UserId $User.Id -All -ErrorAction Stop |
             Where-Object { $_.AdditionalProperties.'@odata.type' -eq '#microsoft.graph.administrativeUnit' }
-        
+
         if ($adminUnits)
         {
             foreach ($adminUnit in $adminUnits)

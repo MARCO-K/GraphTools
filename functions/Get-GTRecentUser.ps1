@@ -13,7 +13,7 @@
 
 .PARAMETER UserPrincipalName
     The User Principal Name (UPN) of the user to retrieve.
-    
+
     Aliases: UPN, UserName, UPNName
 
 .OUTPUTS

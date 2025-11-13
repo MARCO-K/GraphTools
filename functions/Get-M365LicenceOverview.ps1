@@ -9,7 +9,7 @@
     Filters results by service plan name
 .PARAMETER FilterUser
     Filters results by user principal name.
-    
+
     Aliases: User, UPN, UserPrincipalName, UserName, UPNName
 .PARAMETER LastLogin
     Filters users by last login date (days since last login)
@@ -77,25 +77,10 @@ function Get-M365LicenseOverview
         Install-GTRequiredModules -RequiredModules $requiredModules
 
         # Handle Graph connection
-        try
-        {
-            if ($NewSession)
-            { 
-                Write-PSFMessage -Level 'Verbose' -Message 'Close existing Microsoft Graph session.'
-                Disconnect-MgGraph -ErrorAction SilentlyContinue 
-            }
-            
-            $ctx = Get-MgContext
-            if (-not $ctx)
-            {
-                Write-PSFMessage -Level 'Verbose' -Message 'No Microsoft Graph context found. Attempting to connect.'
-                Connect-MgGraph -Scopes $Scopes -NoWelcome -ErrorAction Stop
-            }
-        }
-        catch
-        {
-            Write-PSFMessage -Level 'Error' -Message 'Failed to connect to Microsoft Graph.'
-            throw "Graph connection failed: $_"
+        $graphConnected = Initialize-GTGraphConnection -Scopes $Scopes -NewSession:$NewSession
+        if (-not $graphConnected) {
+            Write-PSFMessage -Level 'Error' -Message 'Failed to establish Microsoft Graph connection. Aborting execution.'
+            return
         }
 
         # Load service plan data
@@ -119,7 +104,7 @@ function Get-M365LicenseOverview
         Write-PSFMessage -Level 'Verbose' -Message 'Build lookup tables.'
         # Use Group-Object for more efficient grouping
         $skuGroups = $skuTable | Group-Object -Property GUID -AsHashTable -AsString
-        
+
         # Build separate lookups - first item for SKU info, all items for service plans
         $skuLookup = @{}
         $servicePlanLookup = @{}
@@ -170,10 +155,10 @@ function Get-M365LicenseOverview
                 {
                     $skuData = $skuLookup[$license.SkuId]
                     if (-not $skuData) { continue }
-                    
+
                     # Apply SKU filter early to skip entire license if it doesn't match
                     if ($FilterLicenseSKU -and $skuData.String_Id -notmatch $FilterLicenseSKU) { continue }
-                    
+
                     $servicePlans = $servicePlanLookup[$license.SkuId]
                     foreach ($plan in $servicePlans)
                     {

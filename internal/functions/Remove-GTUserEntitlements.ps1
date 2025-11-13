@@ -15,7 +15,7 @@
     - Delegated permission grants (OAuth2 permissions granted to apps on behalf of user)
 .PARAMETER UserUPNs
     Array of user principal names to process. Must be valid email format (e.g., user@domain.com)
-    
+
     Note: This parameter does not have aliases since it's specifically named to distinguish between
     user UPNs (input) and internal User objects used by helper functions.
 .PARAMETER removeGroups
@@ -42,11 +42,11 @@
     Remove all types of entitlements
 .EXAMPLE
     Remove-GTUserEntitlements -UserUPNs 'user1@contoso.com' -removeAll
-    
+
     Removes all entitlements from the specified user
 .EXAMPLE
     Remove-GTUserEntitlements -UserUPNs 'user1@contoso.com','user2@contoso.com' -removeGroups -removeLicenses
-    
+
     Removes group memberships and licenses from multiple users
 #>
 function Remove-GTUserEntitlements
@@ -72,7 +72,7 @@ function Remove-GTUserEntitlements
     begin
     {
         $results = [System.Collections.Generic.List[PSObject]]::new()
-        
+
         # check for required scopes
         $RequieredScopes = @('GroupMember.ReadWrite.All', 'Group.ReadWrite.All', 'Directory.ReadWrite.All', 'RoleManagement.ReadWrite.Directory', 'AdministrativeUnit.ReadWrite.All', 'EntitlementManagement.ReadWrite.All', 'DelegatedPermissionGrant.ReadWrite.All')
         $missingScopes = $RequieredScopes | Where-Object { $_ -notin (Get-MgContext).Scopes }
