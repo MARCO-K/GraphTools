@@ -12,6 +12,7 @@
     - Directory role assignments (privileged roles)
     - Administrative unit memberships (scoped administrative rights)
     - Access package assignments (Entitlement Management)
+    - Delegated permission grants (OAuth2 permissions granted to apps on behalf of user)
 .PARAMETER UserUPNs
     Array of user principal names to process. Must be valid email format (e.g., user@domain.com)
 .PARAMETER removeGroups
@@ -32,6 +33,8 @@
     Remove all administrative unit memberships to revoke scoped administrative rights
 .PARAMETER removeAccessPackageAssignments
     Remove all access package assignments to revoke access granted through Entitlement Management
+.PARAMETER removeDelegatedPermissionGrants
+    Remove all delegated permission grants (OAuth2 permissions) granted to applications on behalf of the user
 .PARAMETER removeAll
     Remove all types of entitlements
 .EXAMPLE
@@ -59,6 +62,7 @@ function Remove-GTUserEntitlements
         [switch]$removeRoleAssignments,
         [switch]$removeAdministrativeUnitMemberships,
         [switch]$removeAccessPackageAssignments,
+        [switch]$removeDelegatedPermissionGrants,
         [switch]$removeAll
     )
 
@@ -67,7 +71,7 @@ function Remove-GTUserEntitlements
         $results = [System.Collections.Generic.List[PSObject]]::new()
         
         # check for required scopes
-        $RequieredScopes = @('GroupMember.ReadWrite.All', 'Group.ReadWrite.All', 'Directory.ReadWrite.All', 'RoleManagement.ReadWrite.Directory', 'AdministrativeUnit.ReadWrite.All', 'EntitlementManagement.ReadWrite.All')
+        $RequieredScopes = @('GroupMember.ReadWrite.All', 'Group.ReadWrite.All', 'Directory.ReadWrite.All', 'RoleManagement.ReadWrite.Directory', 'AdministrativeUnit.ReadWrite.All', 'EntitlementManagement.ReadWrite.All', 'DelegatedPermissionGrant.ReadWrite.All')
         $missingScopes = $RequieredScopes | Where-Object { $_ -notin (Get-MgContext).Scopes }
         if ($missingScopes)
         {
@@ -146,6 +150,12 @@ function Remove-GTUserEntitlements
                 if ($removeAccessPackageAssignments -or $removeAll)
                 {
                     Remove-GTUserAccessPackageAssignments -User $User -OutputBase $outputBase -Results $results
+                }
+
+                # 10. Remove Delegated Permission Grants
+                if ($removeDelegatedPermissionGrants -or $removeAll)
+                {
+                    Remove-GTUserDelegatedPermissionGrants -User $User -OutputBase $outputBase -Results $results
                 }
             }
             catch
