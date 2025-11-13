@@ -7,7 +7,7 @@ function Remove-GTUserRoleAssignments
         Removes privileged role assignments like Global Administrator, User Administrator, or other administrative roles.
         This is critical to prevent any residual administrative access.
     .PARAMETER User
-        The user object
+        The user object (must have Id and UserPrincipalName properties)
     .PARAMETER OutputBase
         Base output object for logging
     .PARAMETER Results
@@ -15,7 +15,15 @@ function Remove-GTUserRoleAssignments
     #>
     [CmdletBinding(SupportsShouldProcess)]
     param(
-        [Parameter(Mandatory = $true)]
+        [Parameter(Mandatory = $true, ValueFromPipeline = $true)]
+        [ValidateNotNullOrEmpty()]
+        [ValidateScript({
+            if ($_.Id -and $_.UserPrincipalName) {
+                $true
+            } else {
+                throw "User object must have 'Id' and 'UserPrincipalName' properties"
+            }
+        })]
         [object]$User,
         [Parameter(Mandatory = $true)]
         [hashtable]$OutputBase,

@@ -9,6 +9,7 @@
     - Service principal ownerships
     - User app role assignments (application access)
     - Directory role assignments (privileged roles)
+    - Administrative unit memberships (scoped administrative rights)
 .PARAMETER UserUPNs
     Array of user principal names to process
 .PARAMETER removeGroups
@@ -23,6 +24,8 @@
     Remove all user app role assignments to revoke access to specific applications
 .PARAMETER removeRoleAssignments
     Remove all directory role assignments (privileged roles like Global Administrator)
+.PARAMETER removeAdministrativeUnitMemberships
+    Remove all administrative unit memberships to revoke scoped administrative rights
 .PARAMETER removeAll
     Remove all types of entitlements
 .EXAMPLE
@@ -46,6 +49,7 @@ function Remove-GTUserEntitlements
         [switch]$removeServicePrincipals,
         [switch]$removeUserAppRoleAssignments,
         [switch]$removeRoleAssignments,
+        [switch]$removeAdministrativeUnitMemberships,
         [switch]$removeAll
     )
 
@@ -54,7 +58,7 @@ function Remove-GTUserEntitlements
         $results = [System.Collections.Generic.List[PSObject]]::new()
         
         # check for required scopes
-        $RequieredScopes = @('GroupMember.ReadWrite.All', 'Group.ReadWrite.All', 'Directory.ReadWrite.All', 'RoleManagement.ReadWrite.Directory')
+        $RequieredScopes = @('GroupMember.ReadWrite.All', 'Group.ReadWrite.All', 'Directory.ReadWrite.All', 'RoleManagement.ReadWrite.Directory', 'AdministrativeUnit.ReadWrite.All')
         $missingScopes = $RequieredScopes | Where-Object { $_ -notin (Get-MgContext).Scopes }
         if ($missingScopes)
         {
@@ -63,7 +67,7 @@ function Remove-GTUserEntitlements
         else { Write-PSFMessage -Level Verbose -Message "All required scopes are present" }
 
         # install required modules
-        $requiremodules = @('Microsoft.Graph.Authentication', 'Microsoft.Graph.Beta.Groups', 'Microsoft.Graph.Beta.Users', 'Microsoft.Graph.Beta.Applications', 'Microsoft.Graph.Beta.Users.Actions', 'Microsoft.Graph.Beta.Identity.Governance')
+        $requiremodules = @('Microsoft.Graph.Authentication', 'Microsoft.Graph.Beta.Groups', 'Microsoft.Graph.Beta.Users', 'Microsoft.Graph.Beta.Applications', 'Microsoft.Graph.Beta.Users.Actions', 'Microsoft.Graph.Beta.Identity.Governance', 'Microsoft.Graph.Beta.Identity.DirectoryManagement')
         Install-GTRequiredModule -ModuleNames $requiremodules
 
     }
@@ -115,6 +119,12 @@ function Remove-GTUserEntitlements
                 if ($removeRoleAssignments -or $removeAll)
                 {
                     Remove-GTUserRoleAssignments -User $User -OutputBase $outputBase -Results $results
+                }
+
+                # 7. Remove Administrative Unit Memberships
+                if ($removeAdministrativeUnitMemberships -or $removeAll)
+                {
+                    Remove-GTUserAdministrativeUnitMemberships -User $User -OutputBase $outputBase -Results $results
                 }
             }
             catch

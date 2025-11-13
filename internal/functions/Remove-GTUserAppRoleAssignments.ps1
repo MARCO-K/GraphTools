@@ -7,7 +7,7 @@ function Remove-GTUserAppRoleAssignments
         Explicitly removes any direct or group-based application role assignments to ensure 
         the user loses access to specific applications and their functionalities.
     .PARAMETER User
-        The user object
+        The user object (must have Id and UserPrincipalName properties)
     .PARAMETER OutputBase
         Base output object for logging
     .PARAMETER Results
@@ -15,7 +15,15 @@ function Remove-GTUserAppRoleAssignments
     #>
     [CmdletBinding(SupportsShouldProcess)]
     param(
-        [Parameter(Mandatory = $true)]
+        [Parameter(Mandatory = $true, ValueFromPipeline = $true)]
+        [ValidateNotNullOrEmpty()]
+        [ValidateScript({
+            if ($_.Id -and $_.UserPrincipalName) {
+                $true
+            } else {
+                throw "User object must have 'Id' and 'UserPrincipalName' properties"
+            }
+        })]
         [object]$User,
         [Parameter(Mandatory = $true)]
         [hashtable]$OutputBase,

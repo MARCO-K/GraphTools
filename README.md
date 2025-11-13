@@ -26,6 +26,7 @@ GraphTools provides comprehensive security incident response capabilities for us
   - Service principal ownerships
   - Application role assignments
   - Directory role assignments (privileged roles like Global Administrator)
+  - Administrative unit memberships (scoped administrative rights)
 
 See [User Security Response Documentation](docs/User-Security-Response.md) for detailed usage examples.
 
@@ -77,8 +78,8 @@ Remove-GTUserEntitlements -UserUPNs $user -removeAll
 # Remove only specific entitlements
 Remove-GTUserEntitlements -UserUPNs 'user@contoso.com' -removeGroups -removeLicenses
 
-# Remove privileged role assignments
-Remove-GTUserEntitlements -UserUPNs 'admin@contoso.com' -removeRoleAssignments
+# Remove privileged role assignments and administrative unit memberships
+Remove-GTUserEntitlements -UserUPNs 'admin@contoso.com' -removeRoleAssignments -removeAdministrativeUnitMemberships
 
 # Process multiple users
 'user1@contoso.com','user2@contoso.com' | Remove-GTUserEntitlements -removeAll

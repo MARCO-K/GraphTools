@@ -4,7 +4,7 @@ function Remove-GTUserLicenses
     .SYNOPSIS
         Removes all licenses from a user
     .PARAMETER User
-        The user object
+        The user object (must have Id and UserPrincipalName properties)
     .PARAMETER OutputBase
         Base output object for logging
     .PARAMETER Results
@@ -12,7 +12,15 @@ function Remove-GTUserLicenses
     #>
     [CmdletBinding(SupportsShouldProcess)]
     param(
-        [Parameter(Mandatory = $true)]
+        [Parameter(Mandatory = $true, ValueFromPipeline = $true)]
+        [ValidateNotNullOrEmpty()]
+        [ValidateScript({
+            if ($_.Id -and $_.UserPrincipalName) {
+                $true
+            } else {
+                throw "User object must have 'Id' and 'UserPrincipalName' properties"
+            }
+        })]
         [object]$User,
         [Parameter(Mandatory = $true)]
         [hashtable]$OutputBase,
