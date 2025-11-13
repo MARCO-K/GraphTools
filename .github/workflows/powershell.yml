@@ -39,9 +39,7 @@ jobs:
             ~/.local/share/powershell/Modules
             ~/.config/powershell/Modules
             ~/.powershell/Modules
-            $HOME/.local/share/powershell/Modules
-            $HOME/.config/powershell/Modules
-            $HOME/Documents/PowerShell/Modules
+            ~/Documents/PowerShell/Modules
           # Key is based on runner OS + this workflow file; change to a modules lockfile if you prefer cache invalidation when module list changes.
           key: ${{ runner.os }}-pwsh-modules-${{ hashFiles('.github/workflows/powershell.yml') }}
           restore-keys: |
