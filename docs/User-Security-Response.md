@@ -4,12 +4,13 @@ This document describes the separate functions available in GraphTools for respo
 
 ## Overview
 
-When a user account is compromised or needs to be secured, GraphTools provides four distinct functions that can be used individually or together:
+When a user account is compromised or needs to be secured, GraphTools provides five distinct functions that can be used individually or together:
 
 1. **Revoke-GTSignOutFromAllSessions** - Revoke refresh tokens
 2. **Disable-GTUser** - Disable the user account
 3. **Reset-GTUserPassword** - Reset the user's password
 4. **Disable-GTUserDevice** - Disable user's registered devices
+5. **Remove-GTUserEntitlements** - Remove access rights and privileges (including PIM role eligibilities)
 
 ## Functions
 
@@ -65,9 +66,45 @@ Disables all devices registered to a user in Microsoft Entra ID.
 Disable-GTUserDevice -UPN 'user@contoso.com'
 ```
 
+### 5. Remove-GTUserEntitlements
+
+Removes all user entitlements including group memberships, licenses, role assignments, PIM role eligibilities, and application access.
+
+**Purpose**: Complete privilege revocation during offboarding or security incident response. Includes removal of PIM (Privileged Identity Management) role eligibility schedules to prevent users from activating privileged roles.
+
+**Required Permissions**: `GroupMember.ReadWrite.All`, `Group.ReadWrite.All`, `Directory.ReadWrite.All`, `RoleManagement.ReadWrite.Directory`, `RoleEligibilitySchedule.ReadWrite.Directory`, `AdministrativeUnit.ReadWrite.All`, `EntitlementManagement.ReadWrite.All`, `DelegatedPermissionGrant.ReadWrite.All`
+
+**Examples**:
+```powershell
+# Remove all entitlements (including PIM role eligibilities)
+Remove-GTUserEntitlements -UserUPNs 'user@contoso.com' -removeAll
+
+# Remove only privileged access
+Remove-GTUserEntitlements -UserUPNs 'admin@contoso.com' `
+    -removeRoleAssignments `
+    -removePIMRoleEligibility
+
+# Remove specific entitlements
+Remove-GTUserEntitlements -UserUPNs 'user@contoso.com' `
+    -removeGroups `
+    -removeLicenses `
+    -removePIMRoleEligibility
+```
+
+**What Gets Removed**:
+- Group memberships and ownerships
+- Microsoft 365 licenses
+- Directory role assignments (active roles)
+- **PIM role eligibility schedules (eligible roles)** ⚠️ New in v0.9.0
+- Administrative unit memberships
+- Application role assignments
+- Enterprise application ownerships
+- Access package assignments
+- Delegated permission grants
+
 ## Comprehensive Security Response
 
-For a complete security response when a user account is compromised, you can execute all four functions in sequence:
+For a complete security response when a user account is compromised, you can execute all five functions in sequence:
 
 ```powershell
 $compromisedUser = 'user@contoso.com'
@@ -83,6 +120,9 @@ Reset-GTUserPassword -UPN $compromisedUser
 
 # 4. Disable all registered devices
 Disable-GTUserDevice -UPN $compromisedUser
+
+# 5. Remove all entitlements (including PIM role eligibilities)
+Remove-GTUserEntitlements -UserUPNs $compromisedUser -removeAll
 ```
 
 ### Multiple Users
@@ -96,6 +136,7 @@ $compromisedUsers | Revoke-GTSignOutFromAllSessions
 $compromisedUsers | Disable-GTUser
 $compromisedUsers | Reset-GTUserPassword
 $compromisedUsers | Disable-GTUserDevice
+$compromisedUsers | Remove-GTUserEntitlements -removeAll
 ```
 
 ## Common Parameters
@@ -169,7 +210,18 @@ Invoke-AuditLogQuery -UPN 'user@contoso.com'
 1. **Always revoke tokens first** to immediately terminate active sessions
 2. **Disable the account** to prevent new authentication attempts
 3. **Reset the password** to ensure CAE-compliant applications terminate sessions
-4. **Disable devices** as a final step to prevent device-based access
+4. **Disable devices** to prevent device-based access
+5. **Remove all entitlements** including PIM role eligibilities to ensure complete privilege revocation
+
+### Critical Security Note: PIM Role Eligibilities
+
+⚠️ **Important**: Prior to v0.9.0, removing role assignments did not remove PIM (Privileged Identity Management) role eligibility schedules. This meant users could still activate privileged roles even after remediation.
+
+**v0.9.0+ closes this security gap** by removing both active role assignments AND PIM role eligibilities when using:
+- `Remove-GTUserEntitlements -removeAll`
+- `Remove-GTUserEntitlements -removePIMRoleEligibility`
+
+Always use the `-removePIMRoleEligibility` parameter or `-removeAll` when offboarding privileged users to ensure they cannot activate eligible roles.
 
 ## See Also
 

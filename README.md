@@ -53,6 +53,7 @@ Respond to security incidents with purpose-built cmdlets:
 - **Group Management**: Remove memberships and ownerships
 - **License Management**: Revoke Microsoft 365 licenses
 - **Role Management**: Remove directory and administrative unit roles
+- **PIM Role Management**: Remove Privileged Identity Management role eligibility schedules
 - **Application Access**: Revoke app role assignments and OAuth permissions
 - **Entitlement Management**: Remove access package assignments
 
@@ -175,9 +176,10 @@ Remove-GTUserEntitlements -UserUPNs 'user@contoso.com' `
     -removeGroups `
     -removeLicenses
 
-# Remove privileged access
+# Remove privileged access (including PIM eligibilities)
 Remove-GTUserEntitlements -UserUPNs 'admin@contoso.com' `
     -removeRoleAssignments `
+    -removePIMRoleEligibility `
     -removeAdministrativeUnitMemberships `
     -removeEnterpriseAppOwnership
 ```
@@ -296,6 +298,8 @@ Depending on the functions used, you'll need appropriate Microsoft Graph permiss
 | User Management | `User.ReadWrite.All` |
 | Device Management | `Directory.AccessAsUser.All` |
 | License Management | `Organization.Read.All`, `User.Read.All` |
+| Role Management | `RoleManagement.ReadWrite.Directory` |
+| PIM Role Management | `RoleEligibilitySchedule.ReadWrite.Directory` |
 | Audit Logs | `AuditLog.Read.All`, `AuditLogsQuery.Read.All` |
 | MFA Reports | `User.Read.All`, `AuditLog.Read.All` |
 
