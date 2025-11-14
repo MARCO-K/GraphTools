@@ -20,13 +20,17 @@ Number of days forward from the start date to end the search. Defaults to 0.
 A switch to delete the audit query job after completion. Defaults to $true.
 
 .PARAMETER Operations
-An array of operations to filter the audit logs.
+An array of operations to filter the audit logs. Each operation value must contain only alphanumeric characters, hyphens, and underscores for security.
+
+Examples: "FileDeleted", "User_Logon", "Exchange-Audit"
 
 .PARAMETER RecordType
-An array of record types to filter the audit logs.
+An array of record types to filter the audit logs. Each record type must contain only alphanumeric characters, hyphens, and underscores for security.
+
+Examples: "Exchange", "SharePoint", "AzureAD_Login"
 
 .PARAMETER UserIds
-An array of user IDs to filter the audit logs.
+An array of user IDs to filter the audit logs. Must be valid email addresses (UPN format).
 
 Aliases: Users, UPN, UserPrincipalName, UserName, UPNName
 
@@ -34,7 +38,9 @@ Aliases: Users, UPN, UserPrincipalName, UserName, UPNName
 An array of IP addresses to filter the audit logs.
 
 .PARAMETER Properties
-An array of properties to return in the results.
+An array of properties to return in the results. Each property must contain only alphanumeric characters, dots (for nested properties), and underscores for security.
+
+Examples: "Id", "UserId", "auditData.property"
 
 .PARAMETER maxWaitMinutes
 The maximum time in minutes to wait for the query to complete. Defaults to 10.

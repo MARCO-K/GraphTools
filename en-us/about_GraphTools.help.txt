@@ -42,6 +42,26 @@ LONG DESCRIPTION
 	  privileged roles after account remediation.
 	  
 	  Use: Remove-GTUserEntitlements -UserUPNs 'user@contoso.com' -removePIMRoleEligibility
+	
+	SECURITY & INPUT VALIDATION
+	
+	GraphTools implements comprehensive input validation to protect against 
+	injection attacks:
+	
+	- UPN Validation: All user identifiers must be valid email format
+	- GUID Validation: User and device IDs validated before filter interpolation
+	- Parameter Whitelisting: Operations, RecordType, and Properties parameters 
+	  in Invoke-AuditLogQuery use strict character whitelisting
+	- Injection Prevention: Blocks SQL injection, OData injection, and special 
+	  character attacks
+	
+	Protected functions include:
+	- Invoke-AuditLogQuery (Operations, RecordType, Properties validation)
+	- Disable-GTUserDevice (GUID validation)
+	- Remove-GTUserRoleAssignments (GUID validation)
+	- Remove-GTUserDelegatedPermissionGrants (GUID validation)
+	- Remove-GTPIMRoleEligibility (GUID validation)
+	- Remove-GTUserAccessPackageAssignments (GUID validation)
 	  
 	SECURITY PERMISSIONS
 	

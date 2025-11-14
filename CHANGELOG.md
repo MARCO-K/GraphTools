@@ -7,6 +7,23 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Security
+- **Input Validation for Invoke-AuditLogQuery** - Enhanced security through parameter validation
+  - Added strict character whitelisting for `Operations` parameter (alphanumeric, hyphens, underscores only)
+  - Added strict character whitelisting for `RecordType` parameter (alphanumeric, hyphens, underscores only)
+  - Added strict character whitelisting for `Properties` parameter (alphanumeric, dots, underscores only)
+  - Prevents potential injection attacks through malicious parameter values
+  - New validation patterns added to `GTValidation.ps1`: `AuditLogFilterValue` and `AuditLogProperty`
+  - Enhanced function documentation with security notes and valid input examples
+  
+### Testing
+- Added 12 new security test cases for `Invoke-AuditLogQuery`
+  - Tests for valid inputs (Operations, RecordType, Properties)
+  - Tests for SQL injection attempts
+  - Tests for OData filter injection attempts
+  - Tests for special character injection (quotes, parentheses, semicolons)
+  - Test coverage increased from 14 to 26 test cases (+86%)
+
 ## [0.10.0] - 2025-01-14
 
 ### Changed
