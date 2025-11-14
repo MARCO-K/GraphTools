@@ -10,13 +10,13 @@ Describe "Disable-GTUser" -Tag 'Unit' {
         if (Test-Path $validationFile) {
             . $validationFile
         }
-        
+
         $functionFile = Join-Path $PSScriptRoot '..' 'functions' 'Disable-GTUser.ps1'
         if (-not (Test-Path $functionFile)) {
             Throw "Function file not found: $functionFile"
         }
         . $functionFile
-        
+
         # Create stub functions for external dependencies AFTER loading the function
         # These will be replaced by mocks in BeforeEach and in individual tests
         function Write-PSFMessage { param($Level, $Message, $ErrorRecord) }
