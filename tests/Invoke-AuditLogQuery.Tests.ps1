@@ -122,5 +122,49 @@ Describe "Invoke-AuditLogQuery" {
         It "should throw an error for an invalid UserIds (empty domain part)" {
             { Invoke-AuditLogQuery -UserIds "user@" } | Should -Throw
         }
+
+        It "should accept valid Operations values" {
+            { Invoke-AuditLogQuery -Operations "FileDeleted","FileModified","User_Logon" } | Should -Not -Throw
+        }
+
+        It "should throw an error for Operations with special characters" {
+            { Invoke-AuditLogQuery -Operations "File'; DROP TABLE--" } | Should -Throw "*Invalid Operation value*"
+        }
+
+        It "should throw an error for Operations with single quotes" {
+            { Invoke-AuditLogQuery -Operations "Operation' OR '1'='1" } | Should -Throw "*Invalid Operation value*"
+        }
+
+        It "should throw an error for Operations with parentheses" {
+            { Invoke-AuditLogQuery -Operations "Operation()" } | Should -Throw "*Invalid Operation value*"
+        }
+
+        It "should accept valid RecordType values" {
+            { Invoke-AuditLogQuery -RecordType "Exchange","SharePoint","AzureAD_Login" } | Should -Not -Throw
+        }
+
+        It "should throw an error for RecordType with special characters" {
+            { Invoke-AuditLogQuery -RecordType "Type'; DELETE FROM" } | Should -Throw "*Invalid RecordType value*"
+        }
+
+        It "should throw an error for RecordType with single quotes" {
+            { Invoke-AuditLogQuery -RecordType "Type' OR 1=1--" } | Should -Throw "*Invalid RecordType value*"
+        }
+
+        It "should accept valid Properties values" {
+            { Invoke-AuditLogQuery -Properties "Id","UserId","auditData.property" } | Should -Not -Throw
+        }
+
+        It "should throw an error for Properties with special characters" {
+            { Invoke-AuditLogQuery -Properties "property'; DROP--" } | Should -Throw "*Invalid Property value*"
+        }
+
+        It "should throw an error for Properties with single quotes" {
+            { Invoke-AuditLogQuery -Properties "property' OR '1'='1" } | Should -Throw "*Invalid Property value*"
+        }
+
+        It "should throw an error for Properties with spaces" {
+            { Invoke-AuditLogQuery -Properties "Invalid Property" } | Should -Throw "*Invalid Property value*"
+        }
     }
 }

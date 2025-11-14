@@ -33,6 +33,7 @@
 - **🔄 Automation-Friendly**: Full pipeline support for batch operations and scripting
 - **🎨 Flexible Parameters**: Multiple parameter aliases reduce confusion and improve code readability
 - **🛡️ Enterprise-Ready**: Built-in validation, error handling, and verbose logging
+- **🔒 Security-Hardened**: Input validation and injection attack prevention for all user-supplied parameters
 - **🔍 Robust Error Handling**: Centralized Graph API error parsing with HTTP status code extraction and security-conscious error messages
 
 ## 🔑 Key Features
@@ -341,6 +342,62 @@ foreach ($result in $results) {
     }
 }
 ```
+
+## 🔒 Security & Input Validation
+
+GraphTools implements comprehensive input validation to protect against injection attacks and ensure safe parameter usage.
+
+### Parameter Validation
+
+All user-supplied parameters are validated before being used in API calls or filters:
+
+#### User Principal Names (UPN)
+```powershell
+# UPN validation: Must be valid email format
+Invoke-AuditLogQuery -UserIds 'user@contoso.com'  # ✅ Valid
+Invoke-AuditLogQuery -UserIds 'invalid-user'      # ❌ Blocked
+```
+
+#### Operations and Record Types
+```powershell
+# Operations/RecordType: Alphanumeric, hyphens, underscores only
+Invoke-AuditLogQuery -Operations 'FileDeleted','User_Logon'  # ✅ Valid
+Invoke-AuditLogQuery -Operations "File'; DROP TABLE--"       # ❌ Blocked: Injection attempt
+```
+
+#### Properties
+```powershell
+# Properties: Alphanumeric, dots (for nested properties), underscores only
+Invoke-AuditLogQuery -Properties 'Id','UserId','auditData.property'  # ✅ Valid
+Invoke-AuditLogQuery -Properties "property' OR '1'='1"               # ❌ Blocked: Injection attempt
+```
+
+#### GUID Validation
+```powershell
+# Internal functions use Test-GTGuid for ID validation
+# Prevents OData filter injection through user/device IDs
+# Example from Disable-GTUserDevice:
+Test-GTGuid -InputObject $userId  # Validates before filter interpolation
+```
+
+### Protected Functions
+
+The following functions have built-in GUID validation for filter safety:
+- `Disable-GTUserDevice` - Validates user IDs before device queries
+- `Remove-GTUserRoleAssignments` - Validates principal IDs
+- `Remove-GTUserDelegatedPermissionGrants` - Validates OAuth grant principals
+- `Remove-GTPIMRoleEligibility` - Validates PIM role principals
+- `Remove-GTUserAccessPackageAssignments` - Validates access package assignments
+
+### Security Best Practices
+
+When using GraphTools in production:
+
+1. **Use Least Privilege**: Grant only the minimum required Graph API permissions
+2. **Validate Input**: The module validates parameters, but verify user input before passing to cmdlets
+3. **Audit Operations**: Use `Invoke-AuditLogQuery` to track administrative actions
+4. **Test First**: Use `-WhatIf` with cmdlets that support it (e.g., `Disable-GTUser -WhatIf`)
+5. **Review Output**: Check Status field in results for failed operations
 
 ## 📋 Prerequisites
 

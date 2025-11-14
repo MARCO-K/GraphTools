@@ -197,10 +197,74 @@ Invoke-AuditLogQuery -Users 'user@contoso.com'
 Invoke-AuditLogQuery -UPN 'user@contoso.com'
 ```
 
+## Security & Input Validation
+
+GraphTools implements comprehensive input validation to protect against injection attacks:
+
+### UPN Validation
+All user-supplied UPN parameters are validated against a strict email format regex pattern before use:
+- Pattern: `^[^@\s]+@[^@\s]+\.[^@\s]+$`
+- Validates: Basic email structure with local part, @ symbol, and domain
+- Blocks: Invalid formats, injection attempts, malformed input
+
+```powershell
+# Valid UPNs
+Disable-GTUser -UPN 'user@contoso.com'        # ✅ Valid
+Disable-GTUser -UPN 'john.doe@company.co.uk'  # ✅ Valid
+
+# Invalid UPNs (will throw validation error)
+Disable-GTUser -UPN 'invalid-user'            # ❌ Blocked: No domain
+Disable-GTUser -UPN 'user@'                   # ❌ Blocked: Missing domain
+Disable-GTUser -UPN '@domain.com'             # ❌ Blocked: Missing local part
+```
+
+### GUID Validation
+Internal functions that build OData filters with user/device IDs validate GUIDs before interpolation:
+- Pattern: `^[0-9a-fA-F]{8}-([0-9a-fA-F]{4}-){3}[0-9a-fA-F]{12}$`
+- Validates: Strict GUID format (8-4-4-4-12 hexadecimal pattern)
+- Prevents: OData filter injection through malicious ID values
+
+Protected functions:
+- `Disable-GTUserDevice` - Validates user IDs before device filter queries
+- `Remove-GTUserRoleAssignments` - Validates principal IDs in role queries
+- `Remove-GTUserDelegatedPermissionGrants` - Validates OAuth grant principals
+- `Remove-GTPIMRoleEligibility` - Validates PIM role schedule principals
+- `Remove-GTUserAccessPackageAssignments` - Validates access package assignment targets
+
+### Audit Log Parameter Validation
+`Invoke-AuditLogQuery` implements strict character whitelisting for all filter parameters:
+
+**Operations Parameter**: Only alphanumeric, hyphens, and underscores
+```powershell
+Invoke-AuditLogQuery -Operations 'FileDeleted','User_Logon'  # ✅ Valid
+Invoke-AuditLogQuery -Operations "File'; DROP TABLE--"       # ❌ Blocked
+```
+
+**RecordType Parameter**: Only alphanumeric, hyphens, and underscores
+```powershell
+Invoke-AuditLogQuery -RecordType 'Exchange','SharePoint'     # ✅ Valid
+Invoke-AuditLogQuery -RecordType "Type' OR 1=1--"            # ❌ Blocked
+```
+
+**Properties Parameter**: Only alphanumeric, dots (for nested properties), and underscores
+```powershell
+Invoke-AuditLogQuery -Properties 'Id','auditData.property'   # ✅ Valid
+Invoke-AuditLogQuery -Properties "prop' OR '1'='1"           # ❌ Blocked
+```
+
+### Why This Matters
+These validations prevent:
+- **SQL Injection**: Blocks SQL command injection through parameter values
+- **OData Injection**: Prevents filter manipulation and unauthorized data access
+- **XSS Attacks**: Blocks script injection through parameters
+- **Path Traversal**: Prevents directory traversal attempts
+- **Account Enumeration**: Generic error messages for failed lookups prevent user discovery
+
 ## Notes
 
 - All functions automatically manage Microsoft Graph authentication
 - All functions validate UPN format before execution
+- All parameters are sanitized against injection attacks
 - All functions provide verbose logging for troubleshooting
 - All functions handle errors gracefully with detailed error messages
 - Functions can be used independently based on your security requirements

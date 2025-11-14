@@ -20,13 +20,17 @@ Number of days forward from the start date to end the search. Defaults to 0.
 A switch to delete the audit query job after completion. Defaults to $true.
 
 .PARAMETER Operations
-An array of operations to filter the audit logs.
+An array of operations to filter the audit logs. Each operation value must contain only alphanumeric characters, hyphens, and underscores for security.
+
+Examples: "FileDeleted", "User_Logon", "Exchange-Audit"
 
 .PARAMETER RecordType
-An array of record types to filter the audit logs.
+An array of record types to filter the audit logs. Each record type must contain only alphanumeric characters, hyphens, and underscores for security.
+
+Examples: "Exchange", "SharePoint", "AzureAD_Login"
 
 .PARAMETER UserIds
-An array of user IDs to filter the audit logs.
+An array of user IDs to filter the audit logs. Must be valid email addresses (UPN format).
 
 Aliases: Users, UPN, UserPrincipalName, UserName, UPNName
 
@@ -34,7 +38,9 @@ Aliases: Users, UPN, UserPrincipalName, UserName, UPNName
 An array of IP addresses to filter the audit logs.
 
 .PARAMETER Properties
-An array of properties to return in the results.
+An array of properties to return in the results. Each property must contain only alphanumeric characters, dots (for nested properties), and underscores for security.
+
+Examples: "Id", "UserId", "auditData.property"
 
 .PARAMETER maxWaitMinutes
 The maximum time in minutes to wait for the query to complete. Defaults to 10.
@@ -84,9 +90,25 @@ function Invoke-AuditLogQuery
         [switch]$Delete,
 
         [Parameter(Mandatory = $false)]
+        [ValidateScript({
+            foreach ($op in $_) {
+                if ($op -notmatch $script:GTValidationRegex.AuditLogFilterValue) {
+                    throw "Invalid Operation value '$op'. Only alphanumeric characters, hyphens, and underscores are allowed."
+                }
+            }
+            $true
+        })]
         [array]$Operations,
 
         [Parameter(Mandatory = $false)]
+        [ValidateScript({
+            foreach ($rt in $_) {
+                if ($rt -notmatch $script:GTValidationRegex.AuditLogFilterValue) {
+                    throw "Invalid RecordType value '$rt'. Only alphanumeric characters, hyphens, and underscores are allowed."
+                }
+            }
+            $true
+        })]
         [array]$RecordType,
 
         [Parameter(Mandatory = $false)]
@@ -98,6 +120,14 @@ function Invoke-AuditLogQuery
         [array]$IpAddresses,
 
         [Parameter(Mandatory = $false)]
+        [ValidateScript({
+            foreach ($prop in $_) {
+                if ($prop -notmatch $script:GTValidationRegex.AuditLogProperty) {
+                    throw "Invalid Property value '$prop'. Only alphanumeric characters, dots, and underscores are allowed."
+                }
+            }
+            $true
+        })]
         [array]$Properties = @('Id', 'createdDateTime', 'auditLogRecordType', 'Operation', 'service', 'UserId', 'UserType', 'userPrincipalName', 'auditData'),
 
         [Parameter(Mandatory = 'False')]
