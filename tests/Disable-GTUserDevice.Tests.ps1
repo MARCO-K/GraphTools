@@ -107,26 +107,6 @@ Describe "Disable-GTUserDevice" -Tag 'Unit' {
             $results[0].Reason | Should -Match 'No enabled devices'
         }
 
-        It "reports NoDevices when filter returns only disabled devices" {
-            $upn = 'user@contoso.com'
-            $userId = 'user-guid-789'
-
-            Mock -CommandName Get-MgUser -MockWith {
-                [PSCustomObject]@{ Id = $userId }
-            }
-
-            # The optimized query filters for enabled devices only, so disabled devices won't be returned
-            Mock -CommandName Get-MgDevice -MockWith {
-                @()
-            }
-
-            $results = Disable-GTUserDevice -UPN $upn -Confirm:$false
-
-            $results.Count | Should -Be 1
-            $results[0].Status | Should -Be 'NoDevices'
-            $results[0].Reason | Should -Match 'No enabled devices'
-        }
-
         It "honors -Force and invokes Update-MgDevice" {
             $upn = 'charlie@contoso.com'
             $userId = 'user-guid-101'
