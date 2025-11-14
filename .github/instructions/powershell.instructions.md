@@ -122,3 +122,42 @@ This guide provides PowerShell-specific instructions to help GitHub Copilot gene
   - Support automation scenarios
   - Document all required inputs
 
+## Testing Guidelines
+
+- **Test Structure:**
+  - Use Pester 5.x syntax with `Describe`, `Context`, and `It` blocks
+  - Source the function being tested at the top of the test file
+  - For public functions: `. "$PSScriptRoot/../functions/FunctionName.ps1"`
+  - For internal functions: `. "$PSScriptRoot/../internal/functions/FunctionName.ps1"`
+
+- **Testing Limitations in CI/Sandboxed Environments:**
+  - Microsoft Graph modules and PSFramework are NOT available in sandboxed environments
+  - Tests cannot call actual Graph API endpoints
+  - Tests focus on parameter validation and function structure
+  - Keep tests simple and avoid complex mocking when dependencies are unavailable
+
+- **Test Patterns for Internal Functions:**
+  - Internal functions that depend on Microsoft Graph or PSFramework cannot be fully tested in CI
+  - Focus on parameter validation tests that verify ValidateScript attributes work correctly
+  - Example: Test that invalid user objects (missing Id or UserPrincipalName) are rejected
+  - Avoid tests that attempt to mock and call the full function execution path
+  
+- **Minimal Test Example:**
+  ```powershell
+  . "$PSScriptRoot/../internal/functions/FunctionName.ps1"
+  
+  Describe "FunctionName" {
+      Context "Parameter Validation" {
+          It "should reject invalid parameter" {
+              { FunctionName -Param "invalid" } | Should -Throw
+          }
+      }
+  }
+  ```
+
+- **What NOT to Do:**
+  - Do not attempt to mock PSFramework's `Write-PSFMessage` in BeforeAll blocks (causes loading issues)
+  - Do not try to mock Microsoft Graph cmdlets globally (they may not be available)
+  - Do not create complex integration tests that require live API connections
+  - Do not expect full module imports to work in CI environment
+
