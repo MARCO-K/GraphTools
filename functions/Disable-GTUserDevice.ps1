@@ -197,10 +197,10 @@ Function Disable-GTUserDevice
 
                         # Some SDKs surface status code as StatusCode, HttpStatusCode or numeric string in the message; attempt pattern matching
                         if (-not $httpStatus) {
-                            if ($errorMsg -match '\b404\b' -or $errorMsg -match 'not found') { $httpStatus = 404 }
-                            elseif ($errorMsg -match '\b403\b' -or $errorMsg -match 'Insufficient privileges') { $httpStatus = 403 }
-                            elseif ($errorMsg -match '\b429\b' -or $errorMsg -match 'throttl') { $httpStatus = 429 }
-                            elseif ($errorMsg -match '\b400\b' -or $errorMsg -match 'Bad Request') { $httpStatus = 400 }
+                            if ($errorMsg -imatch '\b404\b' -or $errorMsg -imatch 'not found') { $httpStatus = 404 }
+                            elseif ($errorMsg -imatch '\b403\b' -or $errorMsg -imatch 'Insufficient privileges') { $httpStatus = 403 }
+                            elseif ($errorMsg -imatch '\b429\b' -or $errorMsg -imatch 'throttl') { $httpStatus = 429 }
+                            elseif ($errorMsg -imatch '\b400\b' -or $errorMsg -imatch 'Bad Request') { $httpStatus = 400 }
                         }
 
                         # Compose a user-friendly reason and logging level based on status
