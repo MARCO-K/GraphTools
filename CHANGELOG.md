@@ -11,7 +11,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 - **Centralized Error Handling** - Major refactoring of Graph API error handling across all functions
-  - Refactored 10 functions (4 public, 6 internal) to use the centralized `Get-GTGraphErrorDetails` helper
+  - Refactored 11 functions (5 public, 6 internal) to use the centralized `Get-GTGraphErrorDetails` helper
   - Standardized error messages and logging patterns across all Graph API operations
   - Improved error context with HTTP status code extraction and user-friendly messages
   - Enhanced security by using generic error messages for 404/403 errors to prevent enumeration attacks
