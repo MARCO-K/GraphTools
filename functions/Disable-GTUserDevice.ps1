@@ -2,8 +2,14 @@
 .SYNOPSIS
     Disables all registered devices for a user in Microsoft Entra ID (Azure AD)
 .DESCRIPTION
-    Disables all devices registered to a user account to prevent access from those devices.
-    This function retrieves all registered devices for a user and disables them by setting AccountEnabled to false.
+    Disables all enabled devices registered to a user account to prevent access from those devices.
+    This function uses an optimized query to retrieve enabled devices for a user with minimal API calls,
+    then disables them by setting AccountEnabled to false.
+    
+    Performance optimization: Instead of getting generic device objects and then fetching details for each,
+    this function gets all enabled devices directly with a single filtered query per user, reducing
+    API calls from 1+N to just 2 per user (1 for user ID, 1 for filtered devices).
+    
     Requires Microsoft.Graph.Authentication, Microsoft.Graph.Users, and Microsoft.Graph.Identity.DirectoryManagement modules.
     It validates UPN format and manages Microsoft Graph connection automatically.
 
@@ -101,12 +107,18 @@ Function Disable-GTUserDevice
 
             try
             {
-                # Get all registered devices for the user
-                $registeredDevices = Get-MgUserRegisteredDevice -UserId $User -ErrorAction Stop
+                # Performance Optimization: Get user ID first, then query devices directly with filter
+                # This reduces API calls from 1+N to just 2 per user (1 for user ID, 1 for all enabled devices)
+                $userObject = Get-MgUser -UserId $User -Property Id -ErrorAction Stop
+                $userId = $userObject.Id
 
-                if ($null -eq $registeredDevices -or $registeredDevices.Count -eq 0)
+                # Get all enabled devices registered to this user in a single API call
+                # This replaces Get-MgUserRegisteredDevice + Get-MgUserRegisteredDeviceAsDevice loop
+                $devicesToDisable = Get-MgDevice -All -Filter "accountEnabled eq true and registeredUsers/any(u:u/id eq '$userId')" -ErrorAction Stop
+
+                if ($null -eq $devicesToDisable -or $devicesToDisable.Count -eq 0)
                 {
-                    Write-PSFMessage -Level Verbose -Message "$User - Disable Device Action - No registered devices found"
+                    Write-PSFMessage -Level Verbose -Message "$User - Disable Device Action - No enabled devices found"
                     $result = [PSCustomObject]@{
                         User            = $User
                         DeviceId        = $null
@@ -114,72 +126,51 @@ Function Disable-GTUserDevice
                         Status          = 'NoDevices'
                         TimeUtc         = $timeUtc
                         HttpStatus      = $null
-                        Reason          = 'No registered devices found for user'
+                        Reason          = 'No enabled devices found for user'
                         ExceptionMessage= ''
                     }
                     [void]$results.Add($result)
                     continue
                 }
 
-                foreach ($device in $registeredDevices)
+                # Process each device that needs to be disabled
+                foreach ($device in $devicesToDisable)
                 {
                     $deviceTimeUtc = (Get-Date).ToUniversalTime().ToString('o')
                     try
                     {
-                        # The device object from Get-MgUserRegisteredDevice returns a DirectoryObject
-                        # We need to get it as a Device to access the properties
-                        $deviceDetail = Get-MgUserRegisteredDeviceAsDevice -UserId $User -DirectoryObjectId $device.Id -ErrorAction Stop
+                        # Describe the target and action for ShouldProcess
+                        $target = "$User - Device: $($device.DisplayName) (ID: $($device.Id))"
+                        $action = "Disable device (set AccountEnabled to False)"
 
-                        if ($deviceDetail.AccountEnabled -eq $true)
-                        {
-                            # Describe the target and action for ShouldProcess
-                            $target = "$User - Device: $($deviceDetail.DisplayName) (ID: $($device.Id))"
-                            $action = "Disable device (set AccountEnabled to False)"
+                        if ($PSCmdlet.ShouldProcess($target, $action)) {
+                            Update-MgDevice -DeviceId $device.Id -AccountEnabled:$false -ErrorAction Stop
+                            Write-PSFMessage -Level Verbose -Message "$User - Disable Device Action - Device disabled: $($device.DisplayName) (ID: $($device.Id))"
 
-                            if ($PSCmdlet.ShouldProcess($target, $action)) {
-                                Update-MgDevice -DeviceId $device.Id -AccountEnabled:$false -ErrorAction Stop
-                                Write-PSFMessage -Level Verbose -Message "$User - Disable Device Action - Device disabled: $($deviceDetail.DisplayName) (ID: $($device.Id))"
-
-                                $result = [PSCustomObject]@{
-                                    User            = $User
-                                    DeviceId        = $device.Id
-                                    DeviceName      = $deviceDetail.DisplayName
-                                    Status          = 'Disabled'
-                                    TimeUtc         = $deviceTimeUtc
-                                    HttpStatus      = $null
-                                    Reason          = 'Device disabled'
-                                    ExceptionMessage= ''
-                                }
-                                [void]$results.Add($result)
-                            }
-                            else {
-                                # When -WhatIf or user declines via -Confirm, operation is not performed.
-                                Write-PSFMessage -Level Verbose -Message "$User - Disable Device Action - Skipped (WhatIf/Confirmed=false): $($deviceDetail.DisplayName) (ID: $($device.Id))"
-
-                                $result = [PSCustomObject]@{
-                                    User            = $User
-                                    DeviceId        = $device.Id
-                                    DeviceName      = $deviceDetail.DisplayName
-                                    Status          = 'Skipped'
-                                    TimeUtc         = $deviceTimeUtc
-                                    HttpStatus      = $null
-                                    Reason          = 'Operation skipped (WhatIf/confirmation declined)'
-                                    ExceptionMessage= ''
-                                }
-                                [void]$results.Add($result)
-                            }
-                        }
-                        else
-                        {
-                            Write-PSFMessage -Level Verbose -Message "$User - Disable Device Action - Device already disabled: $($deviceDetail.DisplayName) (ID: $($device.Id))"
                             $result = [PSCustomObject]@{
                                 User            = $User
                                 DeviceId        = $device.Id
-                                DeviceName      = $deviceDetail.DisplayName
-                                Status          = 'AlreadyDisabled'
+                                DeviceName      = $device.DisplayName
+                                Status          = 'Disabled'
                                 TimeUtc         = $deviceTimeUtc
                                 HttpStatus      = $null
-                                Reason          = 'Device was already disabled'
+                                Reason          = 'Device disabled'
+                                ExceptionMessage= ''
+                            }
+                            [void]$results.Add($result)
+                        }
+                        else {
+                            # When -WhatIf or user declines via -Confirm, operation is not performed.
+                            Write-PSFMessage -Level Verbose -Message "$User - Disable Device Action - Skipped (WhatIf/Confirmed=false): $($device.DisplayName) (ID: $($device.Id))"
+
+                            $result = [PSCustomObject]@{
+                                User            = $User
+                                DeviceId        = $device.Id
+                                DeviceName      = $device.DisplayName
+                                Status          = 'Skipped'
+                                TimeUtc         = $deviceTimeUtc
+                                HttpStatus      = $null
+                                Reason          = 'Operation skipped (WhatIf/confirmation declined)'
                                 ExceptionMessage= ''
                             }
                             [void]$results.Add($result)
@@ -240,7 +231,7 @@ Function Disable-GTUserDevice
                         $result = [PSCustomObject]@{
                             User            = $User
                             DeviceId        = $device.Id
-                            DeviceName      = $null
+                            DeviceName      = $device.DisplayName
                             Status          = 'Failed'
                             TimeUtc         = $deviceTimeUtc
                             HttpStatus      = $httpStatus
@@ -253,7 +244,7 @@ Function Disable-GTUserDevice
             }
             catch
             {
-                # Handle errors getting registered devices for the user
+                # Handle errors getting user or devices for the user
                 $ex = $_.Exception
                 $httpStatus = $null
                 $errorMsg = $ex.Message

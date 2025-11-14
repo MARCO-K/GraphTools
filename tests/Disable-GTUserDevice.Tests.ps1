@@ -21,10 +21,10 @@ Describe "Disable-GTUserDevice" -Tag 'Unit' {
         # These will be replaced by mocks in BeforeEach and in individual tests
         function Write-PSFMessage { param($Level, $Message, $ErrorRecord) }
         function Install-GTRequiredModule { param($ModuleNames) }
-        function Initialize-GTGraphConnection { param($Scopes) return $true }
-        function Get-MgUserRegisteredDevice { param($UserId, $ErrorAction) }
-        function Get-MgUserRegisteredDeviceAsDevice { param($UserId, $DirectoryObjectId, $ErrorAction) }
-        function Update-MgDevice { param($DeviceId, $AccountEnabled, $ErrorAction) }
+        function Initialize-GTGraphConnection { param($Scopes, $NewSession) return $true }
+        function Get-MgUser { param([string]$UserId, [string[]]$Property, [string]$ErrorAction) }
+        function Get-MgDevice { param([switch]$All, [string]$Filter, [string]$ErrorAction) }
+        function Update-MgDevice { param([string]$DeviceId, [switch]$AccountEnabled, [string]$ErrorAction) }
     }
 
     BeforeEach {
@@ -51,20 +51,22 @@ Describe "Disable-GTUserDevice" -Tag 'Unit' {
     Context "Device Disabling" {
         It "disables devices for a user and returns a single array of Disabled results" {
             $upn = 'alice@contoso.com'
+            $userId = 'user-guid-123'
 
-            # Mock device retrieval
-            Mock -CommandName Get-MgUserRegisteredDevice -MockWith {
-                @(
-                    [PSCustomObject]@{ Id = "device-id-1" }
-                )
+            # Mock user retrieval
+            Mock -CommandName Get-MgUser -MockWith {
+                [PSCustomObject]@{ Id = $userId }
             } -Verifiable
 
-            Mock -CommandName Get-MgUserRegisteredDeviceAsDevice -MockWith {
-                [PSCustomObject]@{
-                    Id = "device-id-1"
-                    DisplayName = "Test Device"
-                    AccountEnabled = $true
-                }
+            # Mock device retrieval with optimized query
+            Mock -CommandName Get-MgDevice -MockWith {
+                @(
+                    [PSCustomObject]@{
+                        Id = "device-id-1"
+                        DisplayName = "Test Device"
+                        AccountEnabled = $true
+                    }
+                )
             } -Verifiable
 
             Mock -CommandName Update-MgDevice -MockWith { } -Verifiable
@@ -85,10 +87,15 @@ Describe "Disable-GTUserDevice" -Tag 'Unit' {
             Assert-MockCalled -CommandName Update-MgDevice -Times 1
         }
 
-        It "handles users with no registered devices" {
+        It "handles users with no enabled devices" {
             $upn = 'nodevices@contoso.com'
+            $userId = 'user-guid-456'
 
-            Mock -CommandName Get-MgUserRegisteredDevice -MockWith {
+            Mock -CommandName Get-MgUser -MockWith {
+                [PSCustomObject]@{ Id = $userId }
+            }
+
+            Mock -CommandName Get-MgDevice -MockWith {
                 @()
             } -Verifiable
 
@@ -97,44 +104,45 @@ Describe "Disable-GTUserDevice" -Tag 'Unit' {
             $results.Count | Should -Be 1
             $results[0].Status | Should -Be 'NoDevices'
             $results[0].User | Should -Be $upn
-            $results[0].Reason | Should -Match 'No registered devices'
+            $results[0].Reason | Should -Match 'No enabled devices'
         }
 
-        It "handles already disabled devices" {
+        It "reports NoDevices when filter returns only disabled devices" {
             $upn = 'user@contoso.com'
+            $userId = 'user-guid-789'
 
-            Mock -CommandName Get-MgUserRegisteredDevice -MockWith {
-                @([PSCustomObject]@{ Id = "device-id-2" })
+            Mock -CommandName Get-MgUser -MockWith {
+                [PSCustomObject]@{ Id = $userId }
             }
 
-            Mock -CommandName Get-MgUserRegisteredDeviceAsDevice -MockWith {
-                [PSCustomObject]@{
-                    Id = "device-id-2"
-                    DisplayName = "Already Disabled Device"
-                    AccountEnabled = $false
-                }
+            # The optimized query filters for enabled devices only, so disabled devices won't be returned
+            Mock -CommandName Get-MgDevice -MockWith {
+                @()
             }
 
             $results = Disable-GTUserDevice -UPN $upn -Confirm:$false
 
             $results.Count | Should -Be 1
-            $results[0].Status | Should -Be 'AlreadyDisabled'
-            $results[0].DeviceName | Should -Be "Already Disabled Device"
+            $results[0].Status | Should -Be 'NoDevices'
+            $results[0].Reason | Should -Match 'No enabled devices'
         }
 
         It "honors -Force and invokes Update-MgDevice" {
             $upn = 'charlie@contoso.com'
+            $userId = 'user-guid-101'
 
-            Mock -CommandName Get-MgUserRegisteredDevice -MockWith {
-                @([PSCustomObject]@{ Id = "device-id-3" })
+            Mock -CommandName Get-MgUser -MockWith {
+                [PSCustomObject]@{ Id = $userId }
             }
 
-            Mock -CommandName Get-MgUserRegisteredDeviceAsDevice -MockWith {
-                [PSCustomObject]@{
-                    Id = "device-id-3"
-                    DisplayName = "Test Device"
-                    AccountEnabled = $true
-                }
+            Mock -CommandName Get-MgDevice -MockWith {
+                @(
+                    [PSCustomObject]@{
+                        Id = "device-id-3"
+                        DisplayName = "Test Device"
+                        AccountEnabled = $true
+                    }
+                )
             }
 
             Mock -CommandName Update-MgDevice -MockWith { } -Verifiable
@@ -148,12 +156,23 @@ Describe "Disable-GTUserDevice" -Tag 'Unit' {
 
         It "returns Failed with HttpStatus 404 when Graph returns a not found error for device operation" {
             $upn = 'user@contoso.com'
+            $userId = 'user-guid-404'
 
-            Mock -CommandName Get-MgUserRegisteredDevice -MockWith {
-                @([PSCustomObject]@{ Id = "device-id-404" })
+            Mock -CommandName Get-MgUser -MockWith {
+                [PSCustomObject]@{ Id = $userId }
             }
 
-            Mock -CommandName Get-MgUserRegisteredDeviceAsDevice -MockWith {
+            Mock -CommandName Get-MgDevice -MockWith {
+                @(
+                    [PSCustomObject]@{
+                        Id = "device-id-404"
+                        DisplayName = "Test Device"
+                        AccountEnabled = $true
+                    }
+                )
+            }
+
+            Mock -CommandName Update-MgDevice -MockWith {
                 throw [System.Exception]::new('404 Not Found - The device does not exist')
             } -Verifiable
 
@@ -164,22 +183,25 @@ Describe "Disable-GTUserDevice" -Tag 'Unit' {
             $entry.Status | Should -Be 'Failed'
             $entry.HttpStatus | Should -Be 404
             $entry.Reason | Should -Match 'could not be processed'
-            Assert-MockCalled -CommandName Get-MgUserRegisteredDeviceAsDevice -Times 1
+            Assert-MockCalled -CommandName Update-MgDevice -Times 1
         }
 
         It "returns Failed with HttpStatus 403 when Graph returns insufficient privileges error" {
             $upn = 'user@contoso.com'
+            $userId = 'user-guid-403'
 
-            Mock -CommandName Get-MgUserRegisteredDevice -MockWith {
-                @([PSCustomObject]@{ Id = "device-id-403" })
+            Mock -CommandName Get-MgUser -MockWith {
+                [PSCustomObject]@{ Id = $userId }
             }
 
-            Mock -CommandName Get-MgUserRegisteredDeviceAsDevice -MockWith {
-                [PSCustomObject]@{
-                    Id = "device-id-403"
-                    DisplayName = "Test Device"
-                    AccountEnabled = $true
-                }
+            Mock -CommandName Get-MgDevice -MockWith {
+                @(
+                    [PSCustomObject]@{
+                        Id = "device-id-403"
+                        DisplayName = "Test Device"
+                        AccountEnabled = $true
+                    }
+                )
             }
 
             Mock -CommandName Update-MgDevice -MockWith {
@@ -198,7 +220,7 @@ Describe "Disable-GTUserDevice" -Tag 'Unit' {
         It "returns Failed when user retrieval fails with 404" {
             $upn = 'doesnotexist@contoso.com'
 
-            Mock -CommandName Get-MgUserRegisteredDevice -MockWith {
+            Mock -CommandName Get-MgUser -MockWith {
                 throw [System.Exception]::new('404 Not Found - The user does not exist')
             } -Verifiable
 
@@ -209,26 +231,30 @@ Describe "Disable-GTUserDevice" -Tag 'Unit' {
             $entry.Status | Should -Be 'Failed'
             $entry.HttpStatus | Should -Be 404
             $entry.Reason | Should -Match 'could not be processed'
-            Assert-MockCalled -CommandName Get-MgUserRegisteredDevice -Times 1
+            Assert-MockCalled -CommandName Get-MgUser -Times 1
         }
 
         It "processes multiple devices for a single user" {
             $upn = 'multidevice@contoso.com'
+            $userId = 'user-guid-multi'
 
-            Mock -CommandName Get-MgUserRegisteredDevice -MockWith {
-                @(
-                    [PSCustomObject]@{ Id = "device-1" },
-                    [PSCustomObject]@{ Id = "device-2" }
-                )
+            Mock -CommandName Get-MgUser -MockWith {
+                [PSCustomObject]@{ Id = $userId }
             }
 
-            Mock -CommandName Get-MgUserRegisteredDeviceAsDevice -MockWith {
-                param($UserId, $DirectoryObjectId)
-                [PSCustomObject]@{
-                    Id = $DirectoryObjectId
-                    DisplayName = "Device $DirectoryObjectId"
-                    AccountEnabled = $true
-                }
+            Mock -CommandName Get-MgDevice -MockWith {
+                @(
+                    [PSCustomObject]@{
+                        Id = "device-1"
+                        DisplayName = "Device device-1"
+                        AccountEnabled = $true
+                    },
+                    [PSCustomObject]@{
+                        Id = "device-2"
+                        DisplayName = "Device device-2"
+                        AccountEnabled = $true
+                    }
+                )
             }
 
             Mock -CommandName Update-MgDevice -MockWith { }
