@@ -82,8 +82,8 @@ function Remove-GTUserEntitlements
         $results = [System.Collections.Generic.List[PSObject]]::new()
 
         # check for required scopes
-        $RequieredScopes = @('GroupMember.ReadWrite.All', 'Group.ReadWrite.All', 'Directory.ReadWrite.All', 'RoleManagement.ReadWrite.Directory', 'RoleEligibilitySchedule.ReadWrite.Directory', 'AdministrativeUnit.ReadWrite.All', 'EntitlementManagement.ReadWrite.All', 'DelegatedPermissionGrant.ReadWrite.All')
-        $missingScopes = $RequieredScopes | Where-Object { $_ -notin (Get-MgContext).Scopes }
+        $RequiredScopes = @('GroupMember.ReadWrite.All', 'Group.ReadWrite.All', 'Directory.ReadWrite.All', 'RoleManagement.ReadWrite.Directory', 'RoleEligibilitySchedule.ReadWrite.Directory', 'AdministrativeUnit.ReadWrite.All', 'EntitlementManagement.ReadWrite.All', 'DelegatedPermissionGrant.ReadWrite.All')
+        $missingScopes = $RequiredScopes | Where-Object { $_ -notin (Get-MgContext).Scopes }
         if ($missingScopes)
         {
             throw "Required scopes are missing: $($missingScopes -join ', ')"
