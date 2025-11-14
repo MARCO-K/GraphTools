@@ -87,7 +87,7 @@ Function Disable-GTUser
 
             try
             {
-                if ($Force -or $PSCmdlet.ShouldProcess($target, $action)) {
+                if ($PSCmdlet.ShouldProcess($target, $action)) {
                     Update-MgBetaUser -UserId $User -AccountEnabled:$false -ErrorAction Stop
                     Write-PSFMessage -Level Verbose -Message "$User - Disable User Action - User Disabled"
 
