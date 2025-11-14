@@ -58,8 +58,20 @@ function Revoke-GTSignOutFromAllSessions
         }
         catch
         {
-            $ErrorLog = "$($UPN) - Sign out from all sessions action - " + $Error[0].Exception.Message
-            Write-PSFMessage -Level Error -Message $ErrorLog
+            # Use centralized error handling helper to parse Graph API exceptions
+            $errorDetails = Get-GTGraphErrorDetails -Exception $_.Exception -ResourceType 'user'
+            
+            # Log appropriate message based on error details
+            if ($errorDetails.HttpStatus -in 404, 403) {
+                Write-PSFMessage -Level $errorDetails.LogLevel -Message "$UPN - Sign out from all sessions action - $($errorDetails.Reason)"
+                Write-PSFMessage -Level Debug -Message "Detailed error ($($errorDetails.HttpStatus)): $($errorDetails.ErrorMessage)"
+            }
+            elseif ($errorDetails.HttpStatus) {
+                Write-PSFMessage -Level $errorDetails.LogLevel -Message "$UPN - Sign out from all sessions action - $($errorDetails.Reason)"
+            }
+            else {
+                Write-PSFMessage -Level Error -Message "$UPN - Sign out from all sessions action - $($errorDetails.ErrorMessage)"
+            }
         }
     }
     End {

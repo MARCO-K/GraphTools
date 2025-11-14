@@ -100,10 +100,20 @@ function Get-GTRecentUser {
         }
     }
     catch {
-        Write-Error "Failed to retrieve users. Error: $_"
-        # Provide more specific error handling if possible (e.g., check for permissions)
-        if ($_.Exception.Message -match "Authorization_RequestDenied") {
+        # Use centralized error handling helper to parse Graph API exceptions
+        $errorDetails = Get-GTGraphErrorDetails -Exception $_.Exception -ResourceType 'user'
+        
+        # Log appropriate message based on error details
+        if ($errorDetails.HttpStatus -eq 403) {
+            Write-Error "Failed to retrieve users. $($errorDetails.Reason)"
             Write-Warning "Permission denied. Ensure you have User.Read.All or Directory.Read.All."
+            Write-PSFMessage -Level Debug -Message "Detailed error (403): $($errorDetails.ErrorMessage)"
+        }
+        elseif ($errorDetails.HttpStatus) {
+            Write-Error "Failed to retrieve users. $($errorDetails.Reason)"
+        }
+        else {
+            Write-Error "Failed to retrieve users. Error: $($errorDetails.ErrorMessage)"
         }
         return
     }

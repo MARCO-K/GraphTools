@@ -78,7 +78,20 @@ Function Reset-GTUserPassword
                 }
                 catch
                 {
-                    Write-PSFMessage -Level Error -Message "$User - Reset Password Action - $($_.Exception.Message)"
+                    # Use centralized error handling helper to parse Graph API exceptions
+                    $errorDetails = Get-GTGraphErrorDetails -Exception $_.Exception -ResourceType 'user'
+                    
+                    # Log appropriate message based on error details
+                    if ($errorDetails.HttpStatus -in 404, 403) {
+                        Write-PSFMessage -Level $errorDetails.LogLevel -Message "$User - Reset Password Action - $($errorDetails.Reason)"
+                        Write-PSFMessage -Level Debug -Message "Detailed error ($($errorDetails.HttpStatus)): $($errorDetails.ErrorMessage)"
+                    }
+                    elseif ($errorDetails.HttpStatus) {
+                        Write-PSFMessage -Level $errorDetails.LogLevel -Message "$User - Reset Password Action - $($errorDetails.Reason)"
+                    }
+                    else {
+                        Write-PSFMessage -Level Error -Message "$User - Reset Password Action - $($errorDetails.ErrorMessage)"
+                    }
                 }
             }
         }
