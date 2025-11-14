@@ -36,7 +36,7 @@ function Test-GTGraphScopes
     if (-not $context)
     {
         if (-not $Quiet) { Write-Error "No Microsoft Graph connection found" }
-        #return $false
+        return $false
     }
 
     # Determine permission type (delegated vs application)
@@ -63,7 +63,30 @@ function Test-GTGraphScopes
             {
                 if ($permissionType -eq 'Scopes')
                 {
-                    $null = Connect-MgGraph -Scopes $RequiredScopes -NoWelcome -ErrorAction Stop
+                    # Combine current scopes with all required scopes for a seamless reconnect
+                    $allScopes = ($context.Scopes + $RequiredScopes) | Select-Object -Unique
+                    $null = Connect-MgGraph -Scopes $allScopes -NoWelcome -ErrorAction Stop
+                    
+                    # Post-reconnect verification: ensure all required permissions were granted
+                    $newContext = Get-MgContext
+                    if (-not $newContext)
+                    {
+                        if (-not $Quiet) { Write-Error "Reconnection succeeded but context validation failed" }
+                        return $false
+                    }
+                    
+                    # Verify all required scopes are present in the new context
+                    $newCurrent = $newContext.Scopes.ForEach{ $_.ToLower() }
+                    $stillMissing = $required | Where-Object { $_ -notin $newCurrent }
+                    
+                    if ($stillMissing.Count -gt 0)
+                    {
+                        if (-not $Quiet)
+                        {
+                            Write-Warning "Reconnection completed but some scopes were not granted: $($stillMissing -join ', ')"
+                        }
+                        return $false
+                    }
                 }
                 else
                 {
@@ -74,7 +97,7 @@ function Test-GTGraphScopes
                     return $false
                 }
 
-                if (-not $Quiet) { Write-Verbose "Successfully reconnected" }
+                if (-not $Quiet) { Write-Verbose "Successfully reconnected with all required permissions" }
                 return $true
             }
             catch
