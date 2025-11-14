@@ -30,7 +30,7 @@
       - User            : The UPN of the user owning the device
       - DeviceId        : The device identifier
       - DeviceName      : The display name of the device
-      - Status          : 'Disabled' | 'Skipped' | 'AlreadyDisabled' | 'Failed' | 'NoDevices'
+      - Status          : 'Disabled' | 'Skipped' | 'Failed' | 'NoDevices'
       - TimeUtc         : ISO-8601 UTC timestamp of when the action completed/was skipped
       - HttpStatus      : HTTP status code detected from the Graph error (if applicable)
       - Reason          : Short human-readable reason or guidance
