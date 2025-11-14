@@ -145,12 +145,16 @@ Function Disable-GTUser
                 $reason = "Failed: $errorMsg"
                 switch ($httpStatus) {
                     404 {
-                        $reason = 'User not found (404). Verify the UPN or object exists.'
+                        # Security best practice: Use a generic error message for 404 and 403 to prevent user enumeration.
+                        $reason = 'Operation failed. The user could not be processed.'
                         Write-PSFMessage -Level Error -Message "$User - Disable User Action - $reason"
+                        Write-PSFMessage -Level Debug -Message "Detailed error (404): $errorMsg"
                     }
                     403 {
-                        $reason = "Access denied (403). Ensure the account running this command has 'User.ReadWrite.All' permission and that consent has been granted."
+                        # Security best practice: Use a generic error message for 404 and 403 to prevent user enumeration.
+                        $reason = 'Operation failed. The user could not be processed.'
                         Write-PSFMessage -Level Error -Message "$User - Disable User Action - $reason"
+                        Write-PSFMessage -Level Debug -Message "Detailed error (403): $errorMsg"
                     }
                     429 {
                         $reason = 'Throttled by Graph API (429). Consider retrying after a delay or implementing exponential backoff.'
