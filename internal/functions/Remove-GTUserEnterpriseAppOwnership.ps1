@@ -41,129 +41,117 @@ function Remove-GTUserEnterpriseAppOwnership
         [System.Collections.Generic.List[PSObject]]$Results
     )
 
-    # Process App Registrations (Applications)
+    # Get all owned objects with a single API call
     try
     {
-        $ownedApplications = Get-MgBetaUserOwnedObject -UserId $User.Id -All -ErrorAction Stop |
-            Where-Object { $_.AdditionalProperties.'@odata.type' -eq '#microsoft.graph.application' }
+        $allOwnedObjects = Get-MgBetaUserOwnedObject -UserId $User.Id -All -ErrorAction Stop
 
-        if ($ownedApplications)
-        {
-            foreach ($app in $ownedApplications)
-            {
-                $action = 'RemoveAppRegistrationOwnership'
-                $output = $OutputBase + @{
-                    ResourceName = $app.AdditionalProperties.displayName
-                    ResourceType = 'AppRegistration'
-                    ResourceId   = $app.Id
-                    Action       = $action
-                }
-
-                try
-                {
-                    # Check if user is the last owner
-                    $owners = Get-MgBetaApplicationOwner -ApplicationId $app.Id -All -ErrorAction Stop
-                    if ($owners.Count -eq 1)
-                    {
-                        Write-PSFMessage -Level Warning -Message "Skipping last owner ($($User.UserPrincipalName)) of App Registration: $($app.AdditionalProperties.displayName). Transfer ownership first."
-                        $output['Status'] = 'Skipped: Last owner - transfer ownership first'
-                        $Results.Add([PSCustomObject]$output)
-                        continue
-                    }
-
-                    if ($PSCmdlet.ShouldProcess($app.AdditionalProperties.displayName, $action))
-                    {
-                        Write-PSFMessage -Level Verbose -Message "Removing user $($User.UserPrincipalName) from App Registration ownership: $($app.AdditionalProperties.displayName)"
-                        Remove-MgBetaApplicationOwnerByRef -ApplicationId $app.Id -DirectoryObjectId $User.Id -ErrorAction Stop
-                        $output['Status'] = 'Success'
-                    }
-                }
-                catch
-                {
-                    Write-PSFMessage -Level Error -Message "Failed to remove user $($User.UserPrincipalName) from App Registration: $($app.AdditionalProperties.displayName)."
-                    $output['Status'] = "Failed: $($_.Exception.Message)"
-                }
-                $Results.Add([PSCustomObject]$output)
-            }
-        }
-        else
-        {
-            Write-PSFMessage -Level Verbose -Message "No App Registration ownerships found for user $($User.UserPrincipalName)"
-        }
+        # Filter the results in memory
+        $ownedApplications = $allOwnedObjects | Where-Object { $_.AdditionalProperties.'@odata.type' -eq '#microsoft.graph.application' }
+        $ownedServicePrincipals = $allOwnedObjects | Where-Object { $_.AdditionalProperties.'@odata.type' -eq '#microsoft.graph.servicePrincipal' }
     }
     catch
     {
-        Write-PSFMessage -Level Error -Message "Failed to retrieve App Registration ownerships for user $($User.UserPrincipalName)."
+        # Handle failure to get any owned objects
+        Write-PSFMessage -Level Error -Message "Failed to retrieve owned objects for user $($User.UserPrincipalName)."
         $output = $OutputBase + @{
-            ResourceName = 'AppRegistrations'
-            ResourceType = 'AppRegistration'
+            ResourceName = 'OwnedObjects'
+            ResourceType = 'All'
             ResourceId   = $null
-            Action       = 'RemoveAppRegistrationOwnership'
+            Action       = 'RetrieveOwnedObjects'
             Status       = "Failed: $($_.Exception.Message)"
         }
         $Results.Add([PSCustomObject]$output)
+        return
+    }
+
+    # Process App Registrations (Applications)
+    if ($ownedApplications)
+    {
+        foreach ($app in $ownedApplications)
+        {
+            $action = 'RemoveAppRegistrationOwnership'
+            $output = $OutputBase + @{
+                ResourceName = $app.AdditionalProperties.displayName
+                ResourceType = 'AppRegistration'
+                ResourceId   = $app.Id
+                Action       = $action
+            }
+
+            try
+            {
+                # Check if user is the last owner
+                $owners = Get-MgBetaApplicationOwner -ApplicationId $app.Id -All -ErrorAction Stop
+                if ($owners.Count -eq 1)
+                {
+                    Write-PSFMessage -Level Warning -Message "Skipping last owner ($($User.UserPrincipalName)) of App Registration: $($app.AdditionalProperties.displayName). Transfer ownership first."
+                    $output['Status'] = 'Skipped: Last owner - transfer ownership first'
+                    $Results.Add([PSCustomObject]$output)
+                    continue
+                }
+
+                if ($PSCmdlet.ShouldProcess($app.AdditionalProperties.displayName, $action))
+                {
+                    Write-PSFMessage -Level Verbose -Message "Removing user $($User.UserPrincipalName) from App Registration ownership: $($app.AdditionalProperties.displayName)"
+                    Remove-MgBetaApplicationOwnerByRef -ApplicationId $app.Id -DirectoryObjectId $User.Id -ErrorAction Stop
+                    $output['Status'] = 'Success'
+                }
+            }
+            catch
+            {
+                Write-PSFMessage -Level Error -Message "Failed to remove user $($User.UserPrincipalName) from App Registration: $($app.AdditionalProperties.displayName)."
+                $output['Status'] = "Failed: $($_.Exception.Message)"
+            }
+            $Results.Add([PSCustomObject]$output)
+        }
+    }
+    else
+    {
+        Write-PSFMessage -Level Verbose -Message "No App Registration ownerships found for user $($User.UserPrincipalName)"
     }
 
     # Process Enterprise Applications (Service Principals)
-    try
+    if ($ownedServicePrincipals)
     {
-        $ownedServicePrincipals = Get-MgBetaUserOwnedObject -UserId $User.Id -All -ErrorAction Stop |
-            Where-Object { $_.AdditionalProperties.'@odata.type' -eq '#microsoft.graph.servicePrincipal' }
-
-        if ($ownedServicePrincipals)
+        foreach ($sp in $ownedServicePrincipals)
         {
-            foreach ($sp in $ownedServicePrincipals)
-            {
-                $action = 'RemoveEnterpriseAppOwnership'
-                $output = $OutputBase + @{
-                    ResourceName = $sp.AdditionalProperties.displayName
-                    ResourceType = 'EnterpriseApplication'
-                    ResourceId   = $sp.Id
-                    Action       = $action
-                }
-
-                try
-                {
-                    # Check if user is the last owner
-                    $owners = Get-MgBetaServicePrincipalOwner -ServicePrincipalId $sp.Id -All -ErrorAction Stop
-                    if ($owners.Count -eq 1)
-                    {
-                        Write-PSFMessage -Level Warning -Message "Skipping last owner ($($User.UserPrincipalName)) of Enterprise Application: $($sp.AdditionalProperties.displayName). Transfer ownership first."
-                        $output['Status'] = 'Skipped: Last owner - transfer ownership first'
-                        $Results.Add([PSCustomObject]$output)
-                        continue
-                    }
-
-                    if ($PSCmdlet.ShouldProcess($sp.AdditionalProperties.displayName, $action))
-                    {
-                        Write-PSFMessage -Level Verbose -Message "Removing user $($User.UserPrincipalName) from Enterprise Application ownership: $($sp.AdditionalProperties.displayName)"
-                        Remove-MgBetaServicePrincipalOwnerByRef -ServicePrincipalId $sp.Id -DirectoryObjectId $User.Id -ErrorAction Stop
-                        $output['Status'] = 'Success'
-                    }
-                }
-                catch
-                {
-                    Write-PSFMessage -Level Error -Message "Failed to remove user $($User.UserPrincipalName) from Enterprise Application: $($sp.AdditionalProperties.displayName)."
-                    $output['Status'] = "Failed: $($_.Exception.Message)"
-                }
-                $Results.Add([PSCustomObject]$output)
+            $action = 'RemoveEnterpriseAppOwnership'
+            $output = $OutputBase + @{
+                ResourceName = $sp.AdditionalProperties.displayName
+                ResourceType = 'EnterpriseApplication'
+                ResourceId   = $sp.Id
+                Action       = $action
             }
-        }
-        else
-        {
-            Write-PSFMessage -Level Verbose -Message "No Enterprise Application ownerships found for user $($User.UserPrincipalName)"
+
+            try
+            {
+                # Check if user is the last owner
+                $owners = Get-MgBetaServicePrincipalOwner -ServicePrincipalId $sp.Id -All -ErrorAction Stop
+                if ($owners.Count -eq 1)
+                {
+                    Write-PSFMessage -Level Warning -Message "Skipping last owner ($($User.UserPrincipalName)) of Enterprise Application: $($sp.AdditionalProperties.displayName). Transfer ownership first."
+                    $output['Status'] = 'Skipped: Last owner - transfer ownership first'
+                    $Results.Add([PSCustomObject]$output)
+                    continue
+                }
+
+                if ($PSCmdlet.ShouldProcess($sp.AdditionalProperties.displayName, $action))
+                {
+                    Write-PSFMessage -Level Verbose -Message "Removing user $($User.UserPrincipalName) from Enterprise Application ownership: $($sp.AdditionalProperties.displayName)"
+                    Remove-MgBetaServicePrincipalOwnerByRef -ServicePrincipalId $sp.Id -DirectoryObjectId $User.Id -ErrorAction Stop
+                    $output['Status'] = 'Success'
+                }
+            }
+            catch
+            {
+                Write-PSFMessage -Level Error -Message "Failed to remove user $($User.UserPrincipalName) from Enterprise Application: $($sp.AdditionalProperties.displayName)."
+                $output['Status'] = "Failed: $($_.Exception.Message)"
+            }
+            $Results.Add([PSCustomObject]$output)
         }
     }
-    catch
+    else
     {
-        Write-PSFMessage -Level Error -Message "Failed to retrieve Enterprise Application ownerships for user $($User.UserPrincipalName)."
-        $output = $OutputBase + @{
-            ResourceName = 'EnterpriseApplications'
-            ResourceType = 'EnterpriseApplication'
-            ResourceId   = $null
-            Action       = 'RemoveEnterpriseAppOwnership'
-            Status       = "Failed: $($_.Exception.Message)"
-        }
-        $Results.Add([PSCustomObject]$output)
+        Write-PSFMessage -Level Verbose -Message "No Enterprise Application ownerships found for user $($User.UserPrincipalName)"
     }
 }
