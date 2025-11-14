@@ -11,6 +11,12 @@ Describe "Disable-GTUserDevice" -Tag 'Unit' {
             . $validationFile
         }
 
+        # Load the error handling helper function (required by Disable-GTUserDevice)
+        $errorHelperFile = Join-Path $PSScriptRoot '..' 'internal' 'functions' 'Get-GTGraphErrorDetails.ps1'
+        if (Test-Path $errorHelperFile) {
+            . $errorHelperFile
+        }
+
         $functionFile = Join-Path $PSScriptRoot '..' 'functions' 'Disable-GTUserDevice.ps1'
         if (-not (Test-Path $functionFile)) {
             Throw "Function file not found: $functionFile"

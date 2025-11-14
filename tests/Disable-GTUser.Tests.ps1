@@ -11,6 +11,12 @@ Describe "Disable-GTUser" -Tag 'Unit' {
             . $validationFile
         }
 
+        # Load the error handling helper function (required by Disable-GTUser)
+        $errorHelperFile = Join-Path $PSScriptRoot '..' 'internal' 'functions' 'Get-GTGraphErrorDetails.ps1'
+        if (Test-Path $errorHelperFile) {
+            . $errorHelperFile
+        }
+
         $functionFile = Join-Path $PSScriptRoot '..' 'functions' 'Disable-GTUser.ps1'
         if (-not (Test-Path $functionFile)) {
             Throw "Function file not found: $functionFile"
@@ -80,8 +86,8 @@ Describe "Disable-GTUser" -Tag 'Unit' {
         $entry = $results[0]
         $entry.Status | Should -Be 'Failed'
         $entry.HttpStatus | Should -Be 404
-        # Reason should mention 'not found' (case-insensitive)
-        $entry.Reason.ToLower() | Should -Match 'not found'
+        # For security, 404 errors return generic message to prevent enumeration
+        $entry.Reason.ToLower() | Should -Match 'could not be processed'
         Assert-MockCalled -CommandName Update-MgBetaUser -Times 1
     }
 
