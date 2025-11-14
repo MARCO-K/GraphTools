@@ -44,8 +44,8 @@ Describe "Disable-GTUser" -Tag 'Unit' {
         $results = Disable-GTUser -UPN $users
 
         # Validate that we received an array with two items
-        $results.Count | Should -Be $users.Count
         $results.GetType().Name | Should -Be 'Object[]'
+        $results.Count | Should -Be $users.Count
 
         # All entries should have Status = 'Disabled'
         ($results | Where-Object { $_.Status -ne 'Disabled' }).Count | Should -Be 0
