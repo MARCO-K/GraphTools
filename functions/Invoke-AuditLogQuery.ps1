@@ -84,9 +84,25 @@ function Invoke-AuditLogQuery
         [switch]$Delete,
 
         [Parameter(Mandatory = $false)]
+        [ValidateScript({
+            foreach ($op in $_) {
+                if ($op -notmatch $script:GTValidationRegex.AuditLogFilterValue) {
+                    throw "Invalid Operation value '$op'. Only alphanumeric characters, hyphens, and underscores are allowed."
+                }
+            }
+            $true
+        })]
         [array]$Operations,
 
         [Parameter(Mandatory = $false)]
+        [ValidateScript({
+            foreach ($rt in $_) {
+                if ($rt -notmatch $script:GTValidationRegex.AuditLogFilterValue) {
+                    throw "Invalid RecordType value '$rt'. Only alphanumeric characters, hyphens, and underscores are allowed."
+                }
+            }
+            $true
+        })]
         [array]$RecordType,
 
         [Parameter(Mandatory = $false)]
@@ -98,6 +114,14 @@ function Invoke-AuditLogQuery
         [array]$IpAddresses,
 
         [Parameter(Mandatory = $false)]
+        [ValidateScript({
+            foreach ($prop in $_) {
+                if ($prop -notmatch $script:GTValidationRegex.AuditLogProperty) {
+                    throw "Invalid Property value '$prop'. Only alphanumeric characters, dots, and underscores are allowed."
+                }
+            }
+            $true
+        })]
         [array]$Properties = @('Id', 'createdDateTime', 'auditLogRecordType', 'Operation', 'service', 'UserId', 'UserType', 'userPrincipalName', 'auditData'),
 
         [Parameter(Mandatory = 'False')]
