@@ -2,7 +2,7 @@ $script:GTValidationRegex = @{
     UPN = '^[^@\s]+@[^@\s]+\.[^@\s]+$'
     GUID = '^[0-9a-fA-F]{8}-([0-9a-fA-F]{4}-){3}[0-9a-fA-F]{12}$'
     # Audit log Operations and RecordTypes: alphanumeric, underscore, hyphen only (no injection characters)
-    AuditLogFilterValue = '^[a-zA-Z0-9_-]+$'
+    AuditLogFilterValue = '^[a-zA-Z0-9_\-]+$'
     # Properties: alphanumeric, dots (for nested properties), underscore only
     AuditLogProperty = '^[a-zA-Z0-9_.]+$'
 }
