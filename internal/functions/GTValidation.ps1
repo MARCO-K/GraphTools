@@ -53,8 +53,8 @@ function Test-GTGuid
 
     begin
     {
-        # Define the strict regex here or ensure it's available via $script: context
-        $strictGuidRegex = '^[0-9a-fA-F]{8}-([0-9a-fA-F]{4}-){3}[0-9a-fA-F]{12}$'
+        # Use the script-scoped regex to ensure a single source of truth
+        $strictGuidRegex = $script:GTValidationRegex.GUID
     }
 
     process
