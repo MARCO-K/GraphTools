@@ -42,6 +42,9 @@ function Remove-GTUserDelegatedPermissionGrants
 
     try
     {
+        # Validate that User.Id is a GUID to prevent OData injection
+        Test-GTGuid -InputObject $User.Id | Out-Null
+        
         # Get all OAuth2 permission grants for the user
         # These are delegated permissions granted to apps on behalf of the user
         $permissionGrants = Get-MgBetaOauth2PermissionGrant -Filter "principalId eq '$($User.Id)'" -All -ErrorAction Stop
