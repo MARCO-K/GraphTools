@@ -95,7 +95,7 @@ Function Disable-GTUser
                         User            = $User
                         Status          = 'Disabled'
                         TimeUtc         = $timeUtc
-                        HttpStatus      = 200
+                        HttpStatus      = $null  # No actual HTTP status available; indicates success
                         Reason          = 'User disabled'
                         ExceptionMessage= ''
                     }
