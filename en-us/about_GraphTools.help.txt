@@ -2,10 +2,62 @@
 	about_GraphTools
 	
 SHORT DESCRIPTION
-	This module provides some extra functionality for working with MS Graph API
+	PowerShell module for Microsoft Entra ID security management, incident response, 
+	and reporting via Microsoft Graph API
 
 LONG DESCRIPTION
-	This module provides some extra functionality for working with MS Graph API
+	GraphTools is a comprehensive PowerShell module designed for IT security 
+	professionals and administrators working with Microsoft Entra ID (formerly Azure AD) 
+	and Microsoft 365 environments.
+
+	KEY FEATURES
+	
+	Security Incident Response:
+	- Revoke refresh tokens and sign out users from all sessions
+	- Disable user accounts and registered devices
+	- Reset passwords to terminate CAE-enabled sessions
+	- Remove all user entitlements including PIM role eligibilities
+	
+	Identity & Access Management:
+	- Group membership and ownership management
+	- License management capabilities
+	- Directory role and PIM role eligibility management
+	- Administrative unit membership management
+	- Application access and OAuth permission management
+	- Entitlement management for access packages
+	
+	Reporting & Analytics:
+	- MFA registration status and authentication methods
+	- License and service plan utilization reports
+	- Audit log queries with advanced filtering
+	- Inactive and recently created user reports
+	- Conditional access policy analysis
+	- Service principal and orphaned group reports
+	
+	VERSION 0.9.0 HIGHLIGHTS
+	
+	- NEW: PIM Role Eligibility Removal
+	  Closes critical security gap by removing PIM (Privileged Identity Management) 
+	  role eligibility schedules during offboarding. Users can no longer activate 
+	  privileged roles after account remediation.
+	  
+	  Use: Remove-GTUserEntitlements -UserUPNs 'user@contoso.com' -removePIMRoleEligibility
+	  
+	SECURITY PERMISSIONS
+	
+	The module requires various Microsoft Graph API permissions depending on 
+	the functions used:
+	- User.ReadWrite.All - User management
+	- Directory.AccessAsUser.All - Device management
+	- RoleManagement.ReadWrite.Directory - Role assignments
+	- RoleEligibilitySchedule.ReadWrite.Directory - PIM role eligibilities (NEW)
+	- AuditLog.Read.All - Audit log access
+	
+	For detailed documentation, use:
+	  Get-Help <Function-Name> -Full
+	  
+	For examples:
+	  Get-Help <Function-Name> -Examples
 	
 KEYWORDS
-	module azure EntraID
+	module azure EntraID PIM security incident-response

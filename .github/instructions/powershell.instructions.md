@@ -74,6 +74,12 @@ This guide provides PowerShell-specific instructions to help GitHub Copilot gene
   - Default to $false when omitted
   - Use clear action names
 
+- **Collection Parameters (PowerShell 7+):**
+  - When using `System.Collections.Generic.List[T]` parameters, add `[AllowEmptyCollection()]` attribute
+  - PowerShell 7+ validates that collections are non-empty by default during parameter binding
+  - Example: `[Parameter(Mandatory = $true)] [AllowEmptyCollection()] [System.Collections.Generic.List[PSObject]]$Results`
+  - This is critical for functions that need to accept empty lists to populate them
+
 ## Pipeline and Output
 
 - **Pipeline Input:**
