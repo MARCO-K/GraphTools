@@ -7,8 +7,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-### Added
-- Made `Remove-GTUserEntitlements` a public function for direct use by module consumers
+## [0.8.2] - 2025-01-14
+
+### Changed
+- Optimized `Remove-GTUserEnterpriseAppOwnership` to reduce API calls
+  - Consolidated two separate `Get-MgBetaUserOwnedObject` calls into a single API call
+  - Filter applications and service principals in memory instead of making separate API requests
+  - Improved performance and reduced API load
+  - Enhanced error handling with early exit on API failure
 
 ## [0.8.1] - 2025-01-13
 
