@@ -62,8 +62,20 @@ function Remove-GTUserGroupMemberships
         }
         catch
         {
-            Write-PSFMessage -Level Error -Message "Failed to remove user $($User.UserPrincipalName) from group $($Group.DisplayName)."
-            $output['Status'] = "Failed: $($_.Exception.Message)"
+            # Use centralized error handling helper to parse Graph API exceptions
+            $errorDetails = Get-GTGraphErrorDetails -Exception $_.Exception -ResourceType 'resource'
+            
+            # Log appropriate message based on error details
+            if ($errorDetails.HttpStatus) {
+                Write-PSFMessage -Level $errorDetails.LogLevel -Message "Failed to remove user $($User.UserPrincipalName) from group $($Group.DisplayName). $($errorDetails.Reason)"
+                if ($errorDetails.HttpStatus -in 404, 403) {
+                    Write-PSFMessage -Level Debug -Message "Detailed error ($($errorDetails.HttpStatus)): $($errorDetails.ErrorMessage)"
+                }
+            }
+            else {
+                Write-PSFMessage -Level Error -Message "Failed to remove user $($User.UserPrincipalName) from group $($Group.DisplayName). $($errorDetails.ErrorMessage)"
+            }
+            $output['Status'] = "Failed: $($errorDetails.Reason)"
         }
         $Results.Add([PSCustomObject]$output)
     }

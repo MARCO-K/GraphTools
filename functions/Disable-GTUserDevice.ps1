@@ -182,54 +182,20 @@ Function Disable-GTUserDevice
                     }
                     catch
                     {
-                        # Improved error handling: attempt to detect common HTTP status codes from the Graph SDK exception
-                        $ex = $_.Exception
-                        $httpStatus = $null
-                        $errorMsg = $ex.Message
+                        # Use centralized error handling helper to parse Graph API exceptions
+                        $errorDetails = Get-GTGraphErrorDetails -Exception $_.Exception -ResourceType 'device'
 
-                        # Attempt to extract status code from common locations used by HTTP-based SDK exceptions
-                        if ($ex.Response -and $ex.Response.StatusCode) {
-                            try { $httpStatus = [int]$ex.Response.StatusCode } catch {}
+                        # Log appropriate message based on error details
+                        if ($errorDetails.HttpStatus -in 404, 403) {
+                            Write-PSFMessage -Level $errorDetails.LogLevel -Message "$User - Disable Device Action - $($errorDetails.Reason) (Device: $($device.Id))"
+                            Write-PSFMessage -Level Debug -Message "Detailed error ($($errorDetails.HttpStatus)): $($errorDetails.ErrorMessage)"
                         }
-                        if (-not $httpStatus -and $ex.InnerException.Response -and $ex.InnerException.Response.StatusCode) {
-                            try { $httpStatus = [int]$ex.InnerException.Response.StatusCode } catch {}
+                        elseif ($errorDetails.HttpStatus) {
+                            Write-PSFMessage -Level $errorDetails.LogLevel -Message "$User - Disable Device Action - $($errorDetails.Reason) (Device: $($device.Id))"
                         }
-
-                        # Some SDKs surface status code as StatusCode, HttpStatusCode or numeric string in the message; attempt pattern matching
-                        if (-not $httpStatus) {
-                            if ($errorMsg -imatch '\b404\b' -or $errorMsg -imatch 'not found') { $httpStatus = 404 }
-                            elseif ($errorMsg -imatch '\b403\b' -or $errorMsg -imatch 'Insufficient privileges') { $httpStatus = 403 }
-                            elseif ($errorMsg -imatch '\b429\b' -or $errorMsg -imatch 'throttl') { $httpStatus = 429 }
-                            elseif ($errorMsg -imatch '\b400\b' -or $errorMsg -imatch 'Bad Request') { $httpStatus = 400 }
-                        }
-
-                        # Compose a user-friendly reason and logging level based on status
-                        $reason = "Failed: $errorMsg"
-                        switch ($httpStatus) {
-                            404 {
-                                # Security best practice: Use a generic error message for 404 and 403 to prevent enumeration.
-                                $reason = 'Operation failed. The device could not be processed.'
-                                Write-PSFMessage -Level Error -Message "$User - Disable Device Action - $reason (Device: $($device.Id))"
-                                Write-PSFMessage -Level Debug -Message "Detailed error (404): $errorMsg"
-                            }
-                            403 {
-                                # Security best practice: Use a generic error message for 404 and 403 to prevent enumeration.
-                                $reason = 'Operation failed. The device could not be processed.'
-                                Write-PSFMessage -Level Error -Message "$User - Disable Device Action - $reason (Device: $($device.Id))"
-                                Write-PSFMessage -Level Debug -Message "Detailed error (403): $errorMsg"
-                            }
-                            429 {
-                                $reason = 'Throttled by Graph API (429). Consider retrying after a delay or implementing exponential backoff.'
-                                Write-PSFMessage -Level Warning -Message "$User - Disable Device Action - $reason (Device: $($device.Id))"
-                            }
-                            400 {
-                                $reason = "Bad request (400). $errorMsg"
-                                Write-PSFMessage -Level Error -Message "$User - Disable Device Action - $reason (Device: $($device.Id))"
-                            }
-                            default {
-                                Write-PSFMessage -Level Error -Message "$User - Disable Device Action - Failed to disable device $($device.Id): $errorMsg"
-                                Write-PSFMessage -Level Debug -Message ($ex | Out-String)
-                            }
+                        else {
+                            Write-PSFMessage -Level Error -Message "$User - Disable Device Action - Failed to disable device $($device.Id): $($errorDetails.ErrorMessage)"
+                            Write-PSFMessage -Level Debug -Message ($_.Exception | Out-String)
                         }
 
                         $result = [PSCustomObject]@{
@@ -238,9 +204,9 @@ Function Disable-GTUserDevice
                             DeviceName      = $device.DisplayName
                             Status          = 'Failed'
                             TimeUtc         = $deviceTimeUtc
-                            HttpStatus      = $httpStatus
-                            Reason          = $reason
-                            ExceptionMessage= $errorMsg
+                            HttpStatus      = $errorDetails.HttpStatus
+                            Reason          = $errorDetails.Reason
+                            ExceptionMessage= $errorDetails.ErrorMessage
                         }
                         [void]$results.Add($result)
                     }
@@ -249,51 +215,20 @@ Function Disable-GTUserDevice
             catch
             {
                 # Handle errors getting user or devices for the user
-                $ex = $_.Exception
-                $httpStatus = $null
-                $errorMsg = $ex.Message
+                # Use centralized error handling helper to parse Graph API exceptions
+                $errorDetails = Get-GTGraphErrorDetails -Exception $_.Exception -ResourceType 'user'
 
-                # Attempt to extract status code
-                if ($ex.Response -and $ex.Response.StatusCode) {
-                    try { $httpStatus = [int]$ex.Response.StatusCode } catch {}
+                # Log appropriate message based on error details
+                if ($errorDetails.HttpStatus -in 404, 403) {
+                    Write-PSFMessage -Level $errorDetails.LogLevel -Message "$User - Disable Device Action - $($errorDetails.Reason)"
+                    Write-PSFMessage -Level Debug -Message "Detailed error ($($errorDetails.HttpStatus)): $($errorDetails.ErrorMessage)"
                 }
-                if (-not $httpStatus -and $ex.InnerException.Response -and $ex.InnerException.Response.StatusCode) {
-                    try { $httpStatus = [int]$ex.InnerException.Response.StatusCode } catch {}
+                elseif ($errorDetails.HttpStatus) {
+                    Write-PSFMessage -Level $errorDetails.LogLevel -Message "$User - Disable Device Action - $($errorDetails.Reason)"
                 }
-
-                # Pattern matching for status codes
-                if (-not $httpStatus) {
-                    if ($errorMsg -match '\b404\b' -or $errorMsg -match 'not found') { $httpStatus = 404 }
-                    elseif ($errorMsg -match '\b403\b' -or $errorMsg -match 'Insufficient privileges') { $httpStatus = 403 }
-                    elseif ($errorMsg -match '\b429\b' -or $errorMsg -match 'throttl') { $httpStatus = 429 }
-                    elseif ($errorMsg -match '\b400\b' -or $errorMsg -match 'Bad Request') { $httpStatus = 400 }
-                }
-
-                # Compose user-friendly reason
-                $reason = "Failed: $errorMsg"
-                switch ($httpStatus) {
-                    404 {
-                        $reason = 'Operation failed. The user could not be processed.'
-                        Write-PSFMessage -Level Error -Message "$User - Disable Device Action - $reason"
-                        Write-PSFMessage -Level Debug -Message "Detailed error (404): $errorMsg"
-                    }
-                    403 {
-                        $reason = 'Operation failed. The user could not be processed.'
-                        Write-PSFMessage -Level Error -Message "$User - Disable Device Action - $reason"
-                        Write-PSFMessage -Level Debug -Message "Detailed error (403): $errorMsg"
-                    }
-                    429 {
-                        $reason = 'Throttled by Graph API (429). Consider retrying after a delay or implementing exponential backoff.'
-                        Write-PSFMessage -Level Warning -Message "$User - Disable Device Action - $reason"
-                    }
-                    400 {
-                        $reason = "Bad request (400). $errorMsg"
-                        Write-PSFMessage -Level Error -Message "$User - Disable Device Action - $reason"
-                    }
-                    default {
-                        Write-PSFMessage -Level Error -Message "$User - Disable Device Action - $errorMsg"
-                        Write-PSFMessage -Level Debug -Message ($ex | Out-String)
-                    }
+                else {
+                    Write-PSFMessage -Level Error -Message "$User - Disable Device Action - $($errorDetails.ErrorMessage)"
+                    Write-PSFMessage -Level Debug -Message ($_.Exception | Out-String)
                 }
 
                 $result = [PSCustomObject]@{
@@ -302,9 +237,9 @@ Function Disable-GTUserDevice
                     DeviceName      = $null
                     Status          = 'Failed'
                     TimeUtc         = $timeUtc
-                    HttpStatus      = $httpStatus
-                    Reason          = $reason
-                    ExceptionMessage= $errorMsg
+                    HttpStatus      = $errorDetails.HttpStatus
+                    Reason          = $errorDetails.Reason
+                    ExceptionMessage= $errorDetails.ErrorMessage
                 }
                 [void]$results.Add($result)
             }

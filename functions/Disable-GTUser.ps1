@@ -118,65 +118,29 @@ Function Disable-GTUser
             }
             catch
             {
-                # Improved error handling: attempt to detect common HTTP status codes from the Graph SDK exception,
-                # fall back to message pattern matching, then return a structured failure object.
+                # Use centralized error handling helper to parse Graph API exceptions
+                $errorDetails = Get-GTGraphErrorDetails -Exception $_.Exception -ResourceType 'user'
 
-                $ex = $_.Exception
-                $httpStatus = $null
-                $errorMsg = $ex.Message
-
-                # Attempt to extract status code from common locations used by HTTP-based SDK exceptions
-                if ($ex.Response -and $ex.Response.StatusCode) {
-                    try { $httpStatus = [int]$ex.Response.StatusCode } catch {}
+                # Log appropriate message based on error details
+                if ($errorDetails.HttpStatus -in 404, 403) {
+                    Write-PSFMessage -Level $errorDetails.LogLevel -Message "$User - Disable User Action - $($errorDetails.Reason)"
+                    Write-PSFMessage -Level Debug -Message "Detailed error ($($errorDetails.HttpStatus)): $($errorDetails.ErrorMessage)"
                 }
-                if (-not $httpStatus -and $ex.InnerException.Response -and $ex.InnerException.Response.StatusCode) {
-                    try { $httpStatus = [int]$ex.InnerException.Response.StatusCode } catch {}
+                elseif ($errorDetails.HttpStatus) {
+                    Write-PSFMessage -Level $errorDetails.LogLevel -Message "$User - Disable User Action - $($errorDetails.Reason)"
                 }
-
-                # Some SDKs surface status code as StatusCode, HttpStatusCode or numeric string in the message; attempt pattern matching
-                if (-not $httpStatus) {
-                    if ($errorMsg -match '\b404\b' -or $errorMsg -match 'not found') { $httpStatus = 404 }
-                    elseif ($errorMsg -match '\b403\b' -or $errorMsg -match 'Insufficient privileges') { $httpStatus = 403 }
-                    elseif ($errorMsg -match '\b429\b' -or $errorMsg -match 'throttl') { $httpStatus = 429 }
-                    elseif ($errorMsg -match '\b400\b' -or $errorMsg -match 'Bad Request') { $httpStatus = 400 }
-                }
-
-                # Compose a user-friendly reason and logging level based on status
-                $reason = "Failed: $errorMsg"
-                switch ($httpStatus) {
-                    404 {
-                        # Security best practice: Use a generic error message for 404 and 403 to prevent user enumeration.
-                        $reason = 'Operation failed. The user could not be processed.'
-                        Write-PSFMessage -Level Error -Message "$User - Disable User Action - $reason"
-                        Write-PSFMessage -Level Debug -Message "Detailed error (404): $errorMsg"
-                    }
-                    403 {
-                        # Security best practice: Use a generic error message for 404 and 403 to prevent user enumeration.
-                        $reason = 'Operation failed. The user could not be processed.'
-                        Write-PSFMessage -Level Error -Message "$User - Disable User Action - $reason"
-                        Write-PSFMessage -Level Debug -Message "Detailed error (403): $errorMsg"
-                    }
-                    429 {
-                        $reason = 'Throttled by Graph API (429). Consider retrying after a delay or implementing exponential backoff.'
-                        Write-PSFMessage -Level Warning -Message "$User - Disable User Action - $reason"
-                    }
-                    400 {
-                        $reason = "Bad request (400). $errorMsg"
-                        Write-PSFMessage -Level Error -Message "$User - Disable User Action - $reason"
-                    }
-                    default {
-                        Write-PSFMessage -Level Error -Message "$User - Disable User Action - Failed: $errorMsg"
-                        Write-PSFMessage -Level Debug -Message ($ex | Out-String)
-                    }
+                else {
+                    Write-PSFMessage -Level Error -Message "$User - Disable User Action - Failed: $($errorDetails.ErrorMessage)"
+                    Write-PSFMessage -Level Debug -Message ($_.Exception | Out-String)
                 }
 
                 $result = [PSCustomObject]@{
                     User            = $User
                     Status          = 'Failed'
                     TimeUtc         = $timeUtc
-                    HttpStatus      = $httpStatus
-                    Reason          = $reason
-                    ExceptionMessage= $errorMsg
+                    HttpStatus      = $errorDetails.HttpStatus
+                    Reason          = $errorDetails.Reason
+                    ExceptionMessage= $errorDetails.ErrorMessage
                 }
                 [void]$results.Add($result)
             }
