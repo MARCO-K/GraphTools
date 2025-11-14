@@ -1,6 +1,18 @@
-. "$PSScriptRoot/../internal/functions/Remove-GTUserEnterpriseAppOwnership.ps1"
-
 Describe "Remove-GTUserEnterpriseAppOwnership" {
+    BeforeAll {
+        # Mock PSFramework logging
+        function Write-PSFMessage { }
+        
+        # Load the error handling helper function (required by Remove-GTUserEnterpriseAppOwnership)
+        $errorHelperFile = Join-Path $PSScriptRoot '..' 'internal' 'functions' 'Get-GTGraphErrorDetails.ps1'
+        if (Test-Path $errorHelperFile) {
+            . $errorHelperFile
+        }
+        
+        # Import the internal function for testing
+        . "$PSScriptRoot/../internal/functions/Remove-GTUserEnterpriseAppOwnership.ps1"
+    }
+    
     Context "Parameter Validation" {
         It "should reject a user object without Id property" {
             $invalidUser = [PSCustomObject]@{

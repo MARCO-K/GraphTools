@@ -7,6 +7,41 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.10.0] - 2025-01-14
+
+### Changed
+- **Centralized Error Handling** - Major refactoring of Graph API error handling across all functions
+  - Refactored 10 functions (4 public, 6 internal) to use the centralized `Get-GTGraphErrorDetails` helper
+  - Standardized error messages and logging patterns across all Graph API operations
+  - Improved error context with HTTP status code extraction and user-friendly messages
+  - Enhanced security by using generic error messages for 404/403 errors to prevent enumeration attacks
+  - Better diagnostics with separate user-facing messages and debug-level detailed error information
+  
+### Improved
+- **Public Functions** - Enhanced error handling in:
+  - `Get-GTInactiveUsers` - Better error reporting for user retrieval failures
+  - `Get-GTOrphanedGroup` - Improved error context for group query failures
+  - `Get-MFAReport` - Standardized error messaging for MFA report retrieval
+  - `Get-M365LicenceOverview` - Enhanced error handling for license processing
+  - `Remove-GTUserEntitlements` - Better error reporting for user lookup failures
+
+- **Internal Helper Functions** - Consistent error handling in:
+  - `Remove-GTPIMRoleEligibility` - Improved error reporting for PIM role eligibility operations
+  - `Remove-GTUserAccessPackageAssignments` - Better error context for access package operations
+  - `Remove-GTUserAdministrativeUnitMemberships` - Enhanced error handling for administrative unit operations
+  - `Remove-GTUserRoleAssignments` - Standardized error messages for role assignment operations
+  - `Remove-GTUserDelegatedPermissionGrants` - Improved error reporting for OAuth permission operations
+  - `Remove-GTUserEnterpriseAppOwnership` - Better error context for application ownership operations
+
+### Testing
+- Updated test files to properly source `Get-GTGraphErrorDetails` helper function
+- Validated all modified functions pass syntax validation and existing tests
+
+### Developer Experience
+- More consistent error handling patterns make it easier to add new Graph API operations
+- Centralized error parsing reduces code duplication and maintenance burden
+- Improved logging helps with troubleshooting Graph API issues in production environments
+
 ## [0.9.1] - 2025-01-14
 
 ### Fixed
@@ -88,7 +123,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
-[Unreleased]: https://github.com/MARCO-K/GraphTools/compare/v0.9.1...main
+[Unreleased]: https://github.com/MARCO-K/GraphTools/compare/v0.10.0...main
+[0.10.0]: https://github.com/MARCO-K/GraphTools/compare/v0.9.1...v0.10.0
 [0.9.1]: https://github.com/MARCO-K/GraphTools/compare/v0.9.0...v0.9.1
 [0.9.0]: https://github.com/MARCO-K/GraphTools/compare/v0.8.1...v0.9.0
 [0.8.1]: https://github.com/MARCO-K/GraphTools/compare/v0.0.5...v0.8.1
