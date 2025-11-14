@@ -183,12 +183,6 @@ Function Disable-GTUser
     {
         # Emit a single array of all per-user result objects for easier consumption by callers/automation.
         # Use ToArray() so a true array is returned instead of an ArrayList to keep type expectations simple.
-        if ($results.Count -gt 0) {
-            Write-Output ($results.ToArray())
-        }
-        else {
-            # No results (e.g., no input); return an empty array
-            Write-Output @()
-        }
+        ,$results.ToArray()
     }
 }
