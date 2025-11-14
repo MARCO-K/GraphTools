@@ -307,6 +307,16 @@ Functions return structured error information including:
 }
 ```
 
+> **Note:** The `HttpStatus` field is only present when an HTTP status code can be extracted from the error. In some cases, it may be `$null` or omitted entirely.
+
+# Example: Error response when HTTP status is not available
+@{
+    User             = 'user@contoso.com'
+    Status           = 'Failed'
+    TimeUtc          = '2025-01-14T12:30:00.000Z'
+    Reason           = 'Operation failed. The user could not be processed.'
+    ExceptionMessage = 'Original error details...'
+}
 ### Logging Levels
 
 Errors are logged at appropriate levels:
