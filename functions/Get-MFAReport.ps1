@@ -106,8 +106,21 @@ function Get-MFAReport
         }
         catch
         {
-            Write-PSFMessage -Level 'Error' -Message 'Failed to retrieve MFA report from Microsoft Graph.'
-            throw "Failed to retrieve MFA data: $_"
+            # Use centralized error handling helper to parse Graph API exceptions
+            $errorDetails = Get-GTGraphErrorDetails -Exception $_.Exception -ResourceType 'user'
+            
+            # Log appropriate message based on error details
+            if ($errorDetails.HttpStatus -in 404, 403) {
+                Write-PSFMessage -Level $errorDetails.LogLevel -Message "Failed to retrieve MFA report from Microsoft Graph - $($errorDetails.Reason)"
+                Write-PSFMessage -Level Debug -Message "Detailed error ($($errorDetails.HttpStatus)): $($errorDetails.ErrorMessage)"
+            }
+            elseif ($errorDetails.HttpStatus) {
+                Write-PSFMessage -Level $errorDetails.LogLevel -Message "Failed to retrieve MFA report from Microsoft Graph - $($errorDetails.Reason)"
+            }
+            else {
+                Write-PSFMessage -Level Error -Message "Failed to retrieve MFA report from Microsoft Graph. $($errorDetails.ErrorMessage)"
+            }
+            throw "Failed to retrieve MFA data: $($errorDetails.Reason)"
         }
 
         # Data Transformation

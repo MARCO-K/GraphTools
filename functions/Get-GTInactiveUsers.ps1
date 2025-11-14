@@ -89,7 +89,21 @@ function Get-GTInactiveUser
         }
         catch
         {
-            Stop-PSFFunction -Message "Failed to retrieve users" -ErrorRecord $_ -EnableException $true
+            # Use centralized error handling helper to parse Graph API exceptions
+            $errorDetails = Get-GTGraphErrorDetails -Exception $_.Exception -ResourceType 'user'
+            
+            # Log appropriate message based on error details
+            if ($errorDetails.HttpStatus -in 404, 403) {
+                Write-PSFMessage -Level $errorDetails.LogLevel -Message "Failed to retrieve users - $($errorDetails.Reason)"
+                Write-PSFMessage -Level Debug -Message "Detailed error ($($errorDetails.HttpStatus)): $($errorDetails.ErrorMessage)"
+            }
+            elseif ($errorDetails.HttpStatus) {
+                Write-PSFMessage -Level $errorDetails.LogLevel -Message "Failed to retrieve users - $($errorDetails.Reason)"
+            }
+            else {
+                Write-PSFMessage -Level Error -Message "Failed to retrieve users. $($errorDetails.ErrorMessage)"
+            }
+            Stop-PSFFunction -Message $errorDetails.Reason -EnableException $true
         }
 
         Write-PSFMessage -Level Debug -Message "Processing $($users.Count) users"

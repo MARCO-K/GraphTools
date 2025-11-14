@@ -65,8 +65,21 @@ function Remove-GTUserRoleAssignments
                 }
                 catch
                 {
-                    Write-PSFMessage -Level Error -Message "Failed to remove role assignment $($roleAssignment.RoleDefinition.DisplayName) from user $($User.UserPrincipalName)."
-                    $output['Status'] = "Failed: $($_.Exception.Message)"
+                    # Use centralized error handling helper to parse Graph API exceptions
+                    $errorDetails = Get-GTGraphErrorDetails -Exception $_.Exception -ResourceType 'resource'
+                    
+                    # Log appropriate message based on error details
+                    if ($errorDetails.HttpStatus -in 404, 403) {
+                        Write-PSFMessage -Level $errorDetails.LogLevel -Message "Failed to remove role assignment $($roleAssignment.RoleDefinition.DisplayName) from user $($User.UserPrincipalName) - $($errorDetails.Reason)"
+                        Write-PSFMessage -Level Debug -Message "Detailed error ($($errorDetails.HttpStatus)): $($errorDetails.ErrorMessage)"
+                    }
+                    elseif ($errorDetails.HttpStatus) {
+                        Write-PSFMessage -Level $errorDetails.LogLevel -Message "Failed to remove role assignment $($roleAssignment.RoleDefinition.DisplayName) from user $($User.UserPrincipalName) - $($errorDetails.Reason)"
+                    }
+                    else {
+                        Write-PSFMessage -Level Error -Message "Failed to remove role assignment $($roleAssignment.RoleDefinition.DisplayName) from user $($User.UserPrincipalName). $($errorDetails.ErrorMessage)"
+                    }
+                    $output['Status'] = "Failed: $($errorDetails.Reason)"
                 }
                 $Results.Add([PSCustomObject]$output)
             }
@@ -78,13 +91,26 @@ function Remove-GTUserRoleAssignments
     }
     catch
     {
-        Write-PSFMessage -Level Error -Message "Failed to retrieve role assignments for user $($User.UserPrincipalName)."
+        # Use centralized error handling helper to parse Graph API exceptions
+        $errorDetails = Get-GTGraphErrorDetails -Exception $_.Exception -ResourceType 'user'
+        
+        # Log appropriate message based on error details
+        if ($errorDetails.HttpStatus -in 404, 403) {
+            Write-PSFMessage -Level $errorDetails.LogLevel -Message "Failed to retrieve role assignments for user $($User.UserPrincipalName) - $($errorDetails.Reason)"
+            Write-PSFMessage -Level Debug -Message "Detailed error ($($errorDetails.HttpStatus)): $($errorDetails.ErrorMessage)"
+        }
+        elseif ($errorDetails.HttpStatus) {
+            Write-PSFMessage -Level $errorDetails.LogLevel -Message "Failed to retrieve role assignments for user $($User.UserPrincipalName) - $($errorDetails.Reason)"
+        }
+        else {
+            Write-PSFMessage -Level Error -Message "Failed to retrieve role assignments for user $($User.UserPrincipalName). $($errorDetails.ErrorMessage)"
+        }
         $output = $OutputBase + @{
             ResourceName = 'RoleAssignments'
             ResourceType = 'DirectoryRole'
             ResourceId   = $null
             Action       = 'RemoveRoleAssignment'
-            Status       = "Failed: $($_.Exception.Message)"
+            Status       = "Failed: $($errorDetails.Reason)"
         }
         $Results.Add([PSCustomObject]$output)
     }
