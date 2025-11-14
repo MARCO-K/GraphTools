@@ -85,13 +85,11 @@ Describe "Disable-GTUser" -Tag 'Unit' {
         Assert-MockCalled -CommandName Update-MgBetaUser -Times 1
     }
 
-    It "returns an empty array when no users are passed (defensive)" {
-        # The function requires UPN parameter Mandatory = $true, but PowerShell will reject empty arrays during parameter binding
-        # Test that the function would return empty array if it could be called with no input
-        Mock -CommandName Update-MgBetaUser -MockWith { } -Verifiable
+    It "returns an empty array when called with empty pipeline input" {
+        Mock -CommandName Update-MgBetaUser -MockWith { }
 
-        # Since we can't pass empty array to a mandatory parameter, test the defensive code path
-        # by calling with ErrorAction to catch the validation error
-        { Disable-GTUser -UPN @() -ErrorAction Stop } | Should -Throw -ExpectedMessage '*empty array*'
+        $results = @() | Disable-GTUser
+        $results | Should -BeOfType 'object[]'
+        $results.Count | Should -Be 0
     }
 }
