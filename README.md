@@ -33,6 +33,7 @@
 - **🔄 Automation-Friendly**: Full pipeline support for batch operations and scripting
 - **🎨 Flexible Parameters**: Multiple parameter aliases reduce confusion and improve code readability
 - **🛡️ Enterprise-Ready**: Built-in validation, error handling, and verbose logging
+- **🔍 Robust Error Handling**: Centralized Graph API error parsing with HTTP status code extraction and security-conscious error messages
 
 ## 🔑 Key Features
 
@@ -275,6 +276,71 @@ Reset-GTUserPassword -UPN 'user1@contoso.com', 'user2@contoso.com'
 | `-UserIds` | `-Users`, `-UPN`, `-UserPrincipalName`, `-UserName`, `-UPNName` |
 
 See [detailed documentation](docs/User-Security-Response.md) for complete alias mappings.
+
+## 🔍 Error Handling & Reliability
+
+GraphTools v0.10.0 introduces centralized error handling for all Microsoft Graph API operations, providing consistent, informative error messages across all functions.
+
+### Centralized Error Processing
+
+All Graph API errors are processed through the `Get-GTGraphErrorDetails` helper function, which:
+
+- **Extracts HTTP Status Codes**: Automatically detects status codes from Graph API exceptions (404, 403, 429, 400, etc.)
+- **Provides Context-Aware Messages**: Different error types receive appropriate user-facing messages
+- **Enhances Security**: Uses generic messages for 404/403 errors to prevent account enumeration attacks
+- **Supports Debugging**: Detailed error information available at Debug log level
+- **Handles Throttling**: Special handling for rate limit errors (429) with retry guidance
+
+### Error Response Format
+
+Functions return structured error information including:
+
+```powershell
+# Example: Disable-GTUser error response
+@{
+    User             = 'user@contoso.com'
+    Status           = 'Failed'
+    TimeUtc          = '2025-01-14T12:30:00.000Z'
+    HttpStatus       = 404
+    Reason           = 'Operation failed. The user could not be processed.'
+    ExceptionMessage = 'Original error details...'
+}
+```
+
+> **Note:** The `HttpStatus` field is only present when an HTTP status code can be extracted from the error. In some cases, it may be `$null` or omitted entirely.
+
+# Example: Error response when HTTP status is not available
+@{
+    User             = 'user@contoso.com'
+    Status           = 'Failed'
+    TimeUtc          = '2025-01-14T12:30:00.000Z'
+    Reason           = 'Operation failed. The user could not be processed.'
+    ExceptionMessage = 'Original error details...'
+}
+### Logging Levels
+
+Errors are logged at appropriate levels:
+- **Error**: Most failures and unrecognized errors
+- **Warning**: Throttling (429) errors with retry guidance
+- **Debug**: Detailed HTTP status codes and full exception messages
+
+### Example: Handling Errors in Scripts
+
+```powershell
+# Error handling with structured output
+$results = Disable-GTUser -UPN 'user1@contoso.com','user2@contoso.com'
+
+foreach ($result in $results) {
+    if ($result.Status -eq 'Failed') {
+        Write-Warning "Failed to disable $($result.User): $($result.Reason)"
+        
+        # Check for specific HTTP status codes
+        if ($result.HttpStatus -eq 429) {
+            Start-Sleep -Seconds 60  # Wait before retry
+        }
+    }
+}
+```
 
 ## 📋 Prerequisites
 

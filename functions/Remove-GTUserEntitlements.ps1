@@ -177,12 +177,27 @@ function Remove-GTUserEntitlements
             }
             catch
             {
+                # Use centralized error handling helper to parse Graph API exceptions
+                $errorDetails = Get-GTGraphErrorDetails -Exception $_.Exception -ResourceType 'user'
+                
+                # Log appropriate message based on error details
+                if ($errorDetails.HttpStatus -in 404, 403) {
+                    Write-PSFMessage -Level $errorDetails.LogLevel -Message "$UPN - User retrieval failed - $($errorDetails.Reason)"
+                    Write-PSFMessage -Level Debug -Message "Detailed error ($($errorDetails.HttpStatus)): $($errorDetails.ErrorMessage)"
+                }
+                elseif ($errorDetails.HttpStatus) {
+                    Write-PSFMessage -Level $errorDetails.LogLevel -Message "$UPN - User retrieval failed - $($errorDetails.Reason)"
+                }
+                else {
+                    Write-PSFMessage -Level Error -Message "$UPN - User retrieval failed. $($errorDetails.ErrorMessage)"
+                }
+                
                 $results.Add([PSCustomObject]($outputBase + @{
                             ResourceName = 'UserLookup'
                             ResourceType = 'User'
                             ResourceId   = $null
                             Action       = 'UserRetrieval'
-                            Status       = "Failed: $($_.Exception.Message)"
+                            Status       = "Failed: $($errorDetails.Reason)"
                         }))
             }
         }

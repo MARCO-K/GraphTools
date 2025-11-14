@@ -87,8 +87,21 @@ function Remove-GTUserDelegatedPermissionGrants
                 }
                 catch
                 {
-                    Write-PSFMessage -Level Error -Message "Failed to remove delegated permission grant for '$appName' from user $($User.UserPrincipalName). Error: $($_.Exception.Message)"
-                    $output['Status'] = "Failed: $($_.Exception.Message)"
+                    # Use centralized error handling helper to parse Graph API exceptions
+                    $errorDetails = Get-GTGraphErrorDetails -Exception $_.Exception -ResourceType 'resource'
+                    
+                    # Log appropriate message based on error details
+                    if ($errorDetails.HttpStatus -in 404, 403) {
+                        Write-PSFMessage -Level $errorDetails.LogLevel -Message "Failed to remove delegated permission grant for '$appName' from user $($User.UserPrincipalName) - $($errorDetails.Reason)"
+                        Write-PSFMessage -Level Debug -Message "Detailed error ($($errorDetails.HttpStatus)): $($errorDetails.ErrorMessage)"
+                    }
+                    elseif ($errorDetails.HttpStatus) {
+                        Write-PSFMessage -Level $errorDetails.LogLevel -Message "Failed to remove delegated permission grant for '$appName' from user $($User.UserPrincipalName) - $($errorDetails.Reason)"
+                    }
+                    else {
+                        Write-PSFMessage -Level Error -Message "Failed to remove delegated permission grant for '$appName' from user $($User.UserPrincipalName). $($errorDetails.ErrorMessage)"
+                    }
+                    $output['Status'] = "Failed: $($errorDetails.Reason)"
                 }
                 $Results.Add([PSCustomObject]$output)
             }
@@ -100,13 +113,26 @@ function Remove-GTUserDelegatedPermissionGrants
     }
     catch
     {
-        Write-PSFMessage -Level Error -Message "Failed to retrieve delegated permission grants for user $($User.UserPrincipalName)."
+        # Use centralized error handling helper to parse Graph API exceptions
+        $errorDetails = Get-GTGraphErrorDetails -Exception $_.Exception -ResourceType 'user'
+        
+        # Log appropriate message based on error details
+        if ($errorDetails.HttpStatus -in 404, 403) {
+            Write-PSFMessage -Level $errorDetails.LogLevel -Message "Failed to retrieve delegated permission grants for user $($User.UserPrincipalName) - $($errorDetails.Reason)"
+            Write-PSFMessage -Level Debug -Message "Detailed error ($($errorDetails.HttpStatus)): $($errorDetails.ErrorMessage)"
+        }
+        elseif ($errorDetails.HttpStatus) {
+            Write-PSFMessage -Level $errorDetails.LogLevel -Message "Failed to retrieve delegated permission grants for user $($User.UserPrincipalName) - $($errorDetails.Reason)"
+        }
+        else {
+            Write-PSFMessage -Level Error -Message "Failed to retrieve delegated permission grants for user $($User.UserPrincipalName). $($errorDetails.ErrorMessage)"
+        }
         $output = $OutputBase + @{
             ResourceName = 'DelegatedPermissionGrants'
             ResourceType = 'OAuth2PermissionGrant'
             ResourceId   = $null
             Action       = 'RemoveDelegatedPermissionGrant'
-            Status       = "Failed: $($_.Exception.Message)"
+            Status       = "Failed: $($errorDetails.Reason)"
         }
         $Results.Add([PSCustomObject]$output)
     }

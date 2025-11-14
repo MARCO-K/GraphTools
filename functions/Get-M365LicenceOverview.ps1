@@ -183,7 +183,21 @@ function Get-M365LicenseOverview
         }
         catch
         {
-            throw "License processing failed: $_"
+            # Use centralized error handling helper to parse Graph API exceptions
+            $errorDetails = Get-GTGraphErrorDetails -Exception $_.Exception -ResourceType 'user'
+            
+            # Log appropriate message based on error details
+            if ($errorDetails.HttpStatus -in 404, 403) {
+                Write-PSFMessage -Level $errorDetails.LogLevel -Message "License processing failed - $($errorDetails.Reason)"
+                Write-PSFMessage -Level Debug -Message "Detailed error ($($errorDetails.HttpStatus)): $($errorDetails.ErrorMessage)"
+            }
+            elseif ($errorDetails.HttpStatus) {
+                Write-PSFMessage -Level $errorDetails.LogLevel -Message "License processing failed - $($errorDetails.Reason)"
+            }
+            else {
+                Write-PSFMessage -Level Error -Message "License processing failed. $($errorDetails.ErrorMessage)"
+            }
+            throw "License processing failed: $($errorDetails.Reason)"
         }
     }
 }

@@ -3,6 +3,14 @@ Describe "Remove-GTPIMRoleEligibility" {
         # Mock PSFramework logging first (before sourcing the function)
         function Write-PSFMessage { }
         
+        # Load the error handling helper function (required by Remove-GTPIMRoleEligibility)
+        $errorHelperFile = Join-Path $PSScriptRoot '..' 'internal' 'functions' 'Get-GTGraphErrorDetails.ps1'
+        if (Test-Path $errorHelperFile) {
+            . $errorHelperFile
+        } else {
+            throw "Required helper function Get-GTGraphErrorDetails.ps1 not found at: $errorHelperFile"
+        }
+        
         # Mock Microsoft Graph cmdlets as stubs
         function Get-MgBetaRoleManagementDirectoryRoleEligibilitySchedule { }
         function Remove-MgBetaRoleManagementDirectoryRoleEligibilitySchedule { }

@@ -53,13 +53,26 @@ function Remove-GTUserEnterpriseAppOwnership
     catch
     {
         # Handle failure to get any owned objects
-        Write-PSFMessage -Level Error -Message "Failed to retrieve owned objects for user $($User.UserPrincipalName)."
+        # Use centralized error handling helper to parse Graph API exceptions
+        $errorDetails = Get-GTGraphErrorDetails -Exception $_.Exception -ResourceType 'user'
+        
+        # Log appropriate message based on error details
+        if ($errorDetails.HttpStatus -in 404, 403) {
+            Write-PSFMessage -Level $errorDetails.LogLevel -Message "Failed to retrieve owned objects for user $($User.UserPrincipalName) - $($errorDetails.Reason)"
+            Write-PSFMessage -Level Debug -Message "Detailed error ($($errorDetails.HttpStatus)): $($errorDetails.ErrorMessage)"
+        }
+        elseif ($errorDetails.HttpStatus) {
+            Write-PSFMessage -Level $errorDetails.LogLevel -Message "Failed to retrieve owned objects for user $($User.UserPrincipalName) - $($errorDetails.Reason)"
+        }
+        else {
+            Write-PSFMessage -Level Error -Message "Failed to retrieve owned objects for user $($User.UserPrincipalName). $($errorDetails.ErrorMessage)"
+        }
         $output = $OutputBase + @{
             ResourceName = 'OwnedObjects'
             ResourceType = 'All'
             ResourceId   = $null
             Action       = 'RetrieveOwnedObjects'
-            Status       = "Failed: $($_.Exception.Message)"
+            Status       = "Failed: $($errorDetails.Reason)"
         }
         $Results.Add([PSCustomObject]$output)
         return
@@ -99,8 +112,21 @@ function Remove-GTUserEnterpriseAppOwnership
             }
             catch
             {
-                Write-PSFMessage -Level Error -Message "Failed to remove user $($User.UserPrincipalName) from App Registration: $($app.AdditionalProperties.displayName)."
-                $output['Status'] = "Failed: $($_.Exception.Message)"
+                # Use centralized error handling helper to parse Graph API exceptions
+                $errorDetails = Get-GTGraphErrorDetails -Exception $_.Exception -ResourceType 'resource'
+                
+                # Log appropriate message based on error details
+                if ($errorDetails.HttpStatus -in 404, 403) {
+                    Write-PSFMessage -Level $errorDetails.LogLevel -Message "Failed to remove user $($User.UserPrincipalName) from App Registration: $($app.AdditionalProperties.displayName) - $($errorDetails.Reason)"
+                    Write-PSFMessage -Level Debug -Message "Detailed error ($($errorDetails.HttpStatus)): $($errorDetails.ErrorMessage)"
+                }
+                elseif ($errorDetails.HttpStatus) {
+                    Write-PSFMessage -Level $errorDetails.LogLevel -Message "Failed to remove user $($User.UserPrincipalName) from App Registration: $($app.AdditionalProperties.displayName) - $($errorDetails.Reason)"
+                }
+                else {
+                    Write-PSFMessage -Level Error -Message "Failed to remove user $($User.UserPrincipalName) from App Registration: $($app.AdditionalProperties.displayName). $($errorDetails.ErrorMessage)"
+                }
+                $output['Status'] = "Failed: $($errorDetails.Reason)"
             }
             $Results.Add([PSCustomObject]$output)
         }
@@ -144,8 +170,21 @@ function Remove-GTUserEnterpriseAppOwnership
             }
             catch
             {
-                Write-PSFMessage -Level Error -Message "Failed to remove user $($User.UserPrincipalName) from Enterprise Application: $($sp.AdditionalProperties.displayName)."
-                $output['Status'] = "Failed: $($_.Exception.Message)"
+                # Use centralized error handling helper to parse Graph API exceptions
+                $errorDetails = Get-GTGraphErrorDetails -Exception $_.Exception -ResourceType 'resource'
+                
+                # Log appropriate message based on error details
+                if ($errorDetails.HttpStatus -in 404, 403) {
+                    Write-PSFMessage -Level $errorDetails.LogLevel -Message "Failed to remove user $($User.UserPrincipalName) from Enterprise Application: $($sp.AdditionalProperties.displayName) - $($errorDetails.Reason)"
+                    Write-PSFMessage -Level Debug -Message "Detailed error ($($errorDetails.HttpStatus)): $($errorDetails.ErrorMessage)"
+                }
+                elseif ($errorDetails.HttpStatus) {
+                    Write-PSFMessage -Level $errorDetails.LogLevel -Message "Failed to remove user $($User.UserPrincipalName) from Enterprise Application: $($sp.AdditionalProperties.displayName) - $($errorDetails.Reason)"
+                }
+                else {
+                    Write-PSFMessage -Level Error -Message "Failed to remove user $($User.UserPrincipalName) from Enterprise Application: $($sp.AdditionalProperties.displayName). $($errorDetails.ErrorMessage)"
+                }
+                $output['Status'] = "Failed: $($errorDetails.Reason)"
             }
             $Results.Add([PSCustomObject]$output)
         }
