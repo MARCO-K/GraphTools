@@ -3,6 +3,14 @@ Describe "Remove-GTPIMRoleEligibility" {
         # Mock PSFramework logging first (before sourcing the function)
         function Write-PSFMessage { }
         
+        # Load the validation helper function (required by Remove-GTPIMRoleEligibility)
+        $validationFile = Join-Path $PSScriptRoot '..' 'internal' 'functions' 'GTValidation.ps1'
+        if (Test-Path $validationFile) {
+            . $validationFile
+        } else {
+            throw "Required validation function GTValidation.ps1 not found at: $validationFile"
+        }
+        
         # Load the error handling helper function (required by Remove-GTPIMRoleEligibility)
         $errorHelperFile = Join-Path $PSScriptRoot '..' 'internal' 'functions' 'Get-GTGraphErrorDetails.ps1'
         if (Test-Path $errorHelperFile) {
@@ -18,16 +26,16 @@ Describe "Remove-GTPIMRoleEligibility" {
         # Import the internal function for testing
         . "$PSScriptRoot/../internal/functions/Remove-GTPIMRoleEligibility.ps1"
         
-        # Create test user object
+        # Create test user object with valid GUID
         $script:testUser = [PSCustomObject]@{
-            Id = "test-user-id-12345"
+            Id = "12345678-1234-1234-1234-123456789abc"
             UserPrincipalName = "testuser@contoso.com"
         }
         
         # Create test output base
         $script:testOutputBase = @{
             UPN = "testuser@contoso.com"
-            UserId = "test-user-id-12345"
+            UserId = "12345678-1234-1234-1234-123456789abc"
             Timestamp = [datetime]::UtcNow
         }
         
@@ -207,7 +215,7 @@ Describe "Remove-GTPIMRoleEligibility" {
             
             $output = $results[0]
             $output.UPN | Should -Be "testuser@contoso.com"
-            $output.UserId | Should -Be "test-user-id-12345"
+            $output.UserId | Should -Be "12345678-1234-1234-1234-123456789abc"
             $output.ResourceName | Should -Be "Global Administrator"
             $output.ResourceType | Should -Be "PIMRoleEligibility"
             $output.ResourceId | Should -Be "schedule-id-1"
