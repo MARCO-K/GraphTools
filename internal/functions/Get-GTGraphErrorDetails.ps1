@@ -38,7 +38,7 @@ function Get-GTGraphErrorDetails
         Update-MgBetaUser -UserId $userId -AccountEnabled $false
     }
     catch {
-        $errorDetails = Get-GTGraphErrorDetails -Exception $_.Exception -Context $userId -ResourceType 'user'
+        $errorDetails = Get-GTGraphErrorDetails -Exception $_.Exception -ResourceType 'user'
         Write-PSFMessage -Level $errorDetails.LogLevel -Message "$userId - $($errorDetails.Reason)"
     }
 
