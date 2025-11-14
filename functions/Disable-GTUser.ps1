@@ -126,11 +126,11 @@ Function Disable-GTUser
                 $errorMsg = $ex.Message
 
                 # Attempt to extract status code from common locations used by HTTP-based SDK exceptions
-                if ($ex -and ($ex.PSObject.Properties.Name -contains 'Response')) {
-                    try { $httpStatus = $ex.Response.StatusCode } catch {}
+                if ($ex.Response -and $ex.Response.StatusCode) {
+                    try { $httpStatus = [int]$ex.Response.StatusCode } catch {}
                 }
-                if (-not $httpStatus -and $ex.InnerException -and ($ex.InnerException.PSObject.Properties.Name -contains 'Response')) {
-                    try { $httpStatus = $ex.InnerException.Response.StatusCode } catch {}
+                if (-not $httpStatus -and $ex.InnerException.Response -and $ex.InnerException.Response.StatusCode) {
+                    try { $httpStatus = [int]$ex.InnerException.Response.StatusCode } catch {}
                 }
 
                 # Some SDKs surface status code as StatusCode, HttpStatusCode or numeric string in the message; attempt pattern matching
