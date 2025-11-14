@@ -128,33 +128,42 @@ This guide provides PowerShell-specific instructions to help GitHub Copilot gene
   - Support automation scenarios
   - Document all required inputs
 
-## Testing with Pester
+## Testing Guidelines
 
 - **Test Structure:**
-  - Use Pester 5.x syntax with `Describe`, `Context`, `It`, `BeforeAll`, `BeforeEach`
-  - Place test files in `tests/` directory with `.Tests.ps1` suffix
-  - Name test files to match the function being tested
+  - Use Pester 5.x syntax with `Describe`, `Context`, and `It` blocks
+  - Source the function being tested at the top of the test file
+  - For public functions: `. "$PSScriptRoot/../functions/FunctionName.ps1"`
+  - For internal functions: `. "$PSScriptRoot/../internal/functions/FunctionName.ps1"`
 
-- **Mocking Dependencies:**
-  - Define stub functions in `BeforeAll` block before sourcing the function under test
-  - Stub functions must exist before Mock can override them
-  - Example:
-    ```powershell
-    BeforeAll {
-        function Get-MgBetaUser { }  # Stub
-        . "$PSScriptRoot/../functions/MyFunction.ps1"  # Source after stubs
-        Mock -CommandName "Get-MgBetaUser" -MockWith { ... }  # Mock the stub
-    }
-    ```
-  - For internal functions, also stub Write-PSFMessage and any Microsoft Graph cmdlets used
+- **Testing Limitations in CI/Sandboxed Environments:**
+  - Microsoft Graph modules and PSFramework are NOT available in sandboxed environments
+  - Tests cannot call actual Graph API endpoints
+  - Tests focus on parameter validation and function structure
+  - Keep tests simple and avoid complex mocking when dependencies are unavailable
 
-- **Testing Internal Functions:**
-  - Internal functions (in `internal/functions/`) use `[AllowEmptyCollection()]` for List parameters
-  - Create new List instances in each test: `$results = [System.Collections.Generic.List[PSObject]]::new()`
-  - Don't reuse Lists between tests to avoid parameter binding issues
+- **Test Patterns for Internal Functions:**
+  - Internal functions that depend on Microsoft Graph or PSFramework cannot be fully tested in CI
+  - Focus on parameter validation tests that verify ValidateScript attributes work correctly
+  - Example: Test that invalid user objects (missing Id or UserPrincipalName) are rejected
+  - Avoid tests that attempt to mock and call the full function execution path
+  
+- **Minimal Test Example:**
+  ```powershell
+  . "$PSScriptRoot/../internal/functions/FunctionName.ps1"
+  
+  Describe "FunctionName" {
+      Context "Parameter Validation" {
+          It "should reject invalid parameter" {
+              { FunctionName -Param "invalid" } | Should -Throw
+          }
+      }
+  }
+  ```
 
-- **Validation Testing:**
-  - Test parameter validation separately in a dedicated context
-  - Use ValidateScript attribute with regex from GTValidation.ps1 for UPN parameters
-  - Test both valid and invalid inputs
+- **What NOT to Do:**
+  - Do not attempt to mock PSFramework's `Write-PSFMessage` in BeforeAll blocks (causes loading issues)
+  - Do not try to mock Microsoft Graph cmdlets globally (they may not be available)
+  - Do not create complex integration tests that require live API connections
+  - Do not expect full module imports to work in CI environment
 
