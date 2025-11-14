@@ -7,6 +7,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.9.1] - 2025-01-14
+
+### Fixed
+- **Test-GTGraphScopes** - Improved internal Graph connection validation function
+  - Uncommented `return $false` for fail-fast behavior when no Graph context exists
+  - Prevents "You cannot call a method on a null-valued expression" errors
+  - Preserves existing scopes during reconnection by combining current and required scopes
+  - Added post-reconnect verification to ensure all requested permissions were granted
+  - Enhanced error messages for better troubleshooting
+
+### Changed
+- **Test-GTGraphScopes** - Improved reconnection logic to maintain user's existing Graph API permissions
+
 ## [0.9.0] - 2025-01-14
 
 ### Added
@@ -75,5 +88,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
-[Unreleased]: https://github.com/MARCO-K/GraphTools/compare/v0.0.5...main
+[Unreleased]: https://github.com/MARCO-K/GraphTools/compare/v0.9.1...main
+[0.9.1]: https://github.com/MARCO-K/GraphTools/compare/v0.9.0...v0.9.1
+[0.9.0]: https://github.com/MARCO-K/GraphTools/compare/v0.8.1...v0.9.0
+[0.8.1]: https://github.com/MARCO-K/GraphTools/compare/v0.0.5...v0.8.1
 [0.0.5]: https://github.com/MARCO-K/GraphTools/releases/tag/v0.0.5
