@@ -19,7 +19,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Comprehensive test coverage with 11 unit tests
 
 ### Fixed
-- Added `[AllowEmptyCollection()]` attribute to collection parameters for PowerShell 7+ compatibility
+- Added `[AllowEmptyCollection()]` attribute to new function's collection parameter for PowerShell 7+ compatibility
 
 ### Security
 - Closed critical security gap: Users with PIM role eligibilities can no longer activate privileged roles after account remediation
