@@ -84,7 +84,7 @@ function Test-GTGuid
                 )
             }
 
-            Write-Output $isValid
+            if ($isValid -or $Quiet) { Write-Output $isValid }
         }
     }
 }
