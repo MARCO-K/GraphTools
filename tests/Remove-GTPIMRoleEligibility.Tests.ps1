@@ -7,6 +7,8 @@ Describe "Remove-GTPIMRoleEligibility" {
         $errorHelperFile = Join-Path $PSScriptRoot '..' 'internal' 'functions' 'Get-GTGraphErrorDetails.ps1'
         if (Test-Path $errorHelperFile) {
             . $errorHelperFile
+        } else {
+            throw "Required helper function Get-GTGraphErrorDetails.ps1 not found at: $errorHelperFile"
         }
         
         # Mock Microsoft Graph cmdlets as stubs
