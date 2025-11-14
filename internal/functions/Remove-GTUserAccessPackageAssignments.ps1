@@ -44,6 +44,9 @@ function Remove-GTUserAccessPackageAssignments
 
     try
     {
+        # Validate that User.Id is a GUID to prevent OData injection
+        Test-GTGuid -InputObject $User.Id | Out-Null
+        
         # Get all access package assignments for the user with delivered state
         # Using filter with target/objectId for precise user matching
         $filter = "state eq 'Delivered' and target/objectId eq '$($User.Id)'"

@@ -57,11 +57,11 @@ Describe "Disable-GTUserDevice" -Tag 'Unit' {
     Context "Device Disabling" {
         It "disables devices for a user and returns a single array of Disabled results" {
             $upn = 'alice@contoso.com'
-            $userId = 'user-guid-123'
+            $userId = '12345678-1234-1234-1234-123456789abc'
 
             # Mock user retrieval
             Mock -CommandName Get-MgUser -MockWith {
-                [PSCustomObject]@{ Id = $userId }
+                [PSCustomObject]@{ Id = '12345678-1234-1234-1234-123456789abc' }
             } -Verifiable
 
             # Mock device retrieval with optimized query
@@ -95,10 +95,10 @@ Describe "Disable-GTUserDevice" -Tag 'Unit' {
 
         It "handles users with no enabled devices" {
             $upn = 'nodevices@contoso.com'
-            $userId = 'user-guid-456'
+            $userId = 'a1b2c3d4-e5f6-a7b8-c9d0-e1f2a3b4c5d6'
 
             Mock -CommandName Get-MgUser -MockWith {
-                [PSCustomObject]@{ Id = $userId }
+                [PSCustomObject]@{ Id = 'a1b2c3d4-e5f6-a7b8-c9d0-e1f2a3b4c5d6' }
             }
 
             Mock -CommandName Get-MgDevice -MockWith {
@@ -115,10 +115,10 @@ Describe "Disable-GTUserDevice" -Tag 'Unit' {
 
         It "honors -Force and invokes Update-MgDevice" {
             $upn = 'charlie@contoso.com'
-            $userId = 'user-guid-101'
+            $userId = 'aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee'
 
             Mock -CommandName Get-MgUser -MockWith {
-                [PSCustomObject]@{ Id = $userId }
+                [PSCustomObject]@{ Id = 'aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee' }
             }
 
             Mock -CommandName Get-MgDevice -MockWith {
@@ -142,10 +142,10 @@ Describe "Disable-GTUserDevice" -Tag 'Unit' {
 
         It "returns Failed with HttpStatus 404 when Graph returns a not found error for device operation" {
             $upn = 'user@contoso.com'
-            $userId = 'user-guid-404'
+            $userId = '11111111-2222-3333-4444-555555555555'
 
             Mock -CommandName Get-MgUser -MockWith {
-                [PSCustomObject]@{ Id = $userId }
+                [PSCustomObject]@{ Id = '11111111-2222-3333-4444-555555555555' }
             }
 
             Mock -CommandName Get-MgDevice -MockWith {
@@ -174,10 +174,10 @@ Describe "Disable-GTUserDevice" -Tag 'Unit' {
 
         It "returns Failed with HttpStatus 403 when Graph returns insufficient privileges error" {
             $upn = 'user@contoso.com'
-            $userId = 'user-guid-403'
+            $userId = 'bbbbbbbb-cccc-dddd-eeee-ffffffffffff'
 
             Mock -CommandName Get-MgUser -MockWith {
-                [PSCustomObject]@{ Id = $userId }
+                [PSCustomObject]@{ Id = 'bbbbbbbb-cccc-dddd-eeee-ffffffffffff' }
             }
 
             Mock -CommandName Get-MgDevice -MockWith {
@@ -222,10 +222,10 @@ Describe "Disable-GTUserDevice" -Tag 'Unit' {
 
         It "processes multiple devices for a single user" {
             $upn = 'multidevice@contoso.com'
-            $userId = 'user-guid-multi'
+            $userId = 'fedcba98-7654-3210-fedc-ba9876543210'
 
             Mock -CommandName Get-MgUser -MockWith {
-                [PSCustomObject]@{ Id = $userId }
+                [PSCustomObject]@{ Id = 'fedcba98-7654-3210-fedc-ba9876543210' }
             }
 
             Mock -CommandName Get-MgDevice -MockWith {

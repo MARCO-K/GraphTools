@@ -40,6 +40,9 @@ function Remove-GTUserRoleAssignments
 
     try
     {
+        # Validate that User.Id is a GUID to prevent OData injection
+        Test-GTGuid -InputObject $User.Id | Out-Null
+        
         $roleAssignments = Get-MgBetaRoleManagementDirectoryRoleAssignment -Filter "principalId eq '$($User.Id)'" -ExpandProperty roleDefinition -All -ErrorAction Stop
 
         if ($roleAssignments)

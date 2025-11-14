@@ -113,9 +113,7 @@ Function Disable-GTUserDevice
                 $userId = $userObject.Id
 
                 # Validate that userId is a GUID to prevent OData injection
-                if ($userId -notmatch '^[0-9a-fA-F]{8}-([0-9a-fA-F]{4}-){3}[0-9a-fA-F]{12}$') {
-                    throw "Invalid user ID format: $userId"
-                }
+                Test-GTGuid -InputObject $userId | Out-Null
                 # Get all enabled devices registered to this user in a single API call
                 # This replaces Get-MgUserRegisteredDevice + Get-MgUserRegisteredDeviceAsDevice loop
                 $devicesToDisable = Get-MgDevice -All -Filter "accountEnabled eq true and registeredUsers/any(u:u/id eq '$userId')" -ErrorAction Stop

@@ -47,6 +47,9 @@ function Remove-GTPIMRoleEligibility
 
     try
     {
+        # Validate that User.Id is a GUID to prevent OData injection
+        Test-GTGuid -InputObject $User.Id | Out-Null
+        
         $roleEligibilitySchedules = Get-MgBetaRoleManagementDirectoryRoleEligibilitySchedule -Filter "principalId eq '$($User.Id)'" -ExpandProperty roleDefinition -All -ErrorAction Stop
 
         if ($roleEligibilitySchedules)
