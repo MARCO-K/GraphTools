@@ -43,18 +43,14 @@ function Test-GTGraphScopes
     $permissionType = if ($context.AuthType -eq 'Delegated') { 'Scopes' } else { 'AppRoles' }
     $currentPermissions = $context.$permissionType
 
-    # Normalize case for comparison
-    $required = $RequiredScopes.ForEach{ $_.ToLower() }
-    $current = $currentPermissions.ForEach{ $_.ToLower() }
-
-    # Find missing permissions
-    $missing = $required | Where-Object { $_ -notin $current }
+    # Find missing permissions using helper function
+    $missing = Get-GTMissingScopes -RequiredScopes $RequiredScopes -CurrentScopes $currentPermissions
 
     if ($missing.Count -gt 0)
     {
         if (-not $Quiet)
         {
-            Write-Error "Missing scopes: $($missing -join ', ')" -ErrorAction Continue
+            Write-Warning "Missing scopes: $($missing -join ', ')"
         }
 
         if ($Reconnect)
@@ -76,8 +72,7 @@ function Test-GTGraphScopes
                     }
                     
                     # Verify all required scopes are present in the new context
-                    $newCurrent = $newContext.Scopes.ForEach{ $_.ToLower() }
-                    $stillMissing = $required | Where-Object { $_ -notin $newCurrent }
+                    $stillMissing = Get-GTMissingScopes -RequiredScopes $RequiredScopes -CurrentScopes $newContext.Scopes
                     
                     if ($stillMissing.Count -gt 0)
                     {
@@ -92,7 +87,7 @@ function Test-GTGraphScopes
                 {
                     if (-not $Quiet)
                     {
-                        Write-Warning "Application permissions require manual reconnection"
+                        Write-Warning "Application permissions require manual reconnection. Missing permissions: $($missing -join ', ')"
                     }
                     return $false
                 }
