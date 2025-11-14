@@ -7,8 +7,22 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.9.0] - 2025-01-14
+
 ### Added
-- Made `Remove-GTUserEntitlements` a public function for direct use by module consumers
+- **PIM Role Eligibility Removal** - Critical security enhancement for offboarding processes
+  - New internal function `Remove-GTPIMRoleEligibility` to remove PIM (Privileged Identity Management) role eligibility schedules
+  - Prevents users from activating privileged roles after offboarding
+  - Integrated into `Remove-GTUserEntitlements` with new `-removePIMRoleEligibility` switch parameter
+  - Automatically included when using `-removeAll` parameter
+  - Added required Graph API scope: `RoleEligibilitySchedule.ReadWrite.Directory`
+  - Comprehensive test coverage with 11 unit tests
+
+### Fixed
+- Added `[AllowEmptyCollection()]` attribute to collection parameters for PowerShell 7+ compatibility
+
+### Security
+- Closed critical security gap: Users with PIM role eligibilities can no longer activate privileged roles after account remediation
 
 ## [0.8.1] - 2025-01-13
 

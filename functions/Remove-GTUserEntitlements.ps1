@@ -10,6 +10,7 @@
     - Enterprise Applications and App Registrations ownerships
     - User app role assignments (application access)
     - Directory role assignments (privileged roles)
+    - PIM role eligibility schedules (eligible privileged roles)
     - Administrative unit memberships (scoped administrative rights)
     - Access package assignments (Entitlement Management)
     - Delegated permission grants (OAuth2 permissions granted to apps on behalf of user)
@@ -32,6 +33,8 @@
     Remove all user app role assignments to revoke access to specific applications
 .PARAMETER removeRoleAssignments
     Remove all directory role assignments (privileged roles like Global Administrator)
+.PARAMETER removePIMRoleEligibility
+    Remove all PIM role eligibility schedules to prevent activation of eligible privileged roles
 .PARAMETER removeAdministrativeUnitMemberships
     Remove all administrative unit memberships to revoke scoped administrative rights
 .PARAMETER removeAccessPackageAssignments
@@ -48,6 +51,10 @@
     Remove-GTUserEntitlements -UserUPNs 'user1@contoso.com','user2@contoso.com' -removeGroups -removeLicenses
 
     Removes group memberships and licenses from multiple users
+.EXAMPLE
+    Remove-GTUserEntitlements -UserUPNs 'admin@contoso.com' -removeRoleAssignments -removePIMRoleEligibility
+
+    Removes both active role assignments and PIM role eligibilities from an admin account
 #>
 function Remove-GTUserEntitlements
 {
@@ -63,6 +70,7 @@ function Remove-GTUserEntitlements
         [switch]$removeEnterpriseAppOwnership,
         [switch]$removeUserAppRoleAssignments,
         [switch]$removeRoleAssignments,
+        [switch]$removePIMRoleEligibility,
         [switch]$removeAdministrativeUnitMemberships,
         [switch]$removeAccessPackageAssignments,
         [switch]$removeDelegatedPermissionGrants,
@@ -74,7 +82,7 @@ function Remove-GTUserEntitlements
         $results = [System.Collections.Generic.List[PSObject]]::new()
 
         # check for required scopes
-        $RequieredScopes = @('GroupMember.ReadWrite.All', 'Group.ReadWrite.All', 'Directory.ReadWrite.All', 'RoleManagement.ReadWrite.Directory', 'AdministrativeUnit.ReadWrite.All', 'EntitlementManagement.ReadWrite.All', 'DelegatedPermissionGrant.ReadWrite.All')
+        $RequieredScopes = @('GroupMember.ReadWrite.All', 'Group.ReadWrite.All', 'Directory.ReadWrite.All', 'RoleManagement.ReadWrite.Directory', 'RoleEligibilitySchedule.ReadWrite.Directory', 'AdministrativeUnit.ReadWrite.All', 'EntitlementManagement.ReadWrite.All', 'DelegatedPermissionGrant.ReadWrite.All')
         $missingScopes = $RequieredScopes | Where-Object { $_ -notin (Get-MgContext).Scopes }
         if ($missingScopes)
         {
@@ -143,19 +151,25 @@ function Remove-GTUserEntitlements
                     Remove-GTUserRoleAssignments -User $User -OutputBase $outputBase -Results $results
                 }
 
-                # 8. Remove Administrative Unit Memberships
+                # 8. Remove PIM Role Eligibility Schedules
+                if ($removePIMRoleEligibility -or $removeAll)
+                {
+                    Remove-GTPIMRoleEligibility -User $User -OutputBase $outputBase -Results $results
+                }
+
+                # 9. Remove Administrative Unit Memberships
                 if ($removeAdministrativeUnitMemberships -or $removeAll)
                 {
                     Remove-GTUserAdministrativeUnitMemberships -User $User -OutputBase $outputBase -Results $results
                 }
 
-                # 9. Remove Access Package Assignments
+                # 10. Remove Access Package Assignments
                 if ($removeAccessPackageAssignments -or $removeAll)
                 {
                     Remove-GTUserAccessPackageAssignments -User $User -OutputBase $outputBase -Results $results
                 }
 
-                # 10. Remove Delegated Permission Grants
+                # 11. Remove Delegated Permission Grants
                 if ($removeDelegatedPermissionGrants -or $removeAll)
                 {
                     Remove-GTUserDelegatedPermissionGrants -User $User -OutputBase $outputBase -Results $results

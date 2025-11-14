@@ -74,6 +74,12 @@ This guide provides PowerShell-specific instructions to help GitHub Copilot gene
   - Default to $false when omitted
   - Use clear action names
 
+- **Collection Parameters (PowerShell 7+):**
+  - When using `System.Collections.Generic.List[T]` parameters, add `[AllowEmptyCollection()]` attribute
+  - PowerShell 7+ validates that collections are non-empty by default during parameter binding
+  - Example: `[Parameter(Mandatory = $true)] [AllowEmptyCollection()] [System.Collections.Generic.List[PSObject]]$Results`
+  - This is critical for functions that need to accept empty lists to populate them
+
 ## Pipeline and Output
 
 - **Pipeline Input:**
@@ -121,4 +127,34 @@ This guide provides PowerShell-specific instructions to help GitHub Copilot gene
   - Avoid `Read-Host` in scripts
   - Support automation scenarios
   - Document all required inputs
+
+## Testing with Pester
+
+- **Test Structure:**
+  - Use Pester 5.x syntax with `Describe`, `Context`, `It`, `BeforeAll`, `BeforeEach`
+  - Place test files in `tests/` directory with `.Tests.ps1` suffix
+  - Name test files to match the function being tested
+
+- **Mocking Dependencies:**
+  - Define stub functions in `BeforeAll` block before sourcing the function under test
+  - Stub functions must exist before Mock can override them
+  - Example:
+    ```powershell
+    BeforeAll {
+        function Get-MgBetaUser { }  # Stub
+        . "$PSScriptRoot/../functions/MyFunction.ps1"  # Source after stubs
+        Mock -CommandName "Get-MgBetaUser" -MockWith { ... }  # Mock the stub
+    }
+    ```
+  - For internal functions, also stub Write-PSFMessage and any Microsoft Graph cmdlets used
+
+- **Testing Internal Functions:**
+  - Internal functions (in `internal/functions/`) use `[AllowEmptyCollection()]` for List parameters
+  - Create new List instances in each test: `$results = [System.Collections.Generic.List[PSObject]]::new()`
+  - Don't reuse Lists between tests to avoid parameter binding issues
+
+- **Validation Testing:**
+  - Test parameter validation separately in a dedicated context
+  - Use ValidateScript attribute with regex from GTValidation.ps1 for UPN parameters
+  - Test both valid and invalid inputs
 
