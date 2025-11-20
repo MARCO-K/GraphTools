@@ -1,5 +1,4 @@
-function Get-GTInactiveUser
-{
+function Get-GTInactiveUser {
     <#
     .SYNOPSIS
     Retrieves user accounts with advanced filtering options including inactivity days.
@@ -62,80 +61,7 @@ function Get-GTInactiveUser
         [string[]]$Scope = @('User.Read.All', 'AuditLog.Read.All')
     )
 
-    begin
-    {
-        # Module Management
-        $modules = ('Microsoft.Graph.Authentication', 'Microsoft.Graph.Beta.Users')
-        Install-GTRequiredModule -ModuleNames $modules -Verbose
-
-        # Graph Connection Handling
-        $graphConnected = Initialize-GTGraphConnection -Scopes 'User.Read.All'
-function Get-GTInactiveUser
-{
-    <#
-    .SYNOPSIS
-    Retrieves user accounts with advanced filtering options including inactivity days.
-
-    .DESCRIPTION
-    Enhanced version with PSFramework logging, pipeline-friendly structure, and additional filters.
-
-    .PARAMETER DisabledUsersOnly
-    Filter for disabled user accounts
-
-    .PARAMETER ExternalUsersOnly
-    Filter for external users (Guests or #EXT# accounts)
-
-    .PARAMETER NeverLoggedIn
-    Filter for users with no login history
-
-    .PARAMETER InactiveDaysOlderThan
-    Filter for users inactive for more than X days
-
-    .PARAMETER NewSession
-    Switch to force a new Graph session
-
-    .PARAMETER Scope
-    Scopes for Graph Connection. Default includes User.Read.All and AuditLog.Read.All
-
-    .EXAMPLE
-    Get-GTInactiveUser -InactiveDaysOlderThan 90 -Verbose
-    Finds users inactive for over 3 months with verbose logging
-
-    .EXAMPLE
-    Get-GTInactiveUser -ExternalUsersOnly -DisabledUsersOnly -Debug
-    Debugs disabled external user processing
-
-    .EXAMPLE
-    Get-GTInactiveUser -NeverLoggedIn
-    Retrieves all users who have never logged in
-
-    .EXAMPLE
-    Get-GTInactiveUser -InactiveDaysOlderThan 30 -DisabledUsersOnly
-    Gets disabled users who have been inactive for more than 30 days
-
-    .NOTES
-    Requires Microsoft Graph PowerShell SDK with appropriate permissions:
-    - User.Read.All
-    - AuditLog.Read.All (for sign-in activity)
-    #>
-    [CmdletBinding()]
-    [OutputType([object])]
-    param(
-        [switch]$DisabledUsersOnly,
-        [switch]$ExternalUsersOnly,
-        [switch]$NeverLoggedIn,
-        [ValidateRange(1, [int]::MaxValue)]
-        [int]$InactiveDaysOlderThan,
-
-        # Switch to force a new Graph session
-        [switch]$NewSession,
-
-        # Scopes for Graph Connection
-        [string[]]$Scope = @('User.Read.All', 'AuditLog.Read.All')
-    )
-
-    begin
-    {
+    begin {
         # Module Management
         $modules = ('Microsoft.Graph.Authentication', 'Microsoft.Graph.Beta.Users')
         Install-GTRequiredModule -ModuleNames $modules -Verbose
@@ -148,10 +74,8 @@ function Get-GTInactiveUser
         }
     }
 
-    process
-    {
-        try
-        {
+    process {
+        try {
             Write-PSFMessage -Level Verbose -Message "Fetching users from Microsoft Graph"
             
             # Construct server-side filter if possible
@@ -161,8 +85,8 @@ function Get-GTInactiveUser
             }
 
             $params = @{
-                All = $true
-                Property = @(
+                All         = $true
+                Property    = @(
                     'displayName', 'id', 'accountEnabled', 'userPrincipalName', 
                     'createdDateTime', 'userType', 'signinActivity', 
                     'RefreshTokensValidFromDateTime', 'AuthorizationInfo'
@@ -191,8 +115,7 @@ function Get-GTInactiveUser
                     $signinActivity.LastNonInteractiveSignInDateTime
                 ) | Where-Object { $_ -ne $null }
 
-                $maxDate = if ($loginDates.Count -gt 0)
-                { 
+                $maxDate = if ($loginDates.Count -gt 0) { 
                     $loginDates | Measure-Object -Maximum | Select-Object -ExpandProperty Maximum 
                 }
 
@@ -201,8 +124,7 @@ function Get-GTInactiveUser
                     return # Skip if user has logged in
                 }
 
-                $inactiveDays = if ($maxDate)
-                { 
+                $inactiveDays = if ($maxDate) { 
                     (New-TimeSpan -Start $maxDate -End (Get-Date)).Days 
                 }
                 else { 0 }
@@ -229,8 +151,7 @@ function Get-GTInactiveUser
                 }
             }
         }
-        catch
-        {
+        catch {
             # Use centralized error handling helper to parse Graph API exceptions
             $errorDetails = Get-GTGraphErrorDetails -Exception $_.Exception -ResourceType 'user'
             
@@ -249,8 +170,7 @@ function Get-GTInactiveUser
         }
     }
 
-    end
-    {
+    end {
         # Cleanup or final logging if needed
         Write-PSFMessage -Level Verbose -Message "Completed user processing"
     }

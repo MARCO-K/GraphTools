@@ -282,7 +282,15 @@ Describe "YourFunction" {
 3. Add module installation in `begin` block
 4. Add Graph connection initialization
 5. Create `tests/YourFunction.Tests.ps1` with mocks
-6. Function will auto-export (FunctionsToExport = '*' in manifest)
+7. Function will auto-export (FunctionsToExport = '*' in manifest)
+
+**Documentation Updates**:
+When adding or modifying functions, you MUST update the documentation:
+1. **CHANGELOG.md**: Add a new entry under `[Unreleased]` section describing the change.
+2. **README.md**:
+   - Update the "Key Features" tables if adding a new function.
+   - Add usage examples in the "Quick Start" or relevant section.
+   - Update the "File Locations Quick Reference" if file counts change.
 
 ## File Locations Quick Reference
 
@@ -309,6 +317,9 @@ Before submitting changes, ensure:
 - [ ] Error handling uses `try/catch` with PSFramework logging
 - [ ] Test file exists with proper mocking
 - [ ] Code follows PowerShell best practices (no global aliases, etc.)
+- [ ] **Documentation Updated**:
+  - [ ] `CHANGELOG.md` updated with new version/changes
+  - [ ] `README.md` updated with new function details (if applicable)
 
 ## Trust These Instructions
 

@@ -7,6 +7,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+- **Orphaned Resource Detection** - Enhanced capabilities to identify unmanaged resources
+  - New function `Get-GTOrphanedServicePrincipal` to detect Service Principals with no owners, disabled owners, or expired credentials
+  - added `Get-GTOrphanedServicePrincipal` to the module export list
+
+### Changed
+- **Get-GTOrphanedGroup** - Enhanced detection logic
+  - Now identifies groups where *all* owners are disabled (previously only checked for zero owners)
+  - Now identifies empty groups (no members)
+  - Added `OrphanReason` property to output object for better classification
+
 ### Security
 - **Input Validation for Invoke-AuditLogQuery** - Enhanced security through parameter validation
   - Added strict character whitelisting for `Operations` parameter (alphanumeric, hyphens, underscores only)

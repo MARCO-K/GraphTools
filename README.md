@@ -68,6 +68,7 @@ Respond to security incidents with purpose-built cmdlets:
 | `Invoke-AuditLogQuery` | Query unified audit logs with filtering |
 | `Get-GTInactiveUsers` | Identify dormant accounts by last sign-in |
 | `Get-GTRecentUser` | Find recently created user accounts |
+| `Get-GTOrphanedServicePrincipal` | Identify orphaned or insecure Service Principals |
 
 ## 📦 Installation
 
@@ -246,6 +247,19 @@ Get-M365LicenseOverview -FilterServicePlan 'EXCHANGE'
 
 # Inactive users with licenses
 Get-M365LicenseOverview -FilterUser 'user@contoso.com' -LastLogin 90
+```
+
+### Orphaned Resources
+
+```powershell
+# Find groups with no owners, disabled owners, or no members
+Get-GTOrphanedGroup -Verbose
+
+# Find Service Principals with no owners or disabled owners
+Get-GTOrphanedServicePrincipal -Verbose
+
+# Find Service Principals with expired credentials
+Get-GTOrphanedServicePrincipal -CheckExpiredCredentials
 ```
 
 ## 🎨 Parameter Flexibility
