@@ -1,19 +1,24 @@
 Describe "Get-GTGuestUserReport" {
     BeforeAll {
         $functionPath = "$PSScriptRoot/../functions/Get-GTGuestUserReport.ps1"
-        Write-Host "Loading function from: $functionPath"
-        if (Test-Path $functionPath) {
+
+        # Provide minimal stubs before dot-sourcing so the function file can load without CommandNotFound errors
+        function Install-GTRequiredModule { }
+        function Initialize-GTGraphConnection { }
+        function Test-GTGraphScopes { param($RequiredScopes, [switch]$Reconnect, [switch]$Quiet) return $true }
+        function Write-PSFMessage { param($Level, $Message) }
+
+        if (Test-Path $functionPath)
+        {
+            # Dot-source the function under test
             . $functionPath
         }
-        else {
+        else
+        {
             Write-Error "Function file not found at $functionPath"
         }
 
-        function Install-GTRequiredModule {}
-        function Initialize-GTGraphConnection {}
-        function Test-GTGraphScopes {}
-        function Write-PSFMessage {}
-
+        # Replace implementations with Pester mocks for test control
         Mock -CommandName "Install-GTRequiredModule" -MockWith { }
         Mock -CommandName "Initialize-GTGraphConnection" -MockWith { return $true }
         Mock -CommandName "Test-GTGraphScopes" -MockWith { return $true }
@@ -50,15 +55,15 @@ Describe "Get-GTGuestUserReport" {
                     Id                = "1"
                     DisplayName       = "User1"
                     ExternalUserState = "PendingAcceptance"
-                    CreatedDateTime   = (Get-Date).AddDays(-10)
-                    SignInActivity    = @{ LastSignInDateTime = $null }
+                    CreatedDateTime   = (Get-Date).ToUniversalTime().AddDays(-10)
+                    SignInActivity    = [PSCustomObject]@{ LastSignInDateTime = $null }
                 },
                 [PSCustomObject]@{
                     Id                = "2"
                     DisplayName       = "User2"
                     ExternalUserState = "Accepted"
-                    CreatedDateTime   = (Get-Date).AddDays(-40)
-                    SignInActivity    = @{ LastSignInDateTime = (Get-Date).AddDays(-5) }
+                    CreatedDateTime   = (Get-Date).ToUniversalTime().AddDays(-40)
+                    SignInActivity    = [PSCustomObject]@{ LastSignInDateTime = (Get-Date).ToUniversalTime().AddDays(-5) }
                 }
             )
             Mock -CommandName "Get-MgBetaUser" -MockWith { return $mockUsers }

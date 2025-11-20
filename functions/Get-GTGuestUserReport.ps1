@@ -1,4 +1,5 @@
-function Get-GTGuestUserReport {
+function Get-GTGuestUserReport
+{
     <#
     .SYNOPSIS
     Retrieves a report of all guest users with their invitation status.
@@ -19,44 +20,54 @@ function Get-GTGuestUserReport {
     .EXAMPLE
     Get-GTGuestUserReport -PendingOnly
     Returns all guest users who have not yet accepted their invitation.
+    
+        .NOTES
+        Requires the Microsoft Graph PowerShell SDK (Microsoft.Graph.Users) and the following Graph scopes:
+            - User.Read.All
+            - AuditLog.Read.All (to populate signInActivity/LastSignInDateTime)
     #>
     [CmdletBinding()]
     [OutputType([PSCustomObject])]
     param(
         [switch]$PendingOnly,
+        [ValidateRange(0, 36500)]
         [int]$DaysSinceCreation
     )
 
-    begin {
+    begin
+    {
         $modules = @('Microsoft.Graph.Users')
-        Install-GTRequiredModule -ModuleNames $modules -Verbose:$VerbosePreference
+        # Prefer the standard -Verbose switch; do not pass $VerbosePreference to a switch parameter
+        Install-GTRequiredModule -ModuleNames $modules -Verbose
 
         # 1. Scopes Check
         # AuditLog.Read.All is required to populate the 'signInActivity' property reliably.
         $requiredScopes = @('User.Read.All', 'AuditLog.Read.All')
-        if (-not (Test-GTGraphScopes -RequiredScopes $requiredScopes -Reconnect -Quiet)) {
+        if (-not (Test-GTGraphScopes -RequiredScopes $requiredScopes -Reconnect -Quiet))
+        {
             Write-Error "Failed to acquire required permissions ($($requiredScopes -join ', ')). Aborting."
             return
         }
     }
 
-    process {
+    process
+    {
         $results = [System.Collections.Generic.List[PSCustomObject]]::new()
+        $utcNow = (Get-Date).ToUniversalTime()
 
-        try {
+        try
+        {
             Write-PSFMessage -Level Verbose -Message "Fetching guest users from Microsoft Graph..."
             
             # 2. Build Dynamic Filter (Server-Side Optimization)
-            # Base filter: Must be a Guest
             $filterParts = [System.Collections.Generic.List[string]]::new()
             $filterParts.Add("userType eq 'Guest'")
 
-            # Optimization: If PendingOnly is requested, filter at the API level
-            if ($PendingOnly) {
+            if ($PendingOnly)
+            {
                 $filterParts.Add("externalUserState eq 'PendingAcceptance'")
             }
 
-            # Combine filters with 'and'
             $finalFilter = $filterParts -join ' and '
             
             Write-PSFMessage -Level Verbose -Message "Using Filter: $finalFilter"
@@ -72,12 +83,29 @@ function Get-GTGuestUserReport {
 
             Write-PSFMessage -Level Verbose -Message "Found $($guests.Count) guest users."
 
-            foreach ($guest in $guests) {
-                # Calculate Age
-                $daysCreated = if ($guest.CreatedDateTime) { (New-TimeSpan -Start $guest.CreatedDateTime -End (Get-Date)).Days } else { 0 }
+            foreach ($guest in $guests)
+            {
+                # 3. Date Math (UTC Fix)
+                # Ensure we compare UTC to UTC to avoid timezone offset errors
+                $daysCreated = 0
+                if ($guest.CreatedDateTime)
+                {
+                    # Normalize to UTC regardless of original kind (string/DateTime/DateTimeOffset)
+                    try
+                    {
+                        $createdUtc = ([DateTime]$guest.CreatedDateTime).ToUniversalTime()
+                    }
+                    catch
+                    {
+                        # Fallback: if cast fails, attempt parsing then ToUniversalTime
+                        $createdUtc = [DateTime]::Parse($guest.CreatedDateTime).ToUniversalTime()
+                    }
+
+                    # Use TotalDays for consistency and floor to whole days
+                    $daysCreated = [math]::Floor((New-TimeSpan -Start $createdUtc -End $utcNow).TotalDays)
+                }
 
                 # Client-side Filter: DaysSinceCreation
-                # (Date math is harder to do in OData filters, so we keep this client-side)
                 if ($PSBoundParameters.ContainsKey('DaysSinceCreation') -and $daysCreated -lt $DaysSinceCreation) { continue }
 
                 # Handle Null ExternalUserState (Common for old guests, implies 'Accepted')
@@ -90,19 +118,19 @@ function Get-GTGuestUserReport {
                         CreatedDateTime                 = $guest.CreatedDateTime
                         ExternalUserState               = $status
                         ExternalUserStateChangeDateTime = $guest.ExternalUserStateChangeDateTime
-                        LastSignInDateTime              = $guest.SignInActivity.LastSignInDateTime
+                        LastSignInDateTime              = if ($guest.SignInActivity -and $guest.SignInActivity.LastSignInDateTime) { $guest.SignInActivity.LastSignInDateTime } else { $null }
                         DaysSinceCreation               = $daysCreated
                     })
             }
 
-            return $results
+            # 4. Pipeline Output
+            # Output the array so PowerShell unrolls it, allowing for piping to Export-Csv etc.
+            return $results.ToArray()
         }
-        catch {
+        catch
+        {
             $err = Get-GTGraphErrorDetails -Exception $_.Exception -ResourceType 'Guest User Report'
             Write-PSFMessage -Level $err.LogLevel -Message "Failed to retrieve guest users: $($err.Reason)"
-            
-            # Optional: Throw if you want to stop downstream pipeline
-            # throw $err.ErrorMessage
         }
     }
 }
