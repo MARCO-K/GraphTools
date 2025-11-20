@@ -1,11 +1,14 @@
-function Get-GTExpiringSecrets {
+function Get-GTExpiringSecrets
+{
     <#
     .SYNOPSIS
     Retrieves Applications and Service Principals with secrets or certificates expiring within a specified timeframe.
 
     .DESCRIPTION
-    This function scans all Applications and Service Principals in the directory and identifies those
-    with credentials (secrets or certificates) that are set to expire within the specified number of days.
+    This function scans Applications and Service Principals to identify credentials 
+    (secrets or certificates) expiring within the specified number of days.
+    
+    It handles UTC time conversions correctly to ensure accurate expiration reporting.
 
     .PARAMETER DaysUntilExpiry
     The number of days to look ahead for expiration.
@@ -16,114 +19,114 @@ function Get-GTExpiringSecrets {
     .EXAMPLE
     Get-GTExpiringSecrets -DaysUntilExpiry 30
     Finds all credentials expiring in the next 30 days.
-
-    .NOTES
-    Requires Microsoft Graph PowerShell SDK with Application.Read.All permission.
     #>
     [CmdletBinding()]
     [OutputType([PSCustomObject])]
     param(
         [Parameter(Mandatory = $true)]
+        [ValidateRange(1, 3650)]
         [int]$DaysUntilExpiry,
 
         [ValidateSet('All', 'Applications', 'ServicePrincipals')]
         [string]$Scope = 'All'
     )
 
-    begin {
+    begin
+    {
         $modules = @('Microsoft.Graph.Applications')
-        Install-GTRequiredModule -ModuleNames $modules -Verbose:$VerbosePreference
+        Install-GTRequiredModule -ModuleNames $modules -Verbose
 
-        if (-not (Initialize-GTGraphConnection -Scopes 'Application.Read.All')) {
-            Write-Error "Failed to initialize Microsoft Graph connection."
+        $requiredScopes = @('Application.Read.All')
+        if (-not (Test-GTGraphScopes -RequiredScopes $requiredScopes -Reconnect -Quiet))
+        {
+            Write-Error "Failed to acquire required permissions ($($requiredScopes -join ', ')). Aborting."
             return
         }
     }
 
-    process {
-        try {
-            $results = [System.Collections.Generic.List[PSCustomObject]]::new()
-            $expiryThreshold = (Get-Date).AddDays($DaysUntilExpiry)
-            $now = Get-Date
+    process
+    {
+        $results = [System.Collections.Generic.List[PSCustomObject]]::new()
+        
+        # 2. Date Math (Must be UTC)
+        $now = (Get-Date).ToUniversalTime()
+        $expiryThreshold = $now.AddDays($DaysUntilExpiry)
 
-            if ($Scope -in 'All', 'Applications') {
-                Write-PSFMessage -Level Verbose -Message "Scanning Applications..."
-                $apps = Get-MgBetaApplication -All -Property Id, AppId, DisplayName, KeyCredentials, PasswordCredentials -ErrorAction Stop
-                
-                foreach ($app in $apps) {
-                    # Check Password Credentials
-                    foreach ($cred in $app.PasswordCredentials) {
-                        if ($cred.EndDateTime -and $cred.EndDateTime -le $expiryThreshold -and $cred.EndDateTime -ge $now) {
-                            $results.Add([PSCustomObject]@{
-                                    Name           = $app.DisplayName
-                                    AppId          = $app.AppId
-                                    Type           = 'Application'
-                                    CredentialType = 'Secret'
-                                    KeyId          = $cred.KeyId
-                                    ExpiryDate     = $cred.EndDateTime
-                                    DaysRemaining  = (New-TimeSpan -Start $now -End $cred.EndDateTime).Days
-                                })
-                        }
+        # --- Helper Logic to Avoid Duplication ---
+        $ProcessCredentials = {
+            param($ItemList, $ResourceType)
+
+            foreach ($item in $ItemList)
+            {
+                # Process Secrets (PasswordCredentials)
+                foreach ($cred in $item.PasswordCredentials)
+                {
+                    if ($cred.EndDateTime -and $cred.EndDateTime -le $expiryThreshold -and $cred.EndDateTime -ge $now)
+                    {
+                        # Use TotalDays and round up so partial days count as a day remaining
+                        $daysRemaining = [math]::Ceiling((New-TimeSpan -Start $now -End $cred.EndDateTime).TotalDays)
+                        $results.Add([PSCustomObject]@{
+                                Name           = $item.DisplayName
+                                AppId          = $item.AppId
+                                Id             = $item.Id
+                                ResourceType   = $ResourceType
+                                CredentialType = 'Secret'
+                                KeyId          = $cred.KeyId
+                                Hint           = $cred.Hint # Useful to identify which secret it is
+                                ExpiryDate     = $cred.EndDateTime
+                                DaysRemaining  = $daysRemaining
+                            })
                     }
+                }
 
-                    # Check Key Credentials (Certificates)
-                    foreach ($cred in $app.KeyCredentials) {
-                        if ($cred.EndDateTime -and $cred.EndDateTime -le $expiryThreshold -and $cred.EndDateTime -ge $now) {
-                            $results.Add([PSCustomObject]@{
-                                    Name           = $app.DisplayName
-                                    AppId          = $app.AppId
-                                    Type           = 'Application'
-                                    CredentialType = 'Certificate'
-                                    KeyId          = $cred.KeyId
-                                    ExpiryDate     = $cred.EndDateTime
-                                    DaysRemaining  = (New-TimeSpan -Start $now -End $cred.EndDateTime).Days
-                                })
-                        }
+                # Process Certificates (KeyCredentials)
+                foreach ($cred in $item.KeyCredentials)
+                {
+                    if ($cred.EndDateTime -and $cred.EndDateTime -le $expiryThreshold -and $cred.EndDateTime -ge $now)
+                    {
+                        $daysRemaining = [math]::Ceiling((New-TimeSpan -Start $now -End $cred.EndDateTime).TotalDays)
+                        $results.Add([PSCustomObject]@{
+                                Name           = $item.DisplayName
+                                AppId          = $item.AppId
+                                Id             = $item.Id
+                                ResourceType   = $ResourceType
+                                CredentialType = 'Certificate'
+                                KeyId          = $cred.KeyId
+                                Hint           = $null # Certs don't have hints, usually thumbprint is in customKeyIdentifier
+                                ExpiryDate     = $cred.EndDateTime
+                                DaysRemaining  = $daysRemaining
+                            })
                     }
                 }
             }
+        }
 
-            if ($Scope -in 'All', 'ServicePrincipals') {
+        try
+        {
+            # 3. Scan Applications
+            if ($Scope -in 'All', 'Applications')
+            {
+                Write-PSFMessage -Level Verbose -Message "Scanning Applications..."
+                # Optimization: Select only needed properties to reduce bandwidth
+                $apps = Get-MgBetaApplication -All -Property Id, AppId, DisplayName, KeyCredentials, PasswordCredentials -ErrorAction Stop
+                & $ProcessCredentials -ItemList $apps -ResourceType 'Application'
+            }
+
+            # 4. Scan Service Principals
+            if ($Scope -in 'All', 'ServicePrincipals')
+            {
                 Write-PSFMessage -Level Verbose -Message "Scanning Service Principals..."
                 $sps = Get-MgBetaServicePrincipal -All -Property Id, AppId, DisplayName, KeyCredentials, PasswordCredentials -ErrorAction Stop
-                
-                foreach ($sp in $sps) {
-                    # Check Password Credentials
-                    foreach ($cred in $sp.PasswordCredentials) {
-                        if ($cred.EndDateTime -and $cred.EndDateTime -le $expiryThreshold -and $cred.EndDateTime -ge $now) {
-                            $results.Add([PSCustomObject]@{
-                                    Name           = $sp.DisplayName
-                                    AppId          = $sp.AppId
-                                    Type           = 'ServicePrincipal'
-                                    CredentialType = 'Secret'
-                                    KeyId          = $cred.KeyId
-                                    ExpiryDate     = $cred.EndDateTime
-                                    DaysRemaining  = (New-TimeSpan -Start $now -End $cred.EndDateTime).Days
-                                })
-                        }
-                    }
-
-                    # Check Key Credentials (Certificates)
-                    foreach ($cred in $sp.KeyCredentials) {
-                        if ($cred.EndDateTime -and $cred.EndDateTime -le $expiryThreshold -and $cred.EndDateTime -ge $now) {
-                            $results.Add([PSCustomObject]@{
-                                    Name           = $sp.DisplayName
-                                    AppId          = $sp.AppId
-                                    Type           = 'ServicePrincipal'
-                                    CredentialType = 'Certificate'
-                                    KeyId          = $cred.KeyId
-                                    ExpiryDate     = $cred.EndDateTime
-                                    DaysRemaining  = (New-TimeSpan -Start $now -End $cred.EndDateTime).Days
-                                })
-                        }
-                    }
-                }
+                & $ProcessCredentials -ItemList $sps -ResourceType 'ServicePrincipal'
             }
 
-            return $results
+            # Return a plain array so PowerShell pipelines enumerate results predictably
+            return $results.ToArray()
         }
-        catch {
-            Stop-PSFFunction -Message "Failed to retrieve expiring secrets: $($_.Exception.Message)" -ErrorRecord $_ -EnableException $true
+        catch
+        {
+            $err = Get-GTGraphErrorDetails -Exception $_.Exception -ResourceType 'Secret Scan'
+            Write-PSFMessage -Level $err.LogLevel -Message "Failed to retrieve expiring secrets: $($err.Reason)"
         }
     }
 }
