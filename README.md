@@ -69,6 +69,10 @@ Respond to security incidents with purpose-built cmdlets:
 - **Credential Monitoring**: Track expiring secrets and certificates
 - **App Hygiene**: Identify and remove unused applications
 
+### Device Management
+
+- **Hygiene**: Identify inactive devices for cleanup
+
 ### Reporting & Analytics
 
 | Function | Description |
@@ -83,6 +87,7 @@ Respond to security incidents with purpose-built cmdlets:
 | `Remove-GTExpiredInvites` | Remove expired pending guest invitations |
 | `Get-GTExpiringSecrets` | Find expiring secrets and certificates |
 | `Get-GTUnusedApps` | Identify unused Service Principals |
+| `Get-GTInactiveDevices` | Identify inactive devices |
 
 ## 📦 Installation
 

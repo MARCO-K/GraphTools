@@ -35,6 +35,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Tests for special character injection (quotes, parentheses, semicolons)
   - Test coverage increased from 14 to 26 test cases (+86%)
 
+## [0.13.0] - 2025-11-20
+
+### Added
+- **Device Management** - New capabilities for managing devices
+  - `Get-GTInactiveDevices` - Identify devices that have not signed in for a specified number of days
+
 ## [0.12.0] - 2025-11-20
 
 ### Added
