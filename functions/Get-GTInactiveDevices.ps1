@@ -1,17 +1,19 @@
-function Get-GTInactiveDevices {
+function Get-GTInactiveDevices
+{
     <#
     .SYNOPSIS
     Retrieves devices that have not signed in for a specified number of days.
 
     .DESCRIPTION
-    This function retrieves devices from Microsoft Entra ID and filters them based on their
-    approximate last sign-in date to identify inactive devices.
+    This function retrieves devices from Microsoft Entra ID.
+    It uses OData server-side filtering to efficiently retrieve only devices that meet the inactivity criteria.
 
     .PARAMETER InactiveDays
     The number of days of inactivity to check for.
 
     .PARAMETER DeviceType
     Optional filter for specific operating systems (e.g., 'Windows', 'iOS').
+    This uses an exact match ('eq') server-side filter.
 
     .PARAMETER IncludeDisabled
     Switch to include devices that are already disabled. By default, only enabled devices are returned.
@@ -19,82 +21,124 @@ function Get-GTInactiveDevices {
     .EXAMPLE
     Get-GTInactiveDevices -InactiveDays 90
     Finds all enabled devices inactive for more than 90 days.
-
-    .EXAMPLE
-    Get-GTInactiveDevices -InactiveDays 60 -DeviceType 'Windows'
-    Finds enabled Windows devices inactive for more than 60 days.
-
+    
     .NOTES
-    Requires Microsoft Graph PowerShell SDK with Device.Read.All permission.
+    Requires the Microsoft Graph PowerShell SDK (Microsoft.Graph.Identity.DirectoryManagement) and the
+    Graph scope: Device.Read.All. The function uses server-side OData filtering for efficiency.
+    DaysInactive will be an integer number of days (floor of total days) when a last sign-in
+    timestamp exists in Graph; when the device has never signed in, DaysInactive will be $null.
     #>
     [CmdletBinding()]
     [OutputType([PSCustomObject])]
     param(
-        [Parameter(Mandatory = $true)]
-        [int]$InactiveDays,
+    [Parameter(Mandatory = $true)]
+    [ValidateRange(1,36500)]
+    [int]$InactiveDays,
 
         [string]$DeviceType,
 
         [switch]$IncludeDisabled
     )
 
-    begin {
-        $modules = @('Microsoft.Graph.Identity.DirectoryManagement')
-        Install-GTRequiredModule -ModuleNames $modules -Verbose:$VerbosePreference
+    begin
+    {
+    $modules = @('Microsoft.Graph.Identity.DirectoryManagement')
+    # Prefer the standard -Verbose switch; do not pass $VerbosePreference to a switch parameter
+    Install-GTRequiredModule -ModuleNames $modules -Verbose
 
-        if (-not (Initialize-GTGraphConnection -Scopes 'Device.Read.All')) {
-            Write-Error "Failed to initialize Microsoft Graph connection."
+        # 1. Scopes Check
+        $requiredScopes = @('Device.Read.All')
+        if (-not (Test-GTGraphScopes -RequiredScopes $requiredScopes -Reconnect -Quiet))
+        {
+            Write-Error "Failed to acquire required permissions ($($requiredScopes -join ', ')). Aborting."
             return
         }
     }
 
-    process {
-        try {
-            Write-PSFMessage -Level Verbose -Message "Fetching devices from Microsoft Graph..."
-            
+    process
+    {
+        $results = [System.Collections.Generic.List[PSCustomObject]]::new()
+        
+        # 2. Date Math (UTC & Formatting)
+        $utcNow = (Get-Date).ToUniversalTime()
+        $thresholdDate = $utcNow.AddDays(-$InactiveDays)
+    # Format for OData: yyyy-MM-ddTHH:mm:ssZ
+    $filterDateString = $thresholdDate.ToString('yyyy-MM-ddTHH:mm:ssZ')
+
+        try
+        {
+            Write-PSFMessage -Level Verbose -Message "Calculating threshold: Devices inactive since $filterDateString"
+
+            # 3. Build Dynamic Server-Side Filter
+            $filterParts = [System.Collections.Generic.List[string]]::new()
+
+            # Date Filter: approximateLastSignInDateTime is LESS THAN OR EQUAL TO threshold
+            # Wrap the datetime literal in single quotes for the OData filter
+            $filterParts.Add("approximateLastSignInDateTime le '$filterDateString'")
+
+            # Account Enabled Filter
+            if (-not $IncludeDisabled)
+            {
+                $filterParts.Add("accountEnabled eq true")
+            }
+
+            # Device Type Filter
+            if ($DeviceType)
+            {
+                $filterParts.Add("operatingSystem eq '$DeviceType'")
+            }
+
+            $finalFilter = $filterParts -join ' and '
+            Write-PSFMessage -Level Verbose -Message "Using OData Filter: $finalFilter"
+
             $params = @{
                 All         = $true
+                Filter      = $finalFilter
                 Property    = @('id', 'displayName', 'operatingSystem', 'approximateLastSignInDateTime', 'accountEnabled')
                 ErrorAction = 'Stop'
             }
 
-            # Apply server-side filter for OS if possible, otherwise client-side
-            if ($DeviceType) {
-                $params['Filter'] = "operatingSystem eq '$DeviceType'"
-            }
-
             $devices = Get-MgBetaDevice @params
-            $results = [System.Collections.Generic.List[PSCustomObject]]::new()
-            $now = Get-Date
 
-            foreach ($device in $devices) {
-                # Skip disabled devices unless requested
-                if (-not $IncludeDisabled -and -not $device.AccountEnabled) { continue }
+            $deviceCount = if ($devices) { $devices.Count } else { 0 }
+            Write-PSFMessage -Level Verbose -Message "Found $deviceCount inactive devices."
 
-                $lastSignIn = $device.ApproximateLastSignInDateTime
+            foreach ($device in $devices)
+            {
                 $daysInactive = $null
+                if ($device.ApproximateLastSignInDateTime)
+                {
+                    # Normalize to UTC and calculate days (use TotalDays and floor)
+                    try {
+                        $lastSignInUtc = ([DateTime]$device.ApproximateLastSignInDateTime).ToUniversalTime()
+                    }
+                    catch {
+                        # If parsing fails, skip days calculation
+                        $lastSignInUtc = $null
+                    }
 
-                if ($lastSignIn) {
-                    $daysInactive = (New-TimeSpan -Start $lastSignIn -End $now).Days
-                    
-                    if ($daysInactive -ge $InactiveDays) {
-                        $results.Add([PSCustomObject]@{
-                                DisplayName                   = $device.DisplayName
-                                DeviceId                      = $device.Id
-                                OperatingSystem               = $device.OperatingSystem
-                                ApproximateLastSignInDateTime = $lastSignIn
-                                AccountEnabled                = $device.AccountEnabled
-                                DaysInactive                  = $daysInactive
-                            })
+                    if ($lastSignInUtc) {
+                        $daysInactive = [math]::Floor((New-TimeSpan -Start $lastSignInUtc -End $utcNow).TotalDays)
                     }
                 }
+
+                $results.Add([PSCustomObject]@{
+                    DisplayName                   = $device.DisplayName
+                    DeviceId                      = $device.Id
+                    OperatingSystem               = $device.OperatingSystem
+                    ApproximateLastSignInDateTime = $device.ApproximateLastSignInDateTime
+                    AccountEnabled                = $device.AccountEnabled
+                    DaysInactive                  = $daysInactive
+                })
             }
 
-            Write-PSFMessage -Level Verbose -Message "Found $($results.Count) inactive devices."
-            return $results
+            return $results.ToArray()
         }
-        catch {
-            Stop-PSFFunction -Message "Failed to retrieve inactive devices: $($_.Exception.Message)" -ErrorRecord $_ -EnableException $true
+        catch
+        {
+            # 4. Gold Standard Error Handling
+            $err = Get-GTGraphErrorDetails -Exception $_.Exception -ResourceType 'Inactive Devices'
+            Write-PSFMessage -Level $err.LogLevel -Message "Failed to retrieve inactive devices: $($err.Reason)"
         }
     }
 }
