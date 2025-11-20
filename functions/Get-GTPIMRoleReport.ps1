@@ -4,9 +4,11 @@ function Get-GTPIMRoleReport {
     Generates a comprehensive report of all eligible and active PIM role assignments.
 
     .DESCRIPTION
-    This function retrieves both eligible and active PIM role assignments from Microsoft Entra ID.
+    Retrieves both eligible and active PIM role assignments from Microsoft Entra ID.
     It distinguishes between 'Eligible' (can activate) and 'Active' (currently active) assignments.
-    It also caches role definitions to improve performance by avoiding repeated API calls for role names.
+    It caches role definitions to improve performance.
+    
+    This function handles both User and Group assignments correctly.
 
     .PARAMETER UserId
     Optional. Filter the report for a specific user by their Object ID (GUID).
@@ -15,19 +17,7 @@ function Get-GTPIMRoleReport {
     Optional. Filter the report for a specific role by its display name (e.g., 'Global Administrator').
 
     .EXAMPLE
-    Get-GTPIMRoleReport
-    Retrieves all PIM assignments for all users.
-
-    .EXAMPLE
     Get-GTPIMRoleReport -UserId '00000000-0000-0000-0000-000000000000'
-    Retrieves PIM assignments for the specified user.
-
-    .EXAMPLE
-    Get-GTPIMRoleReport -RoleName 'Global Administrator'
-    Retrieves all users who have the 'Global Administrator' role (eligible or active).
-
-    .NOTES
-    Requires Microsoft Graph PowerShell SDK with RoleManagement.Read.Directory permission.
     #>
     [CmdletBinding()]
     [OutputType([PSCustomObject])]
@@ -40,23 +30,25 @@ function Get-GTPIMRoleReport {
     )
 
     begin {
-        $modules = @('Microsoft.Graph.Identity.Governance')
+        # 1. Module Check
+        $modules = @('Microsoft.Graph.Identity.Governance', 'Microsoft.Graph.Users')
         Install-GTRequiredModule -ModuleNames $modules -Verbose:$VerbosePreference
 
-        if (-not (Initialize-GTGraphConnection -Scopes 'RoleManagement.Read.Directory')) {
-            Write-Error "Failed to initialize Microsoft Graph connection."
+        # 2. Scope Check (Gold Standard)
+        # We need User/Group read permissions to expand the 'principal' details
+        $requiredScopes = @('RoleManagement.Read.Directory', 'User.Read.All', 'Group.Read.All')
+        if (-not (Test-GTGraphScopes -RequiredScopes $requiredScopes -Reconnect -Quiet)) {
+            Write-Error "Failed to acquire required permissions ($($requiredScopes -join ', ')). Aborting."
             return
         }
 
-        # Validate User ID if provided
+        # 3. Validate User ID (Gold Standard)
         if ($UserId) {
-            if (-not (Test-GTGuid -InputObject $UserId -Quiet)) {
-                Write-Error "Invalid User ID format. Must be a GUID."
-                return
-            }
+            # This will throw a terminating error if invalid, stopping execution immediately
+            Test-GTGuid -InputObject $UserId
         }
 
-        # Cache Role Definitions
+        # 4. Cache Role Definitions
         Write-PSFMessage -Level Verbose -Message "Caching Role Definitions..."
         try {
             $allRoles = Get-MgBetaRoleManagementDirectoryRoleDefinition -All -Property Id, DisplayName -ErrorAction Stop
@@ -67,7 +59,8 @@ function Get-GTPIMRoleReport {
             Write-PSFMessage -Level Verbose -Message "Cached $($roleCache.Count) roles."
         }
         catch {
-            Write-Error "Failed to cache role definitions: $($_.Exception.Message)"
+            $err = Get-GTGraphErrorDetails -Exception $_.Exception -ResourceType 'RoleDefinitions'
+            Write-PSFMessage -Level Warning -Message "Failed to cache roles: $($err.Reason)"
             return
         }
     }
@@ -76,6 +69,61 @@ function Get-GTPIMRoleReport {
         try {
             $results = [System.Collections.Generic.List[PSCustomObject]]::new()
 
+            # --- Helper to process assignments to avoid code duplication ---
+            $ProcessAssignment = {
+                param($AssignmentList, $Type)
+
+                foreach ($assignment in $AssignmentList) {
+                    $roleDefId = $assignment.RoleDefinitionId
+                    $roleDisplayName = if ($roleCache.ContainsKey($roleDefId)) { $roleCache[$roleDefId] } else { $roleDefId }
+
+                    # Client-side filtering for RoleName
+                    if ($RoleName -and $roleDisplayName -ne $RoleName) { continue }
+
+                    # Handle Principal Details (User vs Group)
+                    $principalName = "Unknown"
+                    $principalUPN = $null
+                    $principalType = "Unknown"
+
+                    if ($assignment.Principal) {
+                        $principalName = $assignment.Principal.DisplayName
+                        $odataType = $assignment.Principal.AdditionalProperties['@odata.type']
+
+                        if ($odataType -match 'group') {
+                            $principalType = 'Group'
+                            $principalUPN = "Group (No UPN)"
+                        }
+                        elseif ($odataType -match 'servicePrincipal') {
+                            $principalType = 'ServicePrincipal'
+                            $principalUPN = $assignment.Principal.AdditionalProperties['appId']
+                        }
+                        else {
+                            $principalType = 'User'
+                            $principalUPN = $assignment.Principal.AdditionalProperties['userPrincipalName']
+                        }
+                    }
+
+                    # Determine State
+                    $state = $assignment.AssignmentState # Default property
+                    if ($Type -eq 'Active') {
+                        $state = if ($assignment.AssignmentType -eq 'Assigned') { 'Assigned (Permanent)' } else { 'Activated (Time-bound)' }
+                    }
+
+                    $results.Add([PSCustomObject]@{
+                            User              = $principalName
+                            UserPrincipalName = $principalUPN
+                            PrincipalType     = $principalType
+                            UserId            = $assignment.PrincipalId
+                            Role              = $roleDisplayName
+                            RoleId            = $roleDefId
+                            Type              = $Type
+                            AssignmentState   = $state
+                            StartDateTime     = $assignment.StartDateTime
+                            EndDateTime       = $assignment.EndDateTime
+                        })
+                }
+            }
+
             # 1. Fetch Eligible Assignments
             Write-PSFMessage -Level Verbose -Message "Fetching Eligible Assignments..."
             $eligibleParams = @{
@@ -83,29 +131,10 @@ function Get-GTPIMRoleReport {
                 ExpandProperty = 'principal'
                 ErrorAction    = 'Stop'
             }
-            if ($UserId) {
-                $eligibleParams['Filter'] = "principalId eq '$UserId'"
-            }
-
+            if ($UserId) { $eligibleParams['Filter'] = "principalId eq '$UserId'" }
+            
             $eligibleAssignments = Get-MgBetaRoleManagementDirectoryRoleEligibilityScheduleInstance @eligibleParams
-
-            foreach ($assignment in $eligibleAssignments) {
-                $roleName = $roleCache[$assignment.RoleDefinitionId]
-                
-                # Filter by RoleName if specified
-                if ($RoleName -and $roleName -ne $RoleName) { continue }
-
-                $results.Add([PSCustomObject]@{
-                        User              = $assignment.Principal.DisplayName
-                        UserPrincipalName = $assignment.Principal.AdditionalProperties['userPrincipalName'] # Principal expansion might not always have UPN directly
-                        UserId            = $assignment.PrincipalId
-                        Role              = $roleName
-                        Type              = 'Eligible'
-                        AssignmentState   = 'Eligible'
-                        StartDateTime     = $assignment.StartDateTime
-                        EndDateTime       = $assignment.EndDateTime
-                    })
-            }
+            & $ProcessAssignment -AssignmentList $eligibleAssignments -Type 'Eligible'
 
             # 2. Fetch Active Assignments
             Write-PSFMessage -Level Verbose -Message "Fetching Active Assignments..."
@@ -114,36 +143,20 @@ function Get-GTPIMRoleReport {
                 ExpandProperty = 'principal'
                 ErrorAction    = 'Stop'
             }
-            if ($UserId) {
-                $activeParams['Filter'] = "principalId eq '$UserId'"
-            }
+            if ($UserId) { $activeParams['Filter'] = "principalId eq '$UserId'" }
 
             $activeAssignments = Get-MgBetaRoleManagementDirectoryRoleAssignmentScheduleInstance @activeParams
-
-            foreach ($assignment in $activeAssignments) {
-                $roleName = $roleCache[$assignment.RoleDefinitionId]
-
-                # Filter by RoleName if specified
-                if ($RoleName -and $roleName -ne $RoleName) { continue }
-
-                $state = if ($assignment.AssignmentType -eq 'Assigned') { 'Assigned (Permanent/Direct)' } else { 'Activated (PIM)' }
-
-                $results.Add([PSCustomObject]@{
-                        User              = $assignment.Principal.DisplayName
-                        UserPrincipalName = $assignment.Principal.AdditionalProperties['userPrincipalName']
-                        UserId            = $assignment.PrincipalId
-                        Role              = $roleName
-                        Type              = 'Active'
-                        AssignmentState   = $state
-                        StartDateTime     = $assignment.StartDateTime
-                        EndDateTime       = $assignment.EndDateTime
-                    })
-            }
+            & $ProcessAssignment -AssignmentList $activeAssignments -Type 'Active'
 
             return $results
         }
         catch {
-            Stop-PSFFunction -Message "Failed to generate PIM report: $($_.Exception.Message)" -ErrorRecord $_ -EnableException $true
+            # Gold Standard Error Handling
+            $err = Get-GTGraphErrorDetails -Exception $_.Exception -ResourceType 'PIM Report'
+            Write-PSFMessage -Level $err.LogLevel -Message "Failed to generate PIM report: $($err.Reason)"
+            
+            # If you want to throw a terminating error to stop a pipeline:
+            # throw $err.ErrorMessage
         }
     }
 }

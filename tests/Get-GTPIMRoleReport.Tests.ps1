@@ -8,20 +8,25 @@ Describe "Get-GTPIMRoleReport" {
             Write-Error "Function file not found at $functionPath"
         }
 
-        function Install-GTRequiredModule {}
-        function Initialize-GTGraphConnection {}
-        function Get-MgBetaRoleManagementDirectoryRoleDefinition {}
-        function Get-MgBetaRoleManagementDirectoryRoleEligibilityScheduleInstance {}
-        function Get-MgBetaRoleManagementDirectoryRoleAssignmentScheduleInstance {}
-        function Test-GTGuid { return $true }
+        # Define dummy functions for mocks
+        function Install-GTRequiredModule { param($ModuleNames, $Verbose) }
+        function Test-GTGraphScopes { param($RequiredScopes, [switch]$Reconnect, [switch]$Quiet) return $true }
+        function Get-MgBetaRoleManagementDirectoryRoleDefinition { param([switch]$All, $Property, $ErrorAction) }
+        function Get-MgBetaRoleManagementDirectoryRoleEligibilityScheduleInstance { param([switch]$All, $ExpandProperty, $ErrorAction, $Filter) }
+        function Get-MgBetaRoleManagementDirectoryRoleAssignmentScheduleInstance { param([switch]$All, $ExpandProperty, $ErrorAction, $Filter) }
+        function Test-GTGuid { param($InputObject, [switch]$Quiet) return $true }
+        function Get-GTGraphErrorDetails { param($Exception, $ResourceType) return @{ LogLevel = 'Error'; Reason = 'Mock Error' } }
+        function Write-PSFMessage { param($Level, $Message) }
 
         Mock -CommandName "Install-GTRequiredModule" -MockWith { }
-        Mock -CommandName "Initialize-GTGraphConnection" -MockWith { return $true }
+        Mock -CommandName "Test-GTGraphScopes" -MockWith { return $true }
         Mock -CommandName "Test-GTGuid" -MockWith { return $true }
+        Mock -CommandName "Write-PSFMessage" -MockWith { }
+        Mock -CommandName "Get-GTGraphErrorDetails" -MockWith { return @{ LogLevel = 'Error'; Reason = 'Mock Error' } }
     }
 
     Context "Functionality" {
-        It "should generate a report with eligible and active assignments" {
+        It "should generate a report with eligible and active assignments including PrincipalType" {
             # Mock Role Definitions
             $mockRoles = @(
                 [PSCustomObject]@{ Id = "Role1"; DisplayName = "Global Admin" }
@@ -29,27 +34,38 @@ Describe "Get-GTPIMRoleReport" {
             )
             Mock -CommandName "Get-MgBetaRoleManagementDirectoryRoleDefinition" -MockWith { return $mockRoles }
 
-            # Mock Eligible
+            # Mock Eligible (User)
             $mockEligible = @(
                 [PSCustomObject]@{
                     PrincipalId      = "User1"
                     RoleDefinitionId = "Role1"
                     StartDateTime    = (Get-Date)
                     EndDateTime      = (Get-Date).AddDays(1)
-                    Principal        = [PSCustomObject]@{ DisplayName = "User One"; AdditionalProperties = @{ userPrincipalName = "user1@contoso.com" } }
+                    Principal        = [PSCustomObject]@{ 
+                        DisplayName          = "User One" 
+                        AdditionalProperties = @{ 
+                            userPrincipalName = "user1@contoso.com"
+                            '@odata.type'     = '#microsoft.graph.user'
+                        } 
+                    }
                 }
             )
             Mock -CommandName "Get-MgBetaRoleManagementDirectoryRoleEligibilityScheduleInstance" -MockWith { return $mockEligible }
 
-            # Mock Active
+            # Mock Active (Group)
             $mockActive = @(
                 [PSCustomObject]@{
-                    PrincipalId      = "User2"
+                    PrincipalId      = "Group1"
                     RoleDefinitionId = "Role2"
                     AssignmentType   = "Assigned"
                     StartDateTime    = (Get-Date)
                     EndDateTime      = $null
-                    Principal        = [PSCustomObject]@{ DisplayName = "User Two"; AdditionalProperties = @{ userPrincipalName = "user2@contoso.com" } }
+                    Principal        = [PSCustomObject]@{ 
+                        DisplayName          = "Admin Group" 
+                        AdditionalProperties = @{ 
+                            '@odata.type' = '#microsoft.graph.group'
+                        } 
+                    }
                 }
             )
             Mock -CommandName "Get-MgBetaRoleManagementDirectoryRoleAssignmentScheduleInstance" -MockWith { return $mockActive }
@@ -60,9 +76,13 @@ Describe "Get-GTPIMRoleReport" {
             $eligible = $results | Where-Object { $_.Type -eq 'Eligible' }
             $eligible.Role | Should -Be "Global Admin"
             $eligible.User | Should -Be "User One"
+            $eligible.PrincipalType | Should -Be "User"
+            $eligible.RoleId | Should -Be "Role1"
 
             $active = $results | Where-Object { $_.Type -eq 'Active' }
             $active.Role | Should -Be "User Admin"
+            $active.User | Should -Be "Admin Group"
+            $active.PrincipalType | Should -Be "Group"
             $active.AssignmentState | Should -BeLike "Assigned*"
         }
 
