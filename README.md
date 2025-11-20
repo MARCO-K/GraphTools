@@ -55,7 +55,7 @@ Respond to security incidents with purpose-built cmdlets:
 - **Group Management**: Remove memberships and ownerships
 - **License Management**: Revoke Microsoft 365 licenses
 - **Role Management**: Remove directory and administrative unit roles
-- **PIM Role Management**: Remove Privileged Identity Management role eligibility schedules
+- **PIM Role Management**: Report on and remove Privileged Identity Management role eligibility schedules
 - **Application Access**: Revoke app role assignments and OAuth permissions
 - **Entitlement Management**: Remove access package assignments
 
@@ -88,6 +88,7 @@ Respond to security incidents with purpose-built cmdlets:
 | `Get-GTExpiringSecrets` | Find expiring secrets and certificates |
 | `Get-GTUnusedApps` | Identify unused Service Principals |
 | `Get-GTInactiveDevices` | Identify inactive devices |
+| `Get-GTPIMRoleReport` | Report on eligible and active PIM role assignments |
 
 ## 📦 Installation
 

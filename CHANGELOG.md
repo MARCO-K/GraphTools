@@ -35,6 +35,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Tests for special character injection (quotes, parentheses, semicolons)
   - Test coverage increased from 14 to 26 test cases (+86%)
 
+## [0.14.0] - 2025-11-20
+
+### Added
+- **PIM Management** - New capabilities for Privileged Identity Management
+  - `Get-GTPIMRoleReport` - Generate comprehensive report of eligible and active PIM role assignments
+  - `Remove-GTPIMRoleEligibility` - Remove both active and eligible PIM role assignments (Public function)
+
 ## [0.13.0] - 2025-11-20
 
 ### Added

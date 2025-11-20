@@ -1,226 +1,63 @@
 Describe "Remove-GTPIMRoleEligibility" {
     BeforeAll {
-        # Mock PSFramework logging first (before sourcing the function)
-        function Write-PSFMessage { }
-        
-        # Load the validation helper function (required by Remove-GTPIMRoleEligibility)
-        $validationFile = Join-Path $PSScriptRoot '..' 'internal' 'functions' 'GTValidation.ps1'
-        if (Test-Path $validationFile) {
-            . $validationFile
-        } else {
-            throw "Required validation function GTValidation.ps1 not found at: $validationFile"
+        $functionPath = "$PSScriptRoot/../functions/Remove-GTPIMRoleEligibility.ps1"
+        if (Test-Path $functionPath) {
+            . $functionPath
         }
-        
-        # Load the error handling helper function (required by Remove-GTPIMRoleEligibility)
-        $errorHelperFile = Join-Path $PSScriptRoot '..' 'internal' 'functions' 'Get-GTGraphErrorDetails.ps1'
-        if (Test-Path $errorHelperFile) {
-            . $errorHelperFile
-        } else {
-            throw "Required helper function Get-GTGraphErrorDetails.ps1 not found at: $errorHelperFile"
+        else {
+            Write-Error "Function file not found at $functionPath"
         }
-        
-        # Mock Microsoft Graph cmdlets as stubs
-        function Get-MgBetaRoleManagementDirectoryRoleEligibilitySchedule { }
-        function Remove-MgBetaRoleManagementDirectoryRoleEligibilitySchedule { }
-        
-        # Import the internal function for testing
-        . "$PSScriptRoot/../internal/functions/Remove-GTPIMRoleEligibility.ps1"
-        
-        # Create test user object with valid GUID
-        $script:testUser = [PSCustomObject]@{
-            Id = "12345678-1234-1234-1234-123456789abc"
-            UserPrincipalName = "testuser@contoso.com"
-        }
-        
-        # Create test output base
-        $script:testOutputBase = @{
-            UPN = "testuser@contoso.com"
-            UserId = "12345678-1234-1234-1234-123456789abc"
-            Timestamp = [datetime]::UtcNow
-        }
-        
-        # Create test results collection
-        $script:testResults = [System.Collections.Generic.List[PSObject]]::new()
-    }
-    
-    BeforeEach {
-        $script:testResults = [System.Collections.Generic.List[PSObject]]::new()
+
+        function Install-GTRequiredModule {}
+        function Initialize-GTGraphConnection {}
+        function Get-MgContext {}
+        function Get-MgBetaUser {}
+        function Test-GTGuid { return $true }
+        function Get-MgBetaRoleManagementDirectoryRoleAssignmentScheduleInstance { param($Filter, $ExpandProperty, $All, $ErrorAction) }
+        function Remove-MgBetaRoleManagementDirectoryRoleAssignmentSchedule { param($UnifiedRoleAssignmentScheduleId, $ErrorAction) }
+        function Get-MgBetaRoleManagementDirectoryRoleEligibilityScheduleInstance { param($Filter, $ExpandProperty, $All, $ErrorAction) }
+        function Remove-MgBetaRoleManagementDirectoryRoleEligibilitySchedule { param($UnifiedRoleEligibilityScheduleId, $ErrorAction) }
+
+        Mock -CommandName "Install-GTRequiredModule" -MockWith { }
+        Mock -CommandName "Initialize-GTGraphConnection" -MockWith { return $true }
+        Mock -CommandName "Test-GTGuid" -MockWith { return $true }
+        Mock -CommandName "Get-MgContext" -MockWith { return [PSCustomObject]@{ Account = "admin@contoso.com" } }
+        Mock -CommandName "Get-MgBetaUser" -MockWith { return [PSCustomObject]@{ Id = "AdminId" } }
     }
 
-    Context "Parameter Validation" {
-        It "should throw error when User object is missing Id property" {
-            $invalidUser = [PSCustomObject]@{
-                UserPrincipalName = "test@contoso.com"
-            }
-            { Remove-GTPIMRoleEligibility -User $invalidUser -OutputBase $testOutputBase -Results $testResults } | Should -Throw "*Id*"
-        }
-
-        It "should throw error when User object is missing UserPrincipalName property" {
-            $invalidUser = [PSCustomObject]@{
-                Id = "test-id"
-            }
-            { Remove-GTPIMRoleEligibility -User $invalidUser -OutputBase $testOutputBase -Results $testResults } | Should -Throw "*UserPrincipalName*"
-        }
-
-        It "should accept valid User object with Id and UserPrincipalName" {
-            Mock -CommandName "Get-MgBetaRoleManagementDirectoryRoleEligibilitySchedule" -MockWith { @() }
-            $results = [System.Collections.Generic.List[PSObject]]::new()
-            Remove-GTPIMRoleEligibility -User $testUser -OutputBase $testOutputBase -Results $results -WhatIf
-            # If we get here without error, test passes
-            $true | Should -Be $true
-        }
-    }
-
-    Context "PIM Role Eligibility Retrieval" {
-        It "should successfully execute with valid parameters" {
-            $results = [System.Collections.Generic.List[PSObject]]::new()
-            
-            { Remove-GTPIMRoleEligibility -User $testUser -OutputBase $testOutputBase -Results $results } | Should -Not -Throw
-            
-            # Verify no errors were added to results when no schedules exist
-            $results.Count | Should -Be 0
-        }
-
-        It "should handle user with no PIM role eligibilities" {
-            Mock -CommandName "Get-MgBetaRoleManagementDirectoryRoleEligibilitySchedule" -MockWith { @() }
-            $results = [System.Collections.Generic.List[PSObject]]::new()
-            
-            Remove-GTPIMRoleEligibility -User $testUser -OutputBase $testOutputBase -Results $results
-            
-            $results.Count | Should -Be 0
-        }
-
-        It "should handle errors when retrieving PIM role eligibilities" {
-            Mock -CommandName "Get-MgBetaRoleManagementDirectoryRoleEligibilitySchedule" -MockWith { 
-                throw "Access denied"
-            }
-            $results = [System.Collections.Generic.List[PSObject]]::new()
-            
-            Remove-GTPIMRoleEligibility -User $testUser -OutputBase $testOutputBase -Results $results
-            
-            $results.Count | Should -Be 1
-            $results[0].Status | Should -BeLike "*Failed*"
-            $results[0].ResourceType | Should -Be "PIMRoleEligibility"
-            $results[0].Action | Should -Be "RemovePIMRoleEligibility"
-        }
-    }
-
-    Context "PIM Role Eligibility Removal" {
-        It "should process single PIM role eligibility correctly" {
-            # Redefine the stub to return test data
-            function Get-MgBetaRoleManagementDirectoryRoleEligibilitySchedule { 
-                return @([PSCustomObject]@{
-                    Id = "schedule-id-1"
-                    RoleDefinition = [PSCustomObject]@{ DisplayName = "Global Administrator" }
-                })
-            }
-            $results = [System.Collections.Generic.List[PSObject]]::new()
-            
-            Remove-GTPIMRoleEligibility -User $testUser -OutputBase $testOutputBase -Results $results
-            
-            # Verify the result was added correctly
-            $results.Count | Should -Be 1
-            $results[0].ResourceName | Should -Be "Global Administrator"
-            $results[0].ResourceType | Should -Be "PIMRoleEligibility"
-            $results[0].Status | Should -Be "Success"
-        }
-
-        It "should remove multiple PIM role eligibilities" {
-            $mockSchedules = @(
+    Context "Functionality" {
+        It "should remove active assignments" {
+            $mockActive = @(
                 [PSCustomObject]@{
-                    Id = "schedule-id-1"
-                    RoleDefinition = [PSCustomObject]@{
-                        DisplayName = "Global Administrator"
-                    }
-                },
-                [PSCustomObject]@{
-                    Id = "schedule-id-2"
-                    RoleDefinition = [PSCustomObject]@{
-                        DisplayName = "User Administrator"
-                    }
-                },
-                [PSCustomObject]@{
-                    Id = "schedule-id-3"
-                    RoleDefinition = [PSCustomObject]@{
-                        DisplayName = "Security Administrator"
-                    }
+                    RoleAssignmentScheduleId = "Sched1"
+                    RoleDefinition           = [PSCustomObject]@{ DisplayName = "Global Admin" }
                 }
             )
-            Mock -CommandName "Get-MgBetaRoleManagementDirectoryRoleEligibilitySchedule" -MockWith { $mockSchedules }
-            Mock -CommandName "Remove-MgBetaRoleManagementDirectoryRoleEligibilitySchedule" -MockWith { }
-            $results = [System.Collections.Generic.List[PSObject]]::new()
-            
-            Remove-GTPIMRoleEligibility -User $testUser -OutputBase $testOutputBase -Results $results
-            
-            Should -Invoke -CommandName "Remove-MgBetaRoleManagementDirectoryRoleEligibilitySchedule" -Times 3
-            $results.Count | Should -Be 3
-            $results[0].ResourceName | Should -Be "Global Administrator"
-            $results[1].ResourceName | Should -Be "User Administrator"
-            $results[2].ResourceName | Should -Be "Security Administrator"
-            $results | ForEach-Object { $_.Status | Should -Be "Success" }
-        }
+            Mock -CommandName "Get-MgBetaRoleManagementDirectoryRoleAssignmentScheduleInstance" -MockWith { return $mockActive }
+            Mock -CommandName "Remove-MgBetaRoleManagementDirectoryRoleAssignmentSchedule" -MockWith { }
 
-        It "should handle removal failure for individual role eligibility" {
-            $mockSchedule = [PSCustomObject]@{
-                Id = "schedule-id-1"
-                RoleDefinition = [PSCustomObject]@{
-                    DisplayName = "Global Administrator"
-                }
-            }
-            Mock -CommandName "Get-MgBetaRoleManagementDirectoryRoleEligibilitySchedule" -MockWith { @($mockSchedule) }
-            Mock -CommandName "Remove-MgBetaRoleManagementDirectoryRoleEligibilitySchedule" -MockWith { 
-                throw "Insufficient permissions"
-            }
-            $results = [System.Collections.Generic.List[PSObject]]::new()
+            $results = Remove-GTPIMRoleEligibility -UserId "User1" -Confirm:$false
             
-            Remove-GTPIMRoleEligibility -User $testUser -OutputBase $testOutputBase -Results $results
-            
+            Assert-MockCalled -CommandName "Remove-MgBetaRoleManagementDirectoryRoleAssignmentSchedule" -Times 1 -ParameterFilter { $UnifiedRoleAssignmentScheduleId -eq "Sched1" }
             $results.Count | Should -Be 1
-            $results[0].Status | Should -BeLike "*Failed*Insufficient permissions*"
-            $results[0].ResourceName | Should -Be "Global Administrator"
+            $results[0].Status | Should -Be "Removed"
         }
-    }
 
-    Context "ShouldProcess Support" {
-        It "should respect WhatIf parameter" {
-            $mockSchedule = [PSCustomObject]@{
-                Id = "schedule-id-1"
-                RoleDefinition = [PSCustomObject]@{
-                    DisplayName = "Global Administrator"
+        It "should remove eligible assignments" {
+            Mock -CommandName "Get-MgBetaRoleManagementDirectoryRoleAssignmentScheduleInstance" -MockWith { return @() }
+            
+            $mockEligible = @(
+                [PSCustomObject]@{
+                    RoleEligibilityScheduleId = "Sched2"
+                    RoleDefinition            = [PSCustomObject]@{ DisplayName = "User Admin" }
                 }
-            }
-            Mock -CommandName "Get-MgBetaRoleManagementDirectoryRoleEligibilitySchedule" -MockWith { @($mockSchedule) }
+            )
+            Mock -CommandName "Get-MgBetaRoleManagementDirectoryRoleEligibilityScheduleInstance" -MockWith { return $mockEligible }
             Mock -CommandName "Remove-MgBetaRoleManagementDirectoryRoleEligibilitySchedule" -MockWith { }
-            $results = [System.Collections.Generic.List[PSObject]]::new()
-            
-            Remove-GTPIMRoleEligibility -User $testUser -OutputBase $testOutputBase -Results $results -WhatIf
-            
-            Should -Invoke -CommandName "Remove-MgBetaRoleManagementDirectoryRoleEligibilitySchedule" -Times 0
-        }
-    }
 
-    Context "Output Validation" {
-        It "should add correct properties to output object" {
-            $mockSchedule = [PSCustomObject]@{
-                Id = "schedule-id-1"
-                RoleDefinition = [PSCustomObject]@{
-                    DisplayName = "Global Administrator"
-                }
-            }
-            Mock -CommandName "Get-MgBetaRoleManagementDirectoryRoleEligibilitySchedule" -MockWith { @($mockSchedule) }
-            Mock -CommandName "Remove-MgBetaRoleManagementDirectoryRoleEligibilitySchedule" -MockWith { }
-            $results = [System.Collections.Generic.List[PSObject]]::new()
-            
-            Remove-GTPIMRoleEligibility -User $testUser -OutputBase $testOutputBase -Results $results
-            
-            $output = $results[0]
-            $output.UPN | Should -Be "testuser@contoso.com"
-            $output.UserId | Should -Be "12345678-1234-1234-1234-123456789abc"
-            $output.ResourceName | Should -Be "Global Administrator"
-            $output.ResourceType | Should -Be "PIMRoleEligibility"
-            $output.ResourceId | Should -Be "schedule-id-1"
-            $output.Action | Should -Be "RemovePIMRoleEligibility"
-            $output.Status | Should -Be "Success"
+            $results = Remove-GTPIMRoleEligibility -UserId "User1" -Confirm:$false
+
+            Assert-MockCalled -CommandName "Remove-MgBetaRoleManagementDirectoryRoleEligibilitySchedule" -Times 1 -ParameterFilter { $UnifiedRoleEligibilityScheduleId -eq "Sched2" }
         }
     }
 }

@@ -56,12 +56,11 @@
 
     Removes both active role assignments and PIM role eligibilities from an admin account
 #>
-function Remove-GTUserEntitlements
-{
+function Remove-GTUserEntitlements {
     [CmdletBinding(SupportsShouldProcess, ConfirmImpact = 'High')]
     param(
         [Parameter(Mandatory = $true, ValueFromPipeline = $true)]
-        [ValidateScript({$_ -match $script:GTValidationRegex.UPN})]
+        [ValidateScript({ $_ -match $script:GTValidationRegex.UPN })]
         [string[]]$UserUPNs,
         [switch]$removeGroups,
         [switch]$removeGroupOwners,
@@ -77,15 +76,13 @@ function Remove-GTUserEntitlements
         [switch]$removeAll
     )
 
-    begin
-    {
+    begin {
         $results = [System.Collections.Generic.List[PSObject]]::new()
 
         # check for required scopes
         $RequiredScopes = @('GroupMember.ReadWrite.All', 'Group.ReadWrite.All', 'Directory.ReadWrite.All', 'RoleManagement.ReadWrite.Directory', 'RoleEligibilitySchedule.ReadWrite.Directory', 'AdministrativeUnit.ReadWrite.All', 'EntitlementManagement.ReadWrite.All', 'DelegatedPermissionGrant.ReadWrite.All')
         $missingScopes = $RequiredScopes | Where-Object { $_ -notin (Get-MgContext).Scopes }
-        if ($missingScopes)
-        {
+        if ($missingScopes) {
             throw "Required scopes are missing: $($missingScopes -join ', ')"
         }
         else { Write-PSFMessage -Level Verbose -Message "All required scopes are present" }
@@ -96,12 +93,9 @@ function Remove-GTUserEntitlements
 
     }
 
-    process
-    {
-        foreach ($UPN in $UserUPNs)
-        {
-            try
-            {
+    process {
+        foreach ($UPN in $UserUPNs) {
+            try {
                 $User = Get-MgBetaUser -UserId $UPN -ErrorAction Stop
                 $outputBase = @{
                     UPN       = $UPN
@@ -110,73 +104,61 @@ function Remove-GTUserEntitlements
                 }
 
                 # 1. Remove Group Memberships
-                if ($removeGroups -or $removeAll)
-                {
+                if ($removeGroups -or $removeAll) {
                     Remove-GTUserGroupMemberships -User $User -OutputBase $outputBase -Results $results
                 }
 
                 # 2. Remove Group Ownerships
-                if ($removeGroupOwners -or $removeAll)
-                {
+                if ($removeGroupOwners -or $removeAll) {
                     Remove-GTUserGroupOwnerships -User $User -OutputBase $outputBase -Results $results
                 }
 
                 # 3. Remove Licenses
-                if ($removeLicenses -or $removeAll)
-                {
+                if ($removeLicenses -or $removeAll) {
                     Remove-GTUserLicenses -User $User -OutputBase $outputBase -Results $results
                 }
 
                 # 4. Remove Service Principal Ownerships (deprecated)
-                if ($removeServicePrincipals -or $removeAll)
-                {
+                if ($removeServicePrincipals -or $removeAll) {
                     Remove-GTUserServicePrincipalOwnerships -User $User -OutputBase $outputBase -Results $results
                 }
 
                 # 5. Remove Enterprise Applications and App Registrations Ownerships
-                if ($removeEnterpriseAppOwnership -or $removeAll)
-                {
+                if ($removeEnterpriseAppOwnership -or $removeAll) {
                     Remove-GTUserEnterpriseAppOwnership -User $User -OutputBase $outputBase -Results $results
                 }
 
                 # 6. Remove UserAppRoleAssignment
-                if ($removeUserAppRoleAssignments -or $removeAll)
-                {
+                if ($removeUserAppRoleAssignments -or $removeAll) {
                     Remove-GTUserAppRoleAssignments -User $User -OutputBase $outputBase -Results $results
                 }
 
                 # 7. Remove Role Assignments (Privileged Roles)
-                if ($removeRoleAssignments -or $removeAll)
-                {
+                if ($removeRoleAssignments -or $removeAll) {
                     Remove-GTUserRoleAssignments -User $User -OutputBase $outputBase -Results $results
                 }
 
                 # 8. Remove PIM Role Eligibility Schedules
-                if ($removePIMRoleEligibility -or $removeAll)
-                {
-                    Remove-GTPIMRoleEligibility -User $User -OutputBase $outputBase -Results $results
+                if ($removePIMRoleEligibility -or $removeAll) {
+                    Remove-GTPIMRoleEligibilityInternal -User $User -OutputBase $outputBase -Results $results
                 }
 
                 # 9. Remove Administrative Unit Memberships
-                if ($removeAdministrativeUnitMemberships -or $removeAll)
-                {
+                if ($removeAdministrativeUnitMemberships -or $removeAll) {
                     Remove-GTUserAdministrativeUnitMemberships -User $User -OutputBase $outputBase -Results $results
                 }
 
                 # 10. Remove Access Package Assignments
-                if ($removeAccessPackageAssignments -or $removeAll)
-                {
+                if ($removeAccessPackageAssignments -or $removeAll) {
                     Remove-GTUserAccessPackageAssignments -User $User -OutputBase $outputBase -Results $results
                 }
 
                 # 11. Remove Delegated Permission Grants
-                if ($removeDelegatedPermissionGrants -or $removeAll)
-                {
+                if ($removeDelegatedPermissionGrants -or $removeAll) {
                     Remove-GTUserDelegatedPermissionGrants -User $User -OutputBase $outputBase -Results $results
                 }
             }
-            catch
-            {
+            catch {
                 # Use centralized error handling helper to parse Graph API exceptions
                 $errorDetails = Get-GTGraphErrorDetails -Exception $_.Exception -ResourceType 'user'
                 
@@ -203,8 +185,7 @@ function Remove-GTUserEntitlements
         }
     }
 
-    end
-    {
+    end {
         return $results
     }
 }
