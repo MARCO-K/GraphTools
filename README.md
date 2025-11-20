@@ -64,6 +64,11 @@ Respond to security incidents with purpose-built cmdlets:
 - **Reporting**: Track guest user status and pending invitations
 - **Cleanup**: Automate removal of expired guest invitations
 
+### Security & Compliance
+
+- **Credential Monitoring**: Track expiring secrets and certificates
+- **App Hygiene**: Identify and remove unused applications
+
 ### Reporting & Analytics
 
 | Function | Description |
@@ -76,6 +81,8 @@ Respond to security incidents with purpose-built cmdlets:
 | `Get-GTOrphanedServicePrincipal` | Identify orphaned or insecure Service Principals |
 | `Get-GTGuestUserReport` | Report on guest users and invitation status |
 | `Remove-GTExpiredInvites` | Remove expired pending guest invitations |
+| `Get-GTExpiringSecrets` | Find expiring secrets and certificates |
+| `Get-GTUnusedApps` | Identify unused Service Principals |
 
 ## 📦 Installation
 

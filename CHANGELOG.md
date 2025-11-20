@@ -35,6 +35,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Tests for special character injection (quotes, parentheses, semicolons)
   - Test coverage increased from 14 to 26 test cases (+86%)
 
+## [0.12.0] - 2025-11-20
+
+### Added
+- **Security & Compliance** - Enhanced security monitoring capabilities
+  - `Get-GTExpiringSecrets` - Identify Applications and Service Principals with expiring secrets or certificates
+  - `Get-GTUnusedApps` - Detect Service Principals with no sign-in activity for a specified period
+
 ## [0.11.0] - 2025-11-20
 
 ### Added
