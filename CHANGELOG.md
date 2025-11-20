@@ -35,6 +35,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Tests for special character injection (quotes, parentheses, semicolons)
   - Test coverage increased from 14 to 26 test cases (+86%)
 
+## [0.11.0] - 2025-11-20
+
+### Added
+- **Guest Management** - New capabilities for managing guest users
+  - `Get-GTGuestUserReport` - Report on guest users and their invitation status
+  - `Remove-GTExpiredInvites` - Automatically clean up pending guest invitations older than X days
+- **Performance** - Pipeline optimization
+  - `Get-GTInactiveUsers` - Optimized for better pipeline performance and memory usage
+
 ## [0.10.0] - 2025-01-14
 
 ### Changed

@@ -59,6 +59,11 @@ Respond to security incidents with purpose-built cmdlets:
 - **Application Access**: Revoke app role assignments and OAuth permissions
 - **Entitlement Management**: Remove access package assignments
 
+### Guest Management
+
+- **Reporting**: Track guest user status and pending invitations
+- **Cleanup**: Automate removal of expired guest invitations
+
 ### Reporting & Analytics
 
 | Function | Description |
@@ -69,6 +74,8 @@ Respond to security incidents with purpose-built cmdlets:
 | `Get-GTInactiveUsers` | Identify dormant accounts by last sign-in |
 | `Get-GTRecentUser` | Find recently created user accounts |
 | `Get-GTOrphanedServicePrincipal` | Identify orphaned or insecure Service Principals |
+| `Get-GTGuestUserReport` | Report on guest users and invitation status |
+| `Remove-GTExpiredInvites` | Remove expired pending guest invitations |
 
 ## 📦 Installation
 
