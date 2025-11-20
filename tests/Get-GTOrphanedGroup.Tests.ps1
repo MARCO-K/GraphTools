@@ -1,11 +1,11 @@
 Describe "Get-GTOrphanedGroup" {
     BeforeAll {
-        # Define dependencies in the Describe scope
-        function Install-GTRequiredModule {}
-        function Initialize-GTGraphConnection {}
-        function Write-PSFMessage {}
-        function Stop-PSFFunction {}
-        function Get-GTGraphErrorDetails {}
+        # Use Pester Mocks for dependencies
+        Mock -CommandName Install-GTRequiredModule -MockWith { param($ModuleNames, $Verbose) } -Verifiable
+        Mock -CommandName Initialize-GTGraphConnection -MockWith { } -Verifiable
+        Mock -CommandName Write-PSFMessage -MockWith { param($Level, $Message) } -Verifiable
+        Mock -CommandName Stop-PSFFunction -MockWith { } -Verifiable
+        Mock -CommandName Get-GTGraphErrorDetails -MockWith { } -Verifiable
 
         # Dot-source the function in the Describe scope
         . "$PSScriptRoot/../functions/Get-GTOrphanedGroup.ps1"

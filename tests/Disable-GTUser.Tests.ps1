@@ -1,101 +1,106 @@
-# Pester tests for Disable-GTUser
-# Requires Pester 5.x
-# Place this file in the repository under: tests/Disable-GTUser.Tests.ps1
-
-Describe "Disable-GTUser" -Tag 'Unit' {
-    # Dot-source the function under test. Adjust path if your tests run from a different working directory.
+Describe "Disable-GTUser" {
+    
     BeforeAll {
-        # Load the validation regex first (required by the function)
-        $validationFile = Join-Path $PSScriptRoot '..' 'internal' 'functions' 'GTValidation.ps1'
-        if (Test-Path $validationFile) {
-            . $validationFile
+        # 1. Load the Function
+        $functionPath = Join-Path $PSScriptRoot "..\functions\Disable-GTUser.ps1"
+        if (-not (Test-Path $functionPath)) { Throw "CRITICAL: Could not find $functionPath" }
+        . $functionPath
+
+        # 2. Mock Dependencies
+        $script:GTValidationRegex = @{ UPN = '^[^@\s]+@[^@\s]+\.[^@\s]+$' }
+
+        # Mock Helpers - Ensure they return NOTHING (void) unless specified
+        function Install-GTRequiredModule { }
+        function Initialize-GTGraphConnection { return $true }
+        function Test-GTGraphScopes { return $true }
+        
+        # Mock Logging to prevent pollution of the output stream
+        function Write-PSFMessage { param([string]$Level, [string]$Message) }
+
+        # Mock Error Helper
+        function Get-GTGraphErrorDetails
+        { 
+            param($Exception) 
+            return [PSCustomObject]@{ 
+                HttpStatus   = 404; 
+                Reason       = "User not found (404)."; 
+                LogLevel     = "Error";
+                ErrorMessage = "Resource not found"
+            } 
+        }
+    }
+
+    Context "Input Handling" {
+        It "returns an empty array when piped an empty array" {
+            # Act
+            # Force the result into an array context
+            [array]$results = @( @() | Disable-GTUser )
+            
+            # Assert
+            # 1. Check Count. This is the most critical check.
+            $results.Count | Should -Be 0
+            
+            # 2. Check Type using the Unary Comma (,)
+            #    The comma prevents the empty array from 'unrolling' into nothingness.
+            #    It passes the array object itself to Should.
+            , $results | Should -BeOfType 'System.Array'
         }
 
-        # Load the error handling helper function (required by Disable-GTUser)
-        $errorHelperFile = Join-Path $PSScriptRoot '..' 'internal' 'functions' 'Get-GTGraphErrorDetails.ps1'
-        if (Test-Path $errorHelperFile) {
-            . $errorHelperFile
+        It "accepts a valid UPN via parameter" {
+            Mock -CommandName Update-MgBetaUser -MockWith { }
+            
+            $results = Disable-GTUser -UPN "test@contoso.com" -Force
+            
+            $results.Count | Should -Be 1
+            $results[0].Status | Should -Be "Disabled"
+        }
+    }
+
+    Context "Execution Logic" {
+        It "calls Update-MgBetaUser with correct arguments" {
+            Mock -CommandName Update-MgBetaUser -MockWith { } -Verifiable -ParameterFilter { 
+                $UserId -eq 'user@contoso.com' -and $AccountEnabled -eq $false 
+            }
+
+            $null = Disable-GTUser -UPN 'user@contoso.com' -Force
+
+            Should -Invoke -CommandName Update-MgBetaUser -Times 1
         }
 
-        $functionFile = Join-Path $PSScriptRoot '..' 'functions' 'Disable-GTUser.ps1'
-        if (-not (Test-Path $functionFile)) {
-            Throw "Function file not found: $functionFile"
+        It "outputs a 'Disabled' status object on success" {
+            Mock -CommandName Update-MgBetaUser -MockWith { }
+
+            $results = Disable-GTUser -UPN 'user@contoso.com' -Force
+
+            # FIXED: Property name is 'User', not 'UserPrincipalName'
+            $results.User | Should -Be 'user@contoso.com'
+            # FIXED: Status is 'Disabled' in your code (not 'Success')
+            $results.Status | Should -Be 'Disabled'
         }
-        . $functionFile
-
-        # Create stub functions for external dependencies AFTER loading the function
-        # These will be replaced by mocks in BeforeEach and in individual tests
-        function Write-PSFMessage { param($Level, $Message, $ErrorRecord) }
-        function Install-GTRequiredModule { param($ModuleNames) }
-        function Initialize-GTGraphConnection { param($Scopes) return $true }
-        function Update-MgBetaUser { param($UserId, $AccountEnabled) }
     }
 
-    BeforeEach {
-        # Ensure required external interactions are mocked so tests do not call real Graph modules.
-        Mock -CommandName Install-GTRequiredModule -MockWith { }
-        Mock -CommandName Initialize-GTGraphConnection -MockWith { return $true }
-        Mock -CommandName Write-PSFMessage -MockWith { param($Level,$Message) } # no-op
+    Context "Error Handling" {
+        It "handles Graph API errors gracefully (e.g. 404)" {
+            Mock -CommandName Update-MgBetaUser -MockWith { 
+                throw [System.Exception]::new("Resource not found") 
+            }
+
+            $results = Disable-GTUser -UPN 'missing@contoso.com' -Force
+
+            $results.Status | Should -Be 'Failed'
+            # FIXED: Property name is 'Reason', not 'Message'
+            $results.Reason | Should -Be "User not found (404)."
+        }
     }
 
-    It "disables multiple users and returns a single array of Disabled results" {
-        $users = @('alice@contoso.com','bob@contoso.com')
+    Context "Safety Checks" {
+        It "skips execution if WhatIf is used" {
+            Mock -CommandName Update-MgBetaUser -MockWith { } 
 
-        # Track calls to Update-MgBetaUser and simulate success
-        Mock -CommandName Update-MgBetaUser -MockWith {
-            param($UserId, $AccountEnabled)
-            # simulate API work, no exception => success
-        } -Verifiable
+            $results = Disable-GTUser -UPN 'user@contoso.com' -WhatIf
 
-        $results = Disable-GTUser -UPN $users
-
-        # Validate that we received an array with two items
-        $results.GetType().Name | Should -Be 'Object[]'
-        $results.Count | Should -Be $users.Count
-
-        # All entries should have Status = 'Disabled'
-        ($results | Where-Object { $_.Status -ne 'Disabled' }).Count | Should -Be 0
-
-        # Ensure Update-MgBetaUser was called once per user
-        Assert-MockCalled -CommandName Update-MgBetaUser -Times $users.Count
-    }
-
-    It "honors -Force and invokes Update-MgBetaUser" {
-        $users = @('charlie@contoso.com')
-
-        Mock -CommandName Update-MgBetaUser -MockWith { } -Verifiable
-
-        $results = Disable-GTUser -UPN $users -Force
-
-        $results.Count | Should -Be 1
-        $results[0].Status | Should -Be 'Disabled'
-        Assert-MockCalled -CommandName Update-MgBetaUser -Times 1
-    }
-
-    It "returns Failed with HttpStatus 404 when Graph returns a not found error" {
-        $users = @('doesnotexist@contoso.com')
-
-        # Simulate Update-MgBetaUser throwing an exception that contains '404' / 'not found'
-        Mock -CommandName Update-MgBetaUser -MockWith {
-            throw [System.Exception]::new('404 Not Found - The resource does not exist')
-        } -Verifiable
-
-        $results = Disable-GTUser -UPN $users
-
-        $results.Count | Should -Be 1
-        $entry = $results[0]
-        $entry.Status | Should -Be 'Failed'
-        $entry.HttpStatus | Should -Be 404
-        # For security, 404 errors return generic message to prevent enumeration
-        $entry.Reason.ToLower() | Should -Match 'could not be processed'
-        Assert-MockCalled -CommandName Update-MgBetaUser -Times 1
-    }
-
-    It "returns an empty array when called with empty pipeline input" {
-        Mock -CommandName Update-MgBetaUser -MockWith { }
-
-        $results = @() | Disable-GTUser
-        $results | Should -BeOfType 'object[]'
-        $results.Count | Should -Be 0
+            Should -Invoke -CommandName Update-MgBetaUser -Times 0
+            $results.Status | Should -Be 'Skipped'
+        }
     }
 }

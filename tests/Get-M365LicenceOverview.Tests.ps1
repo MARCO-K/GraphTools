@@ -1,10 +1,12 @@
-. "$PSScriptRoot/../functions/Get-M365LicenceOverview.ps1"
-
 Describe "Get-M365LicenseOverview" {
     BeforeAll {
+        # Use Pester Mocks before dot-sourcing so the function file can load and calls are intercepted
         # Mock the required modules and functions
         Mock -ModuleName "Microsoft.Graph.Beta.Users" -CommandName "Get-MgBetaUser" -MockWith { }
         Mock -ModuleName "Microsoft.Graph.Beta.Identity.DirectoryManagement" -CommandName "Invoke-RestMethod" -MockWith { }
+
+        # Dot-source the function under test
+        . "$PSScriptRoot/../functions/Get-M365LicenceOverview.ps1"
     }
 
     Context "Parameter Validation" {

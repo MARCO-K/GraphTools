@@ -1,10 +1,12 @@
-. "$PSScriptRoot/../functions/Get-GTServicePrincipalReport.ps1"
-
 Describe "Get-GTServicePrincipalReport" {
     BeforeAll {
+        # Use Pester Mocks before dot-sourcing so the function file can load and calls are intercepted
         # Mock required modules and functions
         Mock -CommandName "Install-GTRequiredModule" -MockWith { }
         Mock -CommandName "Initialize-GTGraphConnection" -MockWith { }
+
+        # Dot-source the function under test
+        . "$PSScriptRoot/../functions/Get-GTServicePrincipalReport.ps1"
     }
 
     Context "Parameter Sets" {

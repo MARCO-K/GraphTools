@@ -1,39 +1,41 @@
-. "$PSScriptRoot/../functions/Get-MFAReport.ps1"
-
 BeforeAll {
+    # Use Pester Mocks before dot-sourcing so the function file can load and calls are intercepted
     # Mock the required modules and functions
-    Mock -ModuleName "Microsoft.Graph.Authentication" -CommandName "Install-GTRequiredModule" -MockWith { }
+    Mock -ModuleName "Microsoft.Graph.Authentication" -CommandName "Install-GTRequiredModule" -MockWith { param($ModuleNames, $Verbose) }
     Mock -ModuleName "Microsoft.Graph.Authentication" -CommandName "Get-MgContext" -MockWith { $true }
     Mock -ModuleName "Microsoft.Graph.Authentication" -CommandName "Connect-MgGraph" -MockWith { }
+
+    # Dot-source the function under test
+    . "$PSScriptRoot/../functions/Get-MFAReport.ps1"
 }
 
 Describe "Get-MFAReport" {
     $mockReport = @(
         @{
             UserPrincipalName = 'adele.vance@contoso.com'
-            UserDisplayName = 'Adele Vance'
-            IsAdmin = $true
-            UserType = 'Member'
-            IsMfaRegistered = $true
-            IsMfaCapable = $true
+            UserDisplayName   = 'Adele Vance'
+            IsAdmin           = $true
+            UserType          = 'Member'
+            IsMfaRegistered   = $true
+            IsMfaCapable      = $true
             MethodsRegistered = @('microsoftAuthenticatorPush', 'FIDO2')
         },
         @{
             UserPrincipalName = 'grad.y@contoso.com'
-            UserDisplayName = 'Grady Archie'
-            IsAdmin = $false
-            UserType = 'Member'
-            IsMfaRegistered = $false
-            IsMfaCapable = $true
+            UserDisplayName   = 'Grady Archie'
+            IsAdmin           = $false
+            UserType          = 'Member'
+            IsMfaRegistered   = $false
+            IsMfaCapable      = $true
             MethodsRegistered = @()
         },
         @{
             UserPrincipalName = 'guest@contoso.com'
-            UserDisplayName = 'Guest User'
-            IsAdmin = $false
-            UserType = 'Guest'
-            IsMfaRegistered = $false
-            IsMfaCapable = $false
+            UserDisplayName   = 'Guest User'
+            IsAdmin           = $false
+            UserType          = 'Guest'
+            IsMfaRegistered   = $false
+            IsMfaCapable      = $false
             MethodsRegistered = @()
         }
     )
@@ -41,10 +43,13 @@ Describe "Get-MFAReport" {
     BeforeEach {
         Mock -ModuleName "Microsoft.Graph.Beta.Reports" -CommandName "Get-MgBetaReportAuthenticationMethodUserRegistrationDetail" -MockWith {
             param($Filter)
-            if ($Filter) {
-                $upns = ($Filter -split "'").Where({$_ -like '*@*'})
+            if ($Filter)
+            {
+                $upns = ($Filter -split "'").Where({ $_ -like '*@*' })
                 $mockReport | Where-Object { $_.UserPrincipalName -in $upns }
-            } else {
+            }
+            else
+            {
                 $mockReport
             }
         } -Verifiable

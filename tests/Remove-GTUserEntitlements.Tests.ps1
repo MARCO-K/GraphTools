@@ -1,21 +1,21 @@
 Describe "Remove-GTUserEntitlements" {
     BeforeAll {
-        # Create stub functions for all cmdlets used (before sourcing the function)
-        function Get-MgContext { }
-        function Install-GTRequiredModule { }
-        function Get-MgBetaUser { }
-        function Remove-GTUserGroupMemberships { }
-        function Remove-GTUserGroupOwnerships { }
-        function Remove-GTUserLicenses { }
-        function Remove-GTUserServicePrincipalOwnerships { }
-        function Remove-GTUserEnterpriseAppOwnership { }
-        function Remove-GTUserAppRoleAssignments { }
-        function Remove-GTUserRoleAssignments { }
-        function Remove-GTPIMRoleEligibility { }
-        function Remove-GTUserAdministrativeUnitMemberships { }
-        function Remove-GTUserAccessPackageAssignments { }
-        function Remove-GTUserDelegatedPermissionGrants { }
-        function Write-PSFMessage { }
+        # Use Pester Mocks for external dependencies so the function file can load and calls are intercepted
+        Mock -CommandName Get-MgContext -MockWith { } -Verifiable
+        Mock -CommandName Install-GTRequiredModule -MockWith { param($ModuleNames, $Verbose) } -Verifiable
+        Mock -CommandName Get-MgBetaUser -MockWith { } -Verifiable
+        Mock -CommandName Remove-GTUserGroupMemberships -MockWith { } -Verifiable
+        Mock -CommandName Remove-GTUserGroupOwnerships -MockWith { } -Verifiable
+        Mock -CommandName Remove-GTUserLicenses -MockWith { } -Verifiable
+        Mock -CommandName Remove-GTUserServicePrincipalOwnerships -MockWith { } -Verifiable
+        Mock -CommandName Remove-GTUserEnterpriseAppOwnership -MockWith { } -Verifiable
+        Mock -CommandName Remove-GTUserAppRoleAssignments -MockWith { } -Verifiable
+        Mock -CommandName Remove-GTUserRoleAssignments -MockWith { } -Verifiable
+        Mock -CommandName Remove-GTPIMRoleEligibility -MockWith { } -Verifiable
+        Mock -CommandName Remove-GTUserAdministrativeUnitMemberships -MockWith { } -Verifiable
+        Mock -CommandName Remove-GTUserAccessPackageAssignments -MockWith { } -Verifiable
+        Mock -CommandName Remove-GTUserDelegatedPermissionGrants -MockWith { } -Verifiable
+        Mock -CommandName Write-PSFMessage -MockWith { } -Verifiable
         
         # Source the GTValidation script for UPN regex
         . "$PSScriptRoot/../internal/functions/GTValidation.ps1"
@@ -32,7 +32,7 @@ Describe "Remove-GTUserEntitlements" {
         Mock -CommandName "Install-GTRequiredModule" -MockWith { }
         Mock -CommandName "Get-MgBetaUser" -MockWith { 
             [PSCustomObject]@{
-                Id = "test-user-id"
+                Id                = "test-user-id"
                 UserPrincipalName = "test@contoso.com"
             }
         }

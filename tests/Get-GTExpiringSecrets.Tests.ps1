@@ -1,12 +1,17 @@
+## Provide lightweight stubs for common helpers in case they are missing during discovery
+if (-not (Get-Command Install-GTRequiredModule -ErrorAction SilentlyContinue)) { function Install-GTRequiredModule { param($ModuleNames, $Verbose) } }
+if (-not (Get-Command Initialize-GTGraphConnection -ErrorAction SilentlyContinue)) { function Initialize-GTGraphConnection { param($Scopes, $NewSession) return $true } }
+if (-not (Get-Command Test-GTGraphScopes -ErrorAction SilentlyContinue)) { function Test-GTGraphScopes { param($RequiredScopes, $Reconnect, $Quiet) return $true } }
+if (-not (Get-Command Write-PSFMessage -ErrorAction SilentlyContinue)) { function Write-PSFMessage { param($Level, $Message, $ErrorRecord) } }
+
 Describe "Get-GTExpiringSecrets" {
     BeforeAll {
         $functionPath = "$PSScriptRoot/../functions/Get-GTExpiringSecrets.ps1"
-        # Provide minimal stubs so dot-sourcing the function file doesn't fail
-        function Install-GTRequiredModule { }
-        # Match real signature: Reconnect and Quiet are switches so calling -Reconnect -Quiet binds correctly
-        function Test-GTGraphScopes { param($RequiredScopes, [switch]$Reconnect, [switch]$Quiet) return $true }
-        function Get-MgBetaApplication { }
-        function Get-MgBetaServicePrincipal { }
+        # Use Pester Mocks before dot-sourcing so the function file can load and calls are intercepted
+        Mock -CommandName Install-GTRequiredModule -MockWith { param($ModuleNames, $Verbose) } -Verifiable
+        Mock -CommandName Test-GTGraphScopes -MockWith { param($RequiredScopes, $Reconnect, $Quiet) return $true } -Verifiable
+        Mock -CommandName Get-MgBetaApplication -MockWith { } -Verifiable
+        Mock -CommandName Get-MgBetaServicePrincipal -MockWith { } -Verifiable
 
         if (Test-Path $functionPath)
         {
@@ -17,10 +22,6 @@ Describe "Get-GTExpiringSecrets" {
         {
             Write-Error "Function file not found at $functionPath"
         }
-
-        # Replace implementations with Pester mocks where appropriate
-        Mock -CommandName "Install-GTRequiredModule" -MockWith { }
-        Mock -CommandName "Test-GTGraphScopes" -MockWith { return $true }
     }
 
     Context "Functionality" {

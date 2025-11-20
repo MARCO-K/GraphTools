@@ -1,14 +1,16 @@
-. "$PSScriptRoot/../functions/Invoke-AuditLogQuery.ps1"
-
 BeforeAll {
+    # Use Pester Mocks before dot-sourcing so the function file can load and calls are intercepted
     # Mock the required modules and functions
-    Mock -ModuleName "Microsoft.Graph.Authentication" -CommandName "Install-GTRequiredModule" -MockWith { }
+    Mock -ModuleName "Microsoft.Graph.Authentication" -CommandName "Install-GTRequiredModule" -MockWith { param($ModuleNames, $Verbose) }
     Mock -ModuleName "Microsoft.Graph.Authentication" -CommandName "Test-GTGraphScopes" -MockWith { $true }
     Mock -ModuleName "Microsoft.Graph.Authentication" -CommandName "Set-MgRequestContext" -MockWith { }
 
     # Mock Get-Date to return a fixed timestamp
     $fixedNow = Get-Date '2025-10-10T00:00:00Z'
     Mock Get-Date { $fixedNow }
+
+    # Dot-source the function under test
+    . "$PSScriptRoot/../functions/Invoke-AuditLogQuery.ps1"
 }
 
 Describe "Invoke-AuditLogQuery" {
@@ -16,42 +18,47 @@ Describe "Invoke-AuditLogQuery" {
         $script:storedFilter = $null
         $mockRecords = @(
             @{
-                Id = "test-record-1"
-                Operation = "FileDeleted"
-                UserId = "user1@contoso.com"
-                auditData = "{'some':'data'}"
+                Id              = "test-record-1"
+                Operation       = "FileDeleted"
+                UserId          = "user1@contoso.com"
+                auditData       = "{'some':'data'}"
                 createdDateTime = (Get-Date).AddDays(-1)
             },
             @{
-                Id = "test-record-2"
-                Operation = "FileModified"
-                UserId = "user2@contoso.com"
-                auditData = "{'other':'data'}"
+                Id              = "test-record-2"
+                Operation       = "FileModified"
+                UserId          = "user2@contoso.com"
+                auditData       = "{'other':'data'}"
                 createdDateTime = (Get-Date).AddDays(-8)
             }
         )
 
         Mock -ModuleName "Microsoft.Graph.Authentication" -CommandName "Invoke-MgGraphRequest" -MockWith {
             param($Uri, $Body, $Method)
-            if ($Uri -like "*/auditLog/queries" -and $Method -eq "POST") {
+            if ($Uri -like "*/auditLog/queries" -and $Method -eq "POST")
+            {
                 $script:storedFilter = ($Body | ConvertFrom-Json).filter
                 return @{
-                    Id = "test-query-id"
+                    Id     = "test-query-id"
                     status = "succeeded"
                 }
             }
-            if ($Uri -like "*/auditLog/queries/test-query-id" -and $Method -eq "GET") {
+            if ($Uri -like "*/auditLog/queries/test-query-id" -and $Method -eq "GET")
+            {
                 return @{
-                    Id = "test-query-id"
+                    Id     = "test-query-id"
                     status = "succeeded"
                 }
             }
-            if ($Uri -like "*/auditLog/queries/test-query-id/records" -and $Method -eq "GET") {
+            if ($Uri -like "*/auditLog/queries/test-query-id/records" -and $Method -eq "GET")
+            {
                 $records = $mockRecords
-                if ($script:storedFilter.OperationFilters) {
+                if ($script:storedFilter.OperationFilters)
+                {
                     $records = $records | Where-Object { $_.Operation -in $script:storedFilter.OperationFilters }
                 }
-                if ($script:storedFilter.userIdsFilters) {
+                if ($script:storedFilter.userIdsFilters)
+                {
                     $records = $records | Where-Object { $_.UserId -in $script:storedFilter.userIdsFilters }
                 }
                 $startDate = Get-Date($script:storedFilter.filterStartDateTime)
@@ -124,7 +131,7 @@ Describe "Invoke-AuditLogQuery" {
         }
 
         It "should accept valid Operations values" {
-            { Invoke-AuditLogQuery -Operations "FileDeleted","FileModified","User_Logon" } | Should -Not -Throw
+            { Invoke-AuditLogQuery -Operations "FileDeleted", "FileModified", "User_Logon" } | Should -Not -Throw
         }
 
         It "should throw an error for Operations with special characters" {
@@ -140,7 +147,7 @@ Describe "Invoke-AuditLogQuery" {
         }
 
         It "should accept valid RecordType values" {
-            { Invoke-AuditLogQuery -RecordType "Exchange","SharePoint","AzureAD_Login" } | Should -Not -Throw
+            { Invoke-AuditLogQuery -RecordType "Exchange", "SharePoint", "AzureAD_Login" } | Should -Not -Throw
         }
 
         It "should throw an error for RecordType with special characters" {
@@ -152,7 +159,7 @@ Describe "Invoke-AuditLogQuery" {
         }
 
         It "should accept valid Properties values" {
-            { Invoke-AuditLogQuery -Properties "Id","UserId","auditData.property" } | Should -Not -Throw
+            { Invoke-AuditLogQuery -Properties "Id", "UserId", "auditData.property" } | Should -Not -Throw
         }
 
         It "should throw an error for Properties with special characters" {

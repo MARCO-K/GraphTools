@@ -1,12 +1,18 @@
+## Provide lightweight stubs for common helpers in case they are missing during discovery
+if (-not (Get-Command Install-GTRequiredModule -ErrorAction SilentlyContinue)) { function Install-GTRequiredModule { param($ModuleNames, $Verbose) } }
+if (-not (Get-Command Initialize-GTGraphConnection -ErrorAction SilentlyContinue)) { function Initialize-GTGraphConnection { param($Scopes, $NewSession) return $true } }
+if (-not (Get-Command Test-GTGraphScopes -ErrorAction SilentlyContinue)) { function Test-GTGraphScopes { param($RequiredScopes, $Reconnect, $Quiet) return $true } }
+if (-not (Get-Command Write-PSFMessage -ErrorAction SilentlyContinue)) { function Write-PSFMessage { param($Level, $Message, $ErrorRecord) } }
+
 Describe "Get-GTGuestUserReport" {
     BeforeAll {
         $functionPath = "$PSScriptRoot/../functions/Get-GTGuestUserReport.ps1"
 
-        # Provide minimal stubs before dot-sourcing so the function file can load without CommandNotFound errors
-        function Install-GTRequiredModule { }
-        function Initialize-GTGraphConnection { }
-        function Test-GTGraphScopes { param($RequiredScopes, [switch]$Reconnect, [switch]$Quiet) return $true }
-        function Write-PSFMessage { param($Level, $Message) }
+        # Use Pester Mocks before dot-sourcing so the function file can load and calls are intercepted
+        Mock -CommandName Install-GTRequiredModule -MockWith { param($ModuleNames, $Verbose) } -Verifiable
+        Mock -CommandName Initialize-GTGraphConnection -MockWith { return $true } -Verifiable
+        Mock -CommandName Test-GTGraphScopes -MockWith { param($RequiredScopes, $Reconnect, $Quiet) return $true } -Verifiable
+        Mock -CommandName Write-PSFMessage -MockWith { param($Level, $Message) } -Verifiable
 
         if (Test-Path $functionPath)
         {
@@ -17,12 +23,6 @@ Describe "Get-GTGuestUserReport" {
         {
             Write-Error "Function file not found at $functionPath"
         }
-
-        # Replace implementations with Pester mocks for test control
-        Mock -CommandName "Install-GTRequiredModule" -MockWith { }
-        Mock -CommandName "Initialize-GTGraphConnection" -MockWith { return $true }
-        Mock -CommandName "Test-GTGraphScopes" -MockWith { return $true }
-        Mock -CommandName "Write-PSFMessage" -MockWith { }
     }
 
     Context "Parameter Validation" {

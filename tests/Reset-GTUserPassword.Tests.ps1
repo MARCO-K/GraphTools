@@ -1,31 +1,27 @@
 # Load dependencies
 $validationFile = Join-Path $PSScriptRoot '..' 'internal' 'functions' 'GTValidation.ps1'
-if (Test-Path $validationFile) {
+if (Test-Path $validationFile)
+{
     . $validationFile
 }
 
 $errorHelperFile = Join-Path $PSScriptRoot '..' 'internal' 'functions' 'Get-GTGraphErrorDetails.ps1'
-if (Test-Path $errorHelperFile) {
+if (Test-Path $errorHelperFile)
+{
     . $errorHelperFile
 }
 
-. "$PSScriptRoot/../functions/Reset-GTUserPassword.ps1"
-
 Describe "Reset-GTUserPassword" {
     BeforeAll {
-        # Create stub functions for external dependencies
-        function Write-PSFMessage { param($Level, $Message, $ErrorRecord) }
-        function Install-GTRequiredModule { param($ModuleNames) }
-        function Initialize-GTGraphConnection { param($Scopes, $NewSession) return $true }
-        function New-GTPassword { return 'TempPassword123!' }
-        function Update-MgBetaUser { param($UserId, $PasswordProfile, $ErrorAction) }
-        
-        # Mock the required modules and functions
-        Mock -CommandName Install-GTRequiredModule -MockWith { }
-        Mock -CommandName Initialize-GTGraphConnection -MockWith { return $true }
-        Mock -CommandName New-GTPassword -MockWith { return 'TempPassword123!' }
-        Mock -CommandName Update-MgBetaUser -MockWith { }
-        Mock -CommandName Write-PSFMessage -MockWith { }
+        # Use Pester Mocks for external dependencies
+        Mock -CommandName Write-PSFMessage -MockWith { param($Level, $Message, $ErrorRecord) } -Verifiable
+        Mock -CommandName Install-GTRequiredModule -MockWith { param($ModuleNames, $Verbose) } -Verifiable
+        Mock -CommandName Initialize-GTGraphConnection -MockWith { param($Scopes, $NewSession) return $true } -Verifiable
+        Mock -CommandName New-GTPassword -MockWith { return 'TempPassword123!' } -Verifiable
+        Mock -CommandName Update-MgBetaUser -MockWith { param($UserId, $PasswordProfile, $ErrorAction) } -Verifiable
+
+        # Dot-source the function under test after mocks are registered
+        . "$PSScriptRoot/../functions/Reset-GTUserPassword.ps1"
     }
 
     Context "Parameter Validation" {
