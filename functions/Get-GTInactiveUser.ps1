@@ -99,8 +99,8 @@ function Get-GTInactiveUser
                 $filterDateStr = $thresholdDate.ToString('yyyy-MM-ddTHH:mm:ssZ')
                 
                 # Note: This filter implicitly excludes users who have NEVER signed in (null dates).
-                # Wrap the datetime literal in single quotes for OData
-                $filterParts.Add("signInActivity/lastSignInDateTime le '$filterDateStr'")
+                # Use an unquoted DateTimeOffset literal for OData (e.g. 2023-01-01T00:00:00Z)
+                $filterParts.Add("signInActivity/lastSignInDateTime le $filterDateStr")
             }
 
             $finalFilter = $filterParts -join ' and '

@@ -31,9 +31,9 @@ function Get-GTInactiveDevices
     [CmdletBinding()]
     [OutputType([PSCustomObject])]
     param(
-    [Parameter(Mandatory = $true)]
-    [ValidateRange(1,36500)]
-    [int]$InactiveDays,
+        [Parameter(Mandatory = $true)]
+        [ValidateRange(1, 36500)]
+        [int]$InactiveDays,
 
         [string]$DeviceType,
 
@@ -42,9 +42,9 @@ function Get-GTInactiveDevices
 
     begin
     {
-    $modules = @('Microsoft.Graph.Identity.DirectoryManagement')
-    # Prefer the standard -Verbose switch; do not pass $VerbosePreference to a switch parameter
-    Install-GTRequiredModule -ModuleNames $modules -Verbose
+        $modules = @('Microsoft.Graph.Identity.DirectoryManagement')
+        # Prefer the standard -Verbose switch; do not pass $VerbosePreference to a switch parameter
+        Install-GTRequiredModule -ModuleNames $modules -Verbose
 
         # 1. Scopes Check
         $requiredScopes = @('Device.Read.All')
@@ -62,8 +62,8 @@ function Get-GTInactiveDevices
         # 2. Date Math (UTC & Formatting)
         $utcNow = (Get-Date).ToUniversalTime()
         $thresholdDate = $utcNow.AddDays(-$InactiveDays)
-    # Format for OData: yyyy-MM-ddTHH:mm:ssZ
-    $filterDateString = $thresholdDate.ToString('yyyy-MM-ddTHH:mm:ssZ')
+        # Format for OData: yyyy-MM-ddTHH:mm:ssZ
+        $filterDateString = $thresholdDate.ToString('yyyy-MM-ddTHH:mm:ssZ')
 
         try
         {
@@ -73,8 +73,8 @@ function Get-GTInactiveDevices
             $filterParts = [System.Collections.Generic.List[string]]::new()
 
             # Date Filter: approximateLastSignInDateTime is LESS THAN OR EQUAL TO threshold
-            # Wrap the datetime literal in single quotes for the OData filter
-            $filterParts.Add("approximateLastSignInDateTime le '$filterDateString'")
+            # Use an unquoted DateTimeOffset literal for OData (e.g. 2023-01-01T00:00:00Z)
+            $filterParts.Add("approximateLastSignInDateTime le $filterDateString")
 
             # Account Enabled Filter
             if (-not $IncludeDisabled)
@@ -109,27 +109,30 @@ function Get-GTInactiveDevices
                 if ($device.ApproximateLastSignInDateTime)
                 {
                     # Normalize to UTC and calculate days (use TotalDays and floor)
-                    try {
+                    try
+                    {
                         $lastSignInUtc = ([DateTime]$device.ApproximateLastSignInDateTime).ToUniversalTime()
                     }
-                    catch {
+                    catch
+                    {
                         # If parsing fails, skip days calculation
                         $lastSignInUtc = $null
                     }
 
-                    if ($lastSignInUtc) {
+                    if ($lastSignInUtc)
+                    {
                         $daysInactive = [math]::Floor((New-TimeSpan -Start $lastSignInUtc -End $utcNow).TotalDays)
                     }
                 }
 
                 $results.Add([PSCustomObject]@{
-                    DisplayName                   = $device.DisplayName
-                    DeviceId                      = $device.Id
-                    OperatingSystem               = $device.OperatingSystem
-                    ApproximateLastSignInDateTime = $device.ApproximateLastSignInDateTime
-                    AccountEnabled                = $device.AccountEnabled
-                    DaysInactive                  = $daysInactive
-                })
+                        DisplayName                   = $device.DisplayName
+                        DeviceId                      = $device.Id
+                        OperatingSystem               = $device.OperatingSystem
+                        ApproximateLastSignInDateTime = $device.ApproximateLastSignInDateTime
+                        AccountEnabled                = $device.AccountEnabled
+                        DaysInactive                  = $daysInactive
+                    })
             }
 
             return $results.ToArray()
