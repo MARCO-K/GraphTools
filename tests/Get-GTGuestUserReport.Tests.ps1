@@ -11,8 +11,13 @@ Describe "Get-GTGuestUserReport" {
 
         function Install-GTRequiredModule {}
         function Initialize-GTGraphConnection {}
+        function Test-GTGraphScopes {}
+        function Write-PSFMessage {}
+
         Mock -CommandName "Install-GTRequiredModule" -MockWith { }
         Mock -CommandName "Initialize-GTGraphConnection" -MockWith { return $true }
+        Mock -CommandName "Test-GTGraphScopes" -MockWith { return $true }
+        Mock -CommandName "Write-PSFMessage" -MockWith { }
     }
 
     Context "Parameter Validation" {
@@ -28,41 +33,32 @@ Describe "Get-GTGuestUserReport" {
     }
 
     Context "Functionality" {
-        It "should filter pending users correctly" {
-            $mockUsers = @(
-                [PSCustomObject]@{
-                    Id                = "1"
-                    DisplayName       = "User1"
-                    ExternalUserState = "PendingAcceptance"
-                    CreatedDateTime   = (Get-Date).AddDays(-10)
-                },
-                [PSCustomObject]@{
-                    Id                = "2"
-                    DisplayName       = "User2"
-                    ExternalUserState = "Accepted"
-                    CreatedDateTime   = (Get-Date).AddDays(-20)
-                }
-            )
-            Mock -CommandName "Get-MgBetaUser" -MockWith { return $mockUsers }
+        It "should use server-side filter for pending users" {
+            Mock -CommandName "Get-MgBetaUser" -MockWith { return @() } -ParameterFilter { 
+                $Filter -match "externalUserState eq 'PendingAcceptance'" -and $Filter -match "userType eq 'Guest'"
+            }
 
-            $results = Get-GTGuestUserReport -PendingOnly
-            $results.Count | Should -Be 1
-            $results[0].Id | Should -Be "1"
+            Get-GTGuestUserReport -PendingOnly
+            
+            # Verification is done via the ParameterFilter in the Mock
+            Assert-MockCalled "Get-MgBetaUser" -Times 1
         }
 
-        It "should filter by creation date correctly" {
+        It "should filter by creation date correctly (client-side)" {
             $mockUsers = @(
                 [PSCustomObject]@{
                     Id                = "1"
                     DisplayName       = "User1"
                     ExternalUserState = "PendingAcceptance"
                     CreatedDateTime   = (Get-Date).AddDays(-10)
+                    SignInActivity    = @{ LastSignInDateTime = $null }
                 },
                 [PSCustomObject]@{
                     Id                = "2"
                     DisplayName       = "User2"
                     ExternalUserState = "Accepted"
                     CreatedDateTime   = (Get-Date).AddDays(-40)
+                    SignInActivity    = @{ LastSignInDateTime = (Get-Date).AddDays(-5) }
                 }
             )
             Mock -CommandName "Get-MgBetaUser" -MockWith { return $mockUsers }
