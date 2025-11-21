@@ -107,4 +107,36 @@ Get-GTLicenseCostReport -PriceList $price -SkuNameFile .\data\sku-names.json
 
 ---
 
+## Remediation playbook & CSV export
+
+After you run `Get-GTLicenseCostReport`, you can export the results to CSV for finance or ticketing systems and generate a simple remediation playbook. Example pipeline:
+
+```powershell
+# 1) Generate the report (inject price list or use defaults)
+$report = Get-GTLicenseCostReport -PriceList @{ 'ENTERPRISEPACK' = 10.0 } -MinWastedThreshold 10.0
+
+# 2) Export full report to CSV for finance
+$report | Export-Csv -Path .\license-waste-report.csv -NoTypeInformation -Encoding UTF8
+
+# 3) Create a remediation playbook grouped by Recommendation
+$playbook = $report | Group-Object -Property Recommendation | ForEach-Object {
+  [PSCustomObject]@{
+    Recommendation = $_.Name
+    Count = ($_.Group).Count
+    TotalWasted = ($_.Group | Measure-Object -Property WastedSpend -Sum).Sum
+    Actions = ($_.Group | Select-Object SkuId, SkuPartNumber, Available, InactiveAssigned)
+  }
+}
+
+# 4) Save playbook to JSON for automation teams
+$playbook | ConvertTo-Json -Depth 5 | Set-Content -Path .\license-remediation-playbook.json -Encoding UTF8
+
+# 5) Example: automatically queue reclamation tasks for SKUs with "Reclaim" recommendation
+$report | Where-Object { $_.Recommendation -like 'Reclaim*' } | ForEach-Object {
+  # This is a placeholder for your provisioning system (ticket API, ServiceNow, etc.)
+  # Example: create-ticket -Title "Reclaim $($_.InactiveAssigned) licenses for $($_.FriendlyName)" -Body "Details: $($_ | ConvertTo-Json)"
+}
+```
+
+
 If you want, I can also add a short example that exports the report to CSV and groups by `Recommendation` to create a remediation playbook.
