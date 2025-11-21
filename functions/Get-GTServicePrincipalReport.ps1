@@ -103,10 +103,7 @@ function Get-GTServicePrincipalReport
             }
 
             # --- Build Properties & Expand ---
-            # FIX: Initialize with empty constructor, then AddRange to avoid constructor overload errors
-            $properties = [System.Collections.Generic.List[string]]::new()
-            $properties.AddRange([string[]]@('id', 'appId', 'displayName', 'servicePrincipalType', 'accountEnabled'))
-            
+            $properties = [System.Collections.Generic.List[string]]::new(@('id', 'appId', 'displayName', 'servicePrincipalType', 'accountEnabled'))
             $expand = [System.Collections.Generic.List[string]]::new()
 
             if ($IncludeSignInActivity) { $properties.Add('signInActivity') }
@@ -114,13 +111,14 @@ function Get-GTServicePrincipalReport
             if ($ExpandOwners) { $expand.Add('owners') }
 
             $params = @{
-                All         = $true
-                Property    = $properties.ToArray()
+                All = $true
+                Property = $properties
                 ErrorAction = 'Stop'
             }
             if ($expand.Count -gt 0) { $params['ExpandProperty'] = $expand }
 
             # --- Execute Query with Fallback Logic ---
+            # We use a scriptblock to encapsulate the retry logic while keeping the pipeline open
             $ExecuteGraphQuery = {
                 if ($filter)
                 {
@@ -142,7 +140,7 @@ function Get-GTServicePrincipalReport
                         }
                         else
                         {
-                            throw $_ 
+                            throw $_ # Re-throw if it's not a filter issue
                         }
                     }
                 }
@@ -154,6 +152,7 @@ function Get-GTServicePrincipalReport
             }
 
             # --- Process & Stream Output ---
+            # We invoke the scriptblock and pipe results directly to ForEach-Object
             & $ExecuteGraphQuery | ForEach-Object {
                 $sp = $_
                 
@@ -177,6 +176,7 @@ function Get-GTServicePrincipalReport
                     if ($sp.Owners)
                     {
                         $ownerDisplayNames = $sp.Owners | ForEach-Object {
+                            # Handle dynamic object properties safely
                             if ($_.AdditionalProperties -and $_.AdditionalProperties.ContainsKey('displayName')) { $_.AdditionalProperties['displayName'] }
                             elseif ($_.DisplayName) { $_.DisplayName }
                             else { "Unknown" }
@@ -190,25 +190,24 @@ function Get-GTServicePrincipalReport
                     $reportObject['KeyCredentialsCount'] = if ($sp.KeyCredentials) { $sp.KeyCredentials.Count } else { 0 }
                     $reportObject['PasswordCredentialsCount'] = if ($sp.PasswordCredentials) { $sp.PasswordCredentials.Count } else { 0 }
                     
-                    $reportObject['KeyCredentialExpiryDates'] = if ($sp.KeyCredentials)
-                    { 
-                        ($sp.KeyCredentials | Select-Object -ExpandProperty EndDateTime | Sort-Object | ForEach-Object { $_.ToString('yyyy-MM-ddTHH:mm:ssZ') }) -join '; ' 
-                    }
-                    else { $null }
+                    # Format dates as ISO 8601 (UTC) for consistency
+                    $reportObject['KeyCredentialExpiryDates'] = if ($sp.KeyCredentials) { 
+                        ($sp.KeyCredentials | Select-Object -ExpandProperty EndDateTime | Where-Object { $_ } | Sort-Object | ForEach-Object { $_.ToString('yyyy-MM-ddTHH:mm:ssZ') }) -join '; ' 
+                    } else { $null }
                     
-                    $reportObject['PasswordCredentialExpiryDates'] = if ($sp.PasswordCredentials)
-                    { 
-                        ($sp.PasswordCredentials | Select-Object -ExpandProperty EndDateTime | Sort-Object | ForEach-Object { $_.ToString('yyyy-MM-ddTHH:mm:ssZ') }) -join '; ' 
-                    }
-                    else { $null }
+                    $reportObject['PasswordCredentialExpiryDates'] = if ($sp.PasswordCredentials) { 
+                        ($sp.PasswordCredentials | Select-Object -ExpandProperty EndDateTime | Where-Object { $_ } | Sort-Object | ForEach-Object { $_.ToString('yyyy-MM-ddTHH:mm:ssZ') }) -join '; ' 
+                    } else { $null }
                 }
 
+                # Output immediately to pipeline
                 [PSCustomObject]$reportObject
             }
         }
         catch
         {
-            $err = Get-GTGraphErrorDetails -Exception $_.Exception -ResourceType 'Service Principals'
+            # Gold Standard Error Handling
+            $err = Get-GTGraphErrorDetails -Exception $_.Exception -ResourceType 'resource'
             Write-PSFMessage -Level $err.LogLevel -Message "Failed to retrieve Service Principals: $($err.Reason)"
             
             throw $err.ErrorMessage
