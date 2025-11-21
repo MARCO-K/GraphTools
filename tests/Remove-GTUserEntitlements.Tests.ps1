@@ -1,8 +1,14 @@
+## Provide lightweight stubs for common helpers in case they are missing during discovery
+if (-not (Get-Command Install-GTRequiredModule -ErrorAction SilentlyContinue)) { function Install-GTRequiredModule { param([string[]]$ModuleNames, [string]$Scope, [switch]$AllowPrerelease) } }
+if (-not (Get-Command Initialize-GTGraphConnection -ErrorAction SilentlyContinue)) { function Initialize-GTGraphConnection { param([string[]]$Scopes, [switch]$NewSession, [switch]$SkipConnect) return $true } }
+if (-not (Get-Command Test-GTGraphScopes -ErrorAction SilentlyContinue)) { function Test-GTGraphScopes { param([string[]]$RequiredScopes, [switch]$Reconnect, [switch]$Quiet) return $true } }
+if (-not (Get-Command Write-PSFMessage -ErrorAction SilentlyContinue)) { function Write-PSFMessage { param($Level, $Message, $ErrorRecord) } }
+
 Describe "Remove-GTUserEntitlements" {
     BeforeAll {
         # Use Pester Mocks for external dependencies so the function file can load and calls are intercepted
         Mock -CommandName Get-MgContext -MockWith { } -Verifiable
-        Mock -CommandName Install-GTRequiredModule -MockWith { param($ModuleNames, $Verbose) } -Verifiable
+        Mock -CommandName Install-GTRequiredModule -MockWith { } -Verifiable
         Mock -CommandName Get-MgBetaUser -MockWith { } -Verifiable
         Mock -CommandName Remove-GTUserGroupMemberships -MockWith { } -Verifiable
         Mock -CommandName Remove-GTUserGroupOwnerships -MockWith { } -Verifiable

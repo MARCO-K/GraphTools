@@ -2,14 +2,14 @@ Describe "Get-GTPIMRoleReport" {
     BeforeAll {
         $functionPath = "$PSScriptRoot/../functions/Get-GTPIMRoleReport.ps1"
         # Use Pester Mocks for external dependencies before dot-sourcing
-        Mock -CommandName Install-GTRequiredModule -MockWith { param($ModuleNames, $Verbose) } -Verifiable
+        Mock -CommandName Install-GTRequiredModule -MockWith { } -Verifiable
         Mock -CommandName Test-GTGraphScopes -MockWith { param($RequiredScopes, $Reconnect, $Quiet) return $true } -Verifiable
         Mock -CommandName Get-MgBetaRoleManagementDirectoryRoleDefinition -MockWith { } -Verifiable
         Mock -CommandName Get-MgBetaRoleManagementDirectoryRoleEligibilityScheduleInstance -MockWith { } -Verifiable
         Mock -CommandName Get-MgBetaRoleManagementDirectoryRoleAssignmentScheduleInstance -MockWith { } -Verifiable
         Mock -CommandName Test-GTGuid -MockWith { param($InputObject, $Quiet) return $true } -Verifiable
         Mock -CommandName Get-GTGraphErrorDetails -MockWith { return @{ LogLevel = 'Error'; Reason = 'Mock Error' } } -Verifiable
-        Mock -CommandName Write-PSFMessage -MockWith { param($Level, $Message) } -Verifiable
+        Mock -CommandName Write-PSFMessage -MockWith { } -Verifiable
 
         if (Test-Path $functionPath)
         {

@@ -2,7 +2,7 @@ Describe "Remove-GTPIMRoleEligibility" {
     BeforeAll {
         $functionPath = "$PSScriptRoot/../functions/Remove-GTPIMRoleEligibility.ps1"
         # Use Pester Mocks before dot-sourcing so the function file can load and calls are intercepted
-        Mock -CommandName Install-GTRequiredModule -MockWith { param($ModuleNames, $Verbose) } -Verifiable
+        Mock -CommandName Install-GTRequiredModule -MockWith { } -Verifiable
         Mock -CommandName Initialize-GTGraphConnection -MockWith { } -Verifiable
         Mock -CommandName Get-MgContext -MockWith { } -Verifiable
         Mock -CommandName Get-MgBetaUser -MockWith { } -Verifiable

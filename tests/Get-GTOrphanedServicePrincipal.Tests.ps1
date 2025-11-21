@@ -1,9 +1,9 @@
 Describe "Get-GTOrphanedServicePrincipal" {
     BeforeAll {
         # Use Pester Mocks for dependencies
-        Mock -CommandName Install-GTRequiredModule -MockWith { param($ModuleNames, $Verbose) } -Verifiable
+        Mock -CommandName Install-GTRequiredModule -MockWith { } -Verifiable
         Mock -CommandName Initialize-GTGraphConnection -MockWith { } -Verifiable
-        Mock -CommandName Write-PSFMessage -MockWith { param($Level, $Message) } -Verifiable
+        Mock -CommandName Write-PSFMessage -MockWith { } -Verifiable
         Mock -CommandName Stop-PSFFunction -MockWith { } -Verifiable
         Mock -CommandName Get-GTGraphErrorDetails -MockWith { } -Verifiable
 

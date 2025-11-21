@@ -2,7 +2,7 @@ Describe "Get-GTUnusedApps" {
     BeforeAll {
         $functionPath = "$PSScriptRoot/../functions/Get-GTUnusedApps.ps1"
         # Use Pester Mocks before dot-sourcing so the function file can load and calls are intercepted
-        Mock -CommandName Install-GTRequiredModule -MockWith { param($ModuleNames, $Verbose) } -Verifiable
+        Mock -CommandName Install-GTRequiredModule -MockWith { } -Verifiable
         Mock -CommandName Initialize-GTGraphConnection -MockWith { return $true } -Verifiable
 
         if (Test-Path $functionPath)
