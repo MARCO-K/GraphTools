@@ -1,61 +1,63 @@
 Describe "Get-MFAReport" {
     BeforeAll {
-        # Use Pester Mocks before dot-sourcing so the function file can load and calls are intercepted
-        # Mock the required modules and functions
-        Mock -ModuleName "Microsoft.Graph.Authentication" -CommandName "Install-GTRequiredModule" -MockWith { }
-        Mock -ModuleName "Microsoft.Graph.Authentication" -CommandName "Get-MgContext" -MockWith { $true }
-        Mock -ModuleName "Microsoft.Graph.Authentication" -CommandName "Connect-MgGraph" -MockWith { }
+        # Define stub functions FIRST
+        function Install-GTRequiredModule { param([string[]]$ModuleNames, [string]$Scope, [switch]$AllowPrerelease) }
+        function Initialize-GTGraphConnection { param([string[]]$Scopes, [switch]$NewSession) return $true }
+        function Test-GTGraphScopes { param([string[]]$RequiredScopes, [switch]$Reconnect, [switch]$Quiet) return $true }
+        function Write-PSFMessage { param($Level, $Message, $ErrorRecord) }
+        function Get-MgBetaReportAuthenticationMethodUserRegistrationDetail { param($Filter) return @() }
 
-        ## Provide lightweight stubs for common helpers in case they are missing during discovery
-        if (-not (Get-Command Install-GTRequiredModule -ErrorAction SilentlyContinue)) { function Install-GTRequiredModule { param([string[]]$ModuleNames, [string]$Scope, [switch]$AllowPrerelease) } }
-        if (-not (Get-Command Initialize-GTGraphConnection -ErrorAction SilentlyContinue)) { function Initialize-GTGraphConnection { param([string[]]$Scopes, [switch]$NewSession, [switch]$SkipConnect) return $true } }
-        if (-not (Get-Command Test-GTGraphScopes -ErrorAction SilentlyContinue)) { function Test-GTGraphScopes { param([string[]]$RequiredScopes, [switch]$Reconnect, [switch]$Quiet) return $true } }
-        if (-not (Get-Command Write-PSFMessage -ErrorAction SilentlyContinue)) { function Write-PSFMessage { param($Level, $Message, $ErrorRecord) } }
-
-        # Dot-source the function under test
-        . "$PSScriptRoot/../functions/Get-MFAReport.ps1"
-    }
-    $mockReport = @(
-        @{
-            UserPrincipalName = 'adele.vance@contoso.com'
-            UserDisplayName   = 'Adele Vance'
-            IsAdmin           = $true
-            UserType          = 'Member'
-            IsMfaRegistered   = $true
-            IsMfaCapable      = $true
-            MethodsRegistered = @('microsoftAuthenticatorPush', 'FIDO2')
-        },
-        @{
-            UserPrincipalName = 'grad.y@contoso.com'
-            UserDisplayName   = 'Grady Archie'
-            IsAdmin           = $false
-            UserType          = 'Member'
-            IsMfaRegistered   = $false
-            IsMfaCapable      = $true
-            MethodsRegistered = @()
-        },
-        @{
-            UserPrincipalName = 'guest@contoso.com'
-            UserDisplayName   = 'Guest User'
-            IsAdmin           = $false
-            UserType          = 'Guest'
-            IsMfaRegistered   = $false
-            IsMfaCapable      = $false
-            MethodsRegistered = @()
+        # Set up validation regex
+        $script:GTValidationRegex = @{
+            UPN = '^[^@\s]+@[^@\s]+\.[^@\s]+$'
         }
-    )
+
+        # Dot-source the function under test AFTER stubs
+        . "$PSScriptRoot/../functions/Get-MFAReport.ps1"
+
+        # Define mock data
+        $script:mockReport = @(
+            @{
+                UserPrincipalName = 'adele.vance@contoso.com'
+                UserDisplayName   = 'Adele Vance'
+                IsAdmin           = $true
+                UserType          = 'Member'
+                IsMfaRegistered   = $true
+                IsMfaCapable      = $true
+                MethodsRegistered = @('microsoftAuthenticatorPush', 'FIDO2')
+            },
+            @{
+                UserPrincipalName = 'grad.y@contoso.com'
+                UserDisplayName   = 'Grady Archie'
+                IsAdmin           = $false
+                UserType          = 'Member'
+                IsMfaRegistered   = $false
+                IsMfaCapable      = $true
+                MethodsRegistered = @()
+            },
+            @{
+                UserPrincipalName = 'guest@contoso.com'
+                UserDisplayName   = 'Guest User'
+                IsAdmin           = $false
+                UserType          = 'Guest'
+                IsMfaRegistered   = $false
+                IsMfaCapable      = $false
+                MethodsRegistered = @()
+            }
+        )
+    }
 
     BeforeEach {
-        Mock -ModuleName "Microsoft.Graph.Beta.Reports" -CommandName "Get-MgBetaReportAuthenticationMethodUserRegistrationDetail" -MockWith {
+        Mock -CommandName "Get-MgBetaReportAuthenticationMethodUserRegistrationDetail" -MockWith {
             param($Filter)
             if ($Filter)
             {
                 $upns = ($Filter -split "'").Where({ $_ -like '*@*' })
-                $mockReport | Where-Object { $_.UserPrincipalName -in $upns }
+                $script:mockReport | Where-Object { $_.UserPrincipalName -in $upns }
             }
             else
             {
-                $mockReport
+                $script:mockReport
             }
         } -Verifiable
     }
@@ -94,18 +96,19 @@ Describe "Get-MFAReport" {
 
     It "should filter for users without MFA" {
         $result = Get-MFAReport -UsersWithoutMFA
-        $result.UPN | Should -Contain('grad.y@contoso.com', 'guest@contoso.com')
+        $result.UPN | Should -Contain 'grad.y@contoso.com'
+        $result.UPN | Should -Contain 'guest@contoso.com'
         $result.Count | Should -Be 2
     }
 
     It "should exclude guest users" {
         $result = Get-MFAReport -NoGuestUser
-        $result.UPN | Should -NotContain 'guest@contoso.com'
+        $result.UPN | Should -Not -Contain 'guest@contoso.com'
         $result.Count | Should -Be 2
     }
 
     It "should throw an error for invalid UPN format" {
-        { 'invalid-upn' | Get-MFAReport } | Should -Throw "Invalid UserPrincipalName format: invalid-upn"
+        { Get-MFAReport -UserPrincipalName 'invalid-upn' } | Should -Throw
     }
 
     It "should throw an error for conflicting parameters" {

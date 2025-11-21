@@ -130,9 +130,6 @@ function Invoke-AuditLogQuery
         })]
         [array]$Properties = @('Id', 'createdDateTime', 'auditLogRecordType', 'Operation', 'service', 'UserId', 'UserType', 'userPrincipalName', 'auditData'),
 
-        [Parameter(Mandatory = 'False')]
-        [OutputType('PSCustomObject')]
-
         [Parameter(Mandatory = $false)]
         [int]$maxWaitMinutes = 10,
 
