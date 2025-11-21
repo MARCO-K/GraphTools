@@ -192,11 +192,11 @@ function Get-GTServicePrincipalReport
                     
                     # Format dates as ISO 8601 (UTC) for consistency
                     $reportObject['KeyCredentialExpiryDates'] = if ($sp.KeyCredentials) { 
-                        ($sp.KeyCredentials | Select-Object -ExpandProperty EndDateTime | Sort-Object | ForEach-Object { $_.ToString('yyyy-MM-ddTHH:mm:ssZ') }) -join '; ' 
+                        ($sp.KeyCredentials | Select-Object -ExpandProperty EndDateTime | Where-Object { $_ } | Sort-Object | ForEach-Object { $_.ToString('yyyy-MM-ddTHH:mm:ssZ') }) -join '; ' 
                     } else { $null }
                     
                     $reportObject['PasswordCredentialExpiryDates'] = if ($sp.PasswordCredentials) { 
-                        ($sp.PasswordCredentials | Select-Object -ExpandProperty EndDateTime | Sort-Object | ForEach-Object { $_.ToString('yyyy-MM-ddTHH:mm:ssZ') }) -join '; ' 
+                        ($sp.PasswordCredentials | Select-Object -ExpandProperty EndDateTime | Where-Object { $_ } | Sort-Object | ForEach-Object { $_.ToString('yyyy-MM-ddTHH:mm:ssZ') }) -join '; ' 
                     } else { $null }
                 }
 
