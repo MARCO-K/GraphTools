@@ -1,4 +1,9 @@
 # Pester tests for Disable-GTUserDevice
+# Provide lightweight stubs for common helpers in case they are missing during discovery
+if (-not (Get-Command Install-GTRequiredModule -ErrorAction SilentlyContinue)) { function Install-GTRequiredModule { param($ModuleNames, $Verbose) } }
+if (-not (Get-Command Initialize-GTGraphConnection -ErrorAction SilentlyContinue)) { function Initialize-GTGraphConnection { param([string[]]$Scopes, [switch]$NewSession, [switch]$SkipConnect) return $true } }
+if (-not (Get-Command Test-GTGraphScopes -ErrorAction SilentlyContinue)) { function Test-GTGraphScopes { param($RequiredScopes, $Reconnect, $Quiet) return $true } }
+if (-not (Get-Command Write-PSFMessage -ErrorAction SilentlyContinue)) { function Write-PSFMessage { param($Level, $Message, $ErrorRecord) } }
 # Requires Pester 5.x
 # Place this file in the repository under: tests/Disable-GTUserDevice.Tests.ps1
 
@@ -7,37 +12,42 @@ Describe "Disable-GTUserDevice" -Tag 'Unit' {
     BeforeAll {
         # Load the validation regex first (required by the function)
         $validationFile = Join-Path $PSScriptRoot '..' 'internal' 'functions' 'GTValidation.ps1'
-        if (Test-Path $validationFile) {
+        if (Test-Path $validationFile)
+        {
             . $validationFile
         }
 
         # Load the error handling helper function (required by Disable-GTUserDevice)
         $errorHelperFile = Join-Path $PSScriptRoot '..' 'internal' 'functions' 'Get-GTGraphErrorDetails.ps1'
-        if (Test-Path $errorHelperFile) {
+        if (Test-Path $errorHelperFile)
+        {
             . $errorHelperFile
         }
 
         $functionFile = Join-Path $PSScriptRoot '..' 'functions' 'Disable-GTUserDevice.ps1'
-        if (-not (Test-Path $functionFile)) {
+        if (-not (Test-Path $functionFile))
+        {
             Throw "Function file not found: $functionFile"
         }
-        . $functionFile
 
-        # Create stub functions for external dependencies AFTER loading the function
-        # These will be replaced by mocks in BeforeEach and in individual tests
-        function Write-PSFMessage { param($Level, $Message, $ErrorRecord) }
-        function Install-GTRequiredModule { param($ModuleNames) }
-        function Initialize-GTGraphConnection { param($Scopes, $NewSession) return $true }
-        function Get-MgUser { param([string]$UserId, [string[]]$Property, [string]$ErrorAction) }
-        function Get-MgDevice { param([switch]$All, [string]$Filter, [string]$ErrorAction) }
-        function Update-MgDevice { param([string]$DeviceId, [switch]$AccountEnabled, [string]$ErrorAction) }
+        # Use Pester Mocks for external dependencies BEFORE loading the function
+        # These will be replaced or configured in BeforeEach and in individual tests
+        Mock -CommandName Write-PSFMessage -MockWith { param($Level, $Message, $ErrorRecord) } -Verifiable
+        Mock -CommandName Install-GTRequiredModule -MockWith { } -Verifiable
+        Mock -CommandName Initialize-GTGraphConnection -MockWith { return $true } -Verifiable
+        Mock -CommandName Get-MgUser -MockWith { param($UserId, $Property, $ErrorAction) } -Verifiable
+        Mock -CommandName Get-MgDevice -MockWith { param($All, $Filter, $ErrorAction) } -Verifiable
+        Mock -CommandName Update-MgDevice -MockWith { param($DeviceId, $AccountEnabled, $ErrorAction) } -Verifiable
+
+        # Dot-source the function under test after mocks are in place
+        . $functionFile
     }
 
     BeforeEach {
         # Ensure required external interactions are mocked so tests do not call real Graph modules.
         Mock -CommandName Install-GTRequiredModule -MockWith { }
         Mock -CommandName Initialize-GTGraphConnection -MockWith { return $true }
-        Mock -CommandName Write-PSFMessage -MockWith { param($Level,$Message) } # no-op
+        Mock -CommandName Write-PSFMessage -MockWith { param($Level, $Message) } # no-op
     }
 
     Context "Parameter Validation" {
@@ -68,8 +78,8 @@ Describe "Disable-GTUserDevice" -Tag 'Unit' {
             Mock -CommandName Get-MgDevice -MockWith {
                 @(
                     [PSCustomObject]@{
-                        Id = "device-id-1"
-                        DisplayName = "Test Device"
+                        Id             = "device-id-1"
+                        DisplayName    = "Test Device"
                         AccountEnabled = $true
                     }
                 )
@@ -124,8 +134,8 @@ Describe "Disable-GTUserDevice" -Tag 'Unit' {
             Mock -CommandName Get-MgDevice -MockWith {
                 @(
                     [PSCustomObject]@{
-                        Id = "device-id-3"
-                        DisplayName = "Test Device"
+                        Id             = "device-id-3"
+                        DisplayName    = "Test Device"
                         AccountEnabled = $true
                     }
                 )
@@ -151,8 +161,8 @@ Describe "Disable-GTUserDevice" -Tag 'Unit' {
             Mock -CommandName Get-MgDevice -MockWith {
                 @(
                     [PSCustomObject]@{
-                        Id = "device-id-404"
-                        DisplayName = "Test Device"
+                        Id             = "device-id-404"
+                        DisplayName    = "Test Device"
                         AccountEnabled = $true
                     }
                 )
@@ -183,8 +193,8 @@ Describe "Disable-GTUserDevice" -Tag 'Unit' {
             Mock -CommandName Get-MgDevice -MockWith {
                 @(
                     [PSCustomObject]@{
-                        Id = "device-id-403"
-                        DisplayName = "Test Device"
+                        Id             = "device-id-403"
+                        DisplayName    = "Test Device"
                         AccountEnabled = $true
                     }
                 )
@@ -231,13 +241,13 @@ Describe "Disable-GTUserDevice" -Tag 'Unit' {
             Mock -CommandName Get-MgDevice -MockWith {
                 @(
                     [PSCustomObject]@{
-                        Id = "device-1"
-                        DisplayName = "Device device-1"
+                        Id             = "device-1"
+                        DisplayName    = "Device device-1"
                         AccountEnabled = $true
                     },
                     [PSCustomObject]@{
-                        Id = "device-2"
-                        DisplayName = "Device device-2"
+                        Id             = "device-2"
+                        DisplayName    = "Device device-2"
                         AccountEnabled = $true
                     }
                 )

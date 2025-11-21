@@ -1,7 +1,6 @@
-. "$PSScriptRoot/../functions/Revoke-GTSignOutFromAllSessions.ps1"
-
 Describe "Revoke-GTSignOutFromAllSessions" {
     BeforeAll {
+        # Use Pester Mocks before dot-sourcing so the function file can load and calls are intercepted
         # Mock the required modules and functions
         Mock -ModuleName "Microsoft.Graph.Users" -CommandName "Get-MgUser" -MockWith {
             [PSCustomObject]@{
@@ -9,6 +8,9 @@ Describe "Revoke-GTSignOutFromAllSessions" {
             }
         }
         Mock -ModuleName "Microsoft.Graph.Users.Actions" -CommandName "Revoke-MgUserSignInSession" -MockWith { }
+
+        # Dot-source the function under test
+        . "$PSScriptRoot/../functions/Revoke-GTSignOutFromAllSessions.ps1"
     }
 
     Context "Happy Path" {

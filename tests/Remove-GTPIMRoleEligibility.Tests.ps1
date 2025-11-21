@@ -1,45 +1,30 @@
 Describe "Remove-GTPIMRoleEligibility" {
     BeforeAll {
         $functionPath = "$PSScriptRoot/../functions/Remove-GTPIMRoleEligibility.ps1"
-        if (Test-Path $functionPath) {
+        # Use Pester Mocks before dot-sourcing so the function file can load and calls are intercepted
+        Mock -CommandName Install-GTRequiredModule -MockWith { } -Verifiable
+        Mock -CommandName Initialize-GTGraphConnection -MockWith { } -Verifiable
+        Mock -CommandName Get-MgContext -MockWith { } -Verifiable
+        Mock -CommandName Get-MgBetaUser -MockWith { } -Verifiable
+        Mock -CommandName Test-GTGuid -MockWith { return $true } -Verifiable
+        Mock -CommandName Test-GTGraphScopes -MockWith { return $true } -Verifiable
+        Mock -CommandName Write-PSFMessage -MockWith { } -Verifiable
+        Mock -CommandName Get-GTGraphErrorDetails -MockWith { return [PSCustomObject]@{ LogLevel = 'Error'; Reason = 'Mock Error'; ErrorMessage = 'Mock Error Message' } } -Verifiable
+        Mock -CommandName Get-MgBetaRoleManagementDirectoryRoleAssignmentScheduleInstance -MockWith { } -Verifiable
+        Mock -CommandName Remove-MgBetaRoleManagementDirectoryRoleAssignmentSchedule -MockWith { } -Verifiable
+        Mock -CommandName Get-MgBetaRoleManagementDirectoryRoleEligibilityScheduleInstance -MockWith { } -Verifiable
+        Mock -CommandName Remove-MgBetaRoleManagementDirectoryRoleEligibilitySchedule -MockWith { } -Verifiable
+        Mock -CommandName Get-MgUser -MockWith { return [PSCustomObject]@{ Id = 'AdminId' } } -Verifiable
+
+        if (Test-Path $functionPath)
+        {
+            # Dot-source the function under test
             . $functionPath
         }
-        else {
+        else
+        {
             Write-Error "Function file not found at $functionPath"
         }
-
-        function Install-GTRequiredModule {}
-        function Initialize-GTGraphConnection {}
-        function Get-MgContext {}
-        function Get-MgBetaUser {}
-        function Test-GTGuid { return $true }
-        function Test-GTGraphScopes { return $true }
-        function Write-PSFMessage {}
-        function Get-GTGraphErrorDetails { return [PSCustomObject]@{ LogLevel = 'Error'; Reason = 'Mock Error'; ErrorMessage = 'Mock Error Message' } }
-        
-        function Get-MgBetaRoleManagementDirectoryRoleAssignmentScheduleInstance { [CmdletBinding()] param($Filter, $ExpandProperty, $All) }
-        function Remove-MgBetaRoleManagementDirectoryRoleAssignmentSchedule { [CmdletBinding()] param($UnifiedRoleAssignmentScheduleId) }
-        function Get-MgBetaRoleManagementDirectoryRoleEligibilityScheduleInstance { [CmdletBinding()] param($Filter, $ExpandProperty, $All) }
-        function Remove-MgBetaRoleManagementDirectoryRoleEligibilitySchedule { [CmdletBinding()] param($UnifiedRoleEligibilityScheduleId) }
-
-        Mock -CommandName "Install-GTRequiredModule" -MockWith { }
-        Mock -CommandName "Initialize-GTGraphConnection" -MockWith { return $true }
-        Mock -CommandName "Test-GTGuid" -MockWith { return $true }
-        Mock -CommandName "Test-GTGraphScopes" -MockWith { return $true }
-        Mock -CommandName "Write-PSFMessage" -MockWith { }
-        Mock -CommandName "Get-GTGraphErrorDetails" -MockWith { 
-            Write-Host "DEBUG: Args: $($Args | Out-String)"
-            if ($Exception) {
-                Write-Host "DEBUG: Exception Type: $($Exception.GetType().FullName)"
-                Write-Host "DEBUG: Exception Message: $($Exception.Message)"
-            }
-            else {
-                Write-Host "DEBUG: Exception parameter is NULL"
-            }
-            return [PSCustomObject]@{ LogLevel = 'Error'; Reason = 'Mock Error'; ErrorMessage = 'Mock Error Message' } 
-        }
-        Mock -CommandName "Get-MgContext" -MockWith { return [PSCustomObject]@{ Account = "admin@contoso.com"; AuthType = "Delegated" } }
-        Mock -CommandName "Get-MgUser" -MockWith { return [PSCustomObject]@{ Id = "AdminId" } }
     }
 
     Context "Functionality" {

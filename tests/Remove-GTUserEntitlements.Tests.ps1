@@ -1,21 +1,27 @@
+## Provide lightweight stubs for common helpers in case they are missing during discovery
+if (-not (Get-Command Install-GTRequiredModule -ErrorAction SilentlyContinue)) { function Install-GTRequiredModule { param([string[]]$ModuleNames, [string]$Scope, [switch]$AllowPrerelease) } }
+if (-not (Get-Command Initialize-GTGraphConnection -ErrorAction SilentlyContinue)) { function Initialize-GTGraphConnection { param([string[]]$Scopes, [switch]$NewSession, [switch]$SkipConnect) return $true } }
+if (-not (Get-Command Test-GTGraphScopes -ErrorAction SilentlyContinue)) { function Test-GTGraphScopes { param([string[]]$RequiredScopes, [switch]$Reconnect, [switch]$Quiet) return $true } }
+if (-not (Get-Command Write-PSFMessage -ErrorAction SilentlyContinue)) { function Write-PSFMessage { param($Level, $Message, $ErrorRecord) } }
+
 Describe "Remove-GTUserEntitlements" {
     BeforeAll {
-        # Create stub functions for all cmdlets used (before sourcing the function)
-        function Get-MgContext { }
-        function Install-GTRequiredModule { }
-        function Get-MgBetaUser { }
-        function Remove-GTUserGroupMemberships { }
-        function Remove-GTUserGroupOwnerships { }
-        function Remove-GTUserLicenses { }
-        function Remove-GTUserServicePrincipalOwnerships { }
-        function Remove-GTUserEnterpriseAppOwnership { }
-        function Remove-GTUserAppRoleAssignments { }
-        function Remove-GTUserRoleAssignments { }
-        function Remove-GTPIMRoleEligibility { }
-        function Remove-GTUserAdministrativeUnitMemberships { }
-        function Remove-GTUserAccessPackageAssignments { }
-        function Remove-GTUserDelegatedPermissionGrants { }
-        function Write-PSFMessage { }
+        # Use Pester Mocks for external dependencies so the function file can load and calls are intercepted
+        Mock -CommandName Get-MgContext -MockWith { } -Verifiable
+        Mock -CommandName Install-GTRequiredModule -MockWith { } -Verifiable
+        Mock -CommandName Get-MgBetaUser -MockWith { } -Verifiable
+        Mock -CommandName Remove-GTUserGroupMemberships -MockWith { } -Verifiable
+        Mock -CommandName Remove-GTUserGroupOwnerships -MockWith { } -Verifiable
+        Mock -CommandName Remove-GTUserLicenses -MockWith { } -Verifiable
+        Mock -CommandName Remove-GTUserServicePrincipalOwnerships -MockWith { } -Verifiable
+        Mock -CommandName Remove-GTUserEnterpriseAppOwnership -MockWith { } -Verifiable
+        Mock -CommandName Remove-GTUserAppRoleAssignments -MockWith { } -Verifiable
+        Mock -CommandName Remove-GTUserRoleAssignments -MockWith { } -Verifiable
+        Mock -CommandName Remove-GTPIMRoleEligibility -MockWith { } -Verifiable
+        Mock -CommandName Remove-GTUserAdministrativeUnitMemberships -MockWith { } -Verifiable
+        Mock -CommandName Remove-GTUserAccessPackageAssignments -MockWith { } -Verifiable
+        Mock -CommandName Remove-GTUserDelegatedPermissionGrants -MockWith { } -Verifiable
+        Mock -CommandName Write-PSFMessage -MockWith { } -Verifiable
         
         # Source the GTValidation script for UPN regex
         . "$PSScriptRoot/../internal/functions/GTValidation.ps1"
@@ -32,7 +38,7 @@ Describe "Remove-GTUserEntitlements" {
         Mock -CommandName "Install-GTRequiredModule" -MockWith { }
         Mock -CommandName "Get-MgBetaUser" -MockWith { 
             [PSCustomObject]@{
-                Id = "test-user-id"
+                Id                = "test-user-id"
                 UserPrincipalName = "test@contoso.com"
             }
         }

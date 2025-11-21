@@ -1,28 +1,37 @@
 Describe "Get-GTPIMRoleReport" {
     BeforeAll {
+        # Define stubs for dependencies to ensure Mock works
+        function Install-GTRequiredModule {}
+        function Test-GTGraphScopes { return $true }
+        function Initialize-GTGraphConnection { return $true }
+        function Write-PSFMessage {}
+        function Get-GTGraphErrorDetails {}
+        function Test-GTGuid { return $true }
+        function Get-MgBetaRoleManagementDirectoryRoleDefinition {}
+        function Get-MgBetaRoleManagementDirectoryRoleEligibilityScheduleInstance {}
+        function Get-MgBetaRoleManagementDirectoryRoleAssignmentScheduleInstance {}
+
         $functionPath = "$PSScriptRoot/../functions/Get-GTPIMRoleReport.ps1"
-        if (Test-Path $functionPath) {
+        # Use Pester Mocks for external dependencies before dot-sourcing
+        Mock -CommandName Install-GTRequiredModule -MockWith {} -Verifiable
+        Mock -CommandName Test-GTGraphScopes -MockWith { return $true } -Verifiable
+        Mock -CommandName Initialize-GTGraphConnection -MockWith { return $true } -Verifiable
+        Mock -CommandName Get-MgBetaRoleManagementDirectoryRoleDefinition -MockWith {} -Verifiable
+        Mock -CommandName Get-MgBetaRoleManagementDirectoryRoleEligibilityScheduleInstance -MockWith {} -Verifiable
+        Mock -CommandName Get-MgBetaRoleManagementDirectoryRoleAssignmentScheduleInstance -MockWith {} -Verifiable
+        Mock -CommandName Test-GTGuid -MockWith { return $true } -Verifiable
+        Mock -CommandName Get-GTGraphErrorDetails -MockWith { return @{ LogLevel = 'Error'; Reason = 'Mock Error' } } -Verifiable
+        Mock -CommandName Write-PSFMessage -MockWith {} -Verifiable
+
+        if (Test-Path $functionPath)
+        {
+            # Dot-source the function under test
             . $functionPath
         }
-        else {
+        else
+        {
             Write-Error "Function file not found at $functionPath"
         }
-
-        # Define dummy functions for mocks
-        function Install-GTRequiredModule { param($ModuleNames, $Verbose) }
-        function Test-GTGraphScopes { param($RequiredScopes, [switch]$Reconnect, [switch]$Quiet) return $true }
-        function Get-MgBetaRoleManagementDirectoryRoleDefinition { param([switch]$All, $Property, $ErrorAction) }
-        function Get-MgBetaRoleManagementDirectoryRoleEligibilityScheduleInstance { param([switch]$All, $ExpandProperty, $ErrorAction, $Filter) }
-        function Get-MgBetaRoleManagementDirectoryRoleAssignmentScheduleInstance { param([switch]$All, $ExpandProperty, $ErrorAction, $Filter) }
-        function Test-GTGuid { param($InputObject, [switch]$Quiet) return $true }
-        function Get-GTGraphErrorDetails { param($Exception, $ResourceType) return @{ LogLevel = 'Error'; Reason = 'Mock Error' } }
-        function Write-PSFMessage { param($Level, $Message) }
-
-        Mock -CommandName "Install-GTRequiredModule" -MockWith { }
-        Mock -CommandName "Test-GTGraphScopes" -MockWith { return $true }
-        Mock -CommandName "Test-GTGuid" -MockWith { return $true }
-        Mock -CommandName "Write-PSFMessage" -MockWith { }
-        Mock -CommandName "Get-GTGraphErrorDetails" -MockWith { return @{ LogLevel = 'Error'; Reason = 'Mock Error' } }
     }
 
     Context "Functionality" {

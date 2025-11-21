@@ -1,21 +1,11 @@
 Describe "Remove-GTExpiredInvites" {
     BeforeAll {
         $functionPath = "$PSScriptRoot/../functions/Remove-GTExpiredInvites.ps1"
-        if (Test-Path $functionPath) {
-            . $functionPath
-        }
-        else {
-            Write-Error "Function file not found at $functionPath"
-        }
-
-        function Install-GTRequiredModule {}
-        function Initialize-GTGraphConnection {}
-        function Get-GTGuestUserReport {}
-        Mock -CommandName "Install-GTRequiredModule" -MockWith { }
-        Mock -CommandName "Initialize-GTGraphConnection" -MockWith { return $true }
-        
+        # Use Pester Mocks before dot-sourcing so the function file can load and calls are intercepted
+        Mock -CommandName Install-GTRequiredModule -MockWith { } -Verifiable
+        Mock -CommandName Initialize-GTGraphConnection -MockWith { return $true } -Verifiable
         # Mock the sibling function
-        Mock -CommandName "Get-GTGuestUserReport" -MockWith { 
+        Mock -CommandName Get-GTGuestUserReport -MockWith { 
             return @(
                 [PSCustomObject]@{
                     Id                = "1"
@@ -23,6 +13,16 @@ Describe "Remove-GTExpiredInvites" {
                     UserPrincipalName = "expired@test.com"
                 }
             )
+        } -Verifiable
+
+        if (Test-Path $functionPath)
+        {
+            # Dot-source the function under test
+            . $functionPath
+        }
+        else
+        {
+            Write-Error "Function file not found at $functionPath"
         }
     }
 

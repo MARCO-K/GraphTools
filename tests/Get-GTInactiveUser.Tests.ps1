@@ -2,16 +2,16 @@
 
 Describe "Get-GTInactiveUser" {
     BeforeAll {
-        # Minimal stubs to prevent CommandNotFound during dot-sourcing
-        function Install-GTRequiredModule { param([string[]]$ModuleNames, [switch]$Verbose) }
-        function Test-GTGraphScopes { param([switch]$Reconnect, [switch]$Quiet) return $true }
-        function Initialize-GTGraphConnection { param($Scopes, [switch]$NewSession) return $true }
-        function Get-GTGraphErrorDetails { param($Exception, $ResourceType) return @{ LogLevel = 'Error'; Reason = 'Stub' } }
+        # Use Pester Mocks before dot-sourcing so the function file can load and calls are intercepted
+        Mock -CommandName Install-GTRequiredModule -MockWith { } -Verifiable
+        Mock -CommandName Test-GTGraphScopes -MockWith { param($RequiredScopes, $Reconnect, $Quiet) return $true } -Verifiable
+        Mock -CommandName Initialize-GTGraphConnection -MockWith { return $true } -Verifiable
+        Mock -CommandName Get-GTGraphErrorDetails -MockWith { param($Exception, $ResourceType) return @{ LogLevel = 'Error'; Reason = 'Stub' } } -Verifiable
 
         # Helpers to capture the last Get-MgBetaUser call and to swap returned users per-test
         $script:LastGetMgBetaUserParams = $null
         $script:CurrentUsers = @()
-        function Get-MgBetaUser { param($All, $Property, $Filter, $ErrorAction) $script:LastGetMgBetaUserParams = $PSBoundParameters; return , $script:CurrentUsers }
+        Mock -CommandName Get-MgBetaUser -MockWith { param($All, $Property, $Filter, $ErrorAction) $script:LastGetMgBetaUserParams = $PSBoundParameters; return , $script:CurrentUsers } -Verifiable
 
         # Dot-source the function under test
         . "$PSScriptRoot/../functions/Get-GTInactiveUser.ps1"
