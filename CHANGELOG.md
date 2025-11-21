@@ -7,7 +7,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-## [0.18.0] - 2025-11-21
+## [0.19.0] - 2025-11-21
+
+### Added
+
+- **Administrative Role Security Analysis** - Comprehensive admin role assignment auditing
+  - New function `Get-GTAdminCountReport` to analyze Directory Role assignments and member counts
+  - Implements risk tier classification (Tier 0 Critical, Tier 1 High, Tier 2 Standard) for security prioritization
+  - Categorizes members by type: Users, Service Principals, and Groups with individual counts
+  - Provides risk analysis heuristics including Global Admin over-assignment detection (>5 users) and group assignment warnings
+  - Supports targeted analysis with RoleName filtering and optional member listing (-ShowMembers)
+  - Pipeline support for batch role analysis
+  - Automatic sorting by risk tier and member count for security review prioritization
+  - Comprehensive test coverage with 15+ test scenarios covering parameter validation, member counting, risk analysis, and output formatting
+
+### Changed
 
 ### Added
 

@@ -93,6 +93,7 @@ Respond to security incidents with purpose-built cmdlets:
 | `Get-GTBreakGlassPolicyReport` | Audit CA policies against emergency access accounts |
 | `Get-GTRiskyAppPermissionReport` | Audit Service Principals for high-risk permissions |
 | `Get-GTLegacyAuthReport` | Identify Legacy Authentication usage in sign-in logs |
+| `Get-GTAdminCountReport` | Analyze administrative roles with member counts and risk tiers |
 
 ## 📦 Installation
 
@@ -275,6 +276,25 @@ Get-M365LicenseOverview -FilterServicePlan 'EXCHANGE'
 
 # Inactive users with licenses
 Get-M365LicenseOverview -FilterUser 'user@contoso.com' -LastLogin 90
+```
+
+### Administrative Role Analysis
+
+```powershell
+# Analyze all administrative roles with member counts and risk tiers
+Get-GTAdminCountReport
+
+# Focus on high-risk Tier 0 roles only
+Get-GTAdminCountReport -RiskTier Tier0
+
+# Include detailed member lists for each role
+Get-GTAdminCountReport -ShowMembers
+
+# Sort by member count (most populated roles first)
+Get-GTAdminCountReport -SortBy MemberCount
+
+# Pipeline support for specific roles
+'Global Administrator', 'User Administrator' | Get-GTAdminCountReport
 ```
 
 ### Orphaned Resources
