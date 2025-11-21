@@ -3,9 +3,9 @@
 Describe "Get-GTInactiveUser" {
     BeforeAll {
         # Use Pester Mocks before dot-sourcing so the function file can load and calls are intercepted
-        Mock -CommandName Install-GTRequiredModule -MockWith { param($ModuleNames, $Verbose) } -Verifiable
+        Mock -CommandName Install-GTRequiredModule -MockWith { } -Verifiable
         Mock -CommandName Test-GTGraphScopes -MockWith { param($RequiredScopes, $Reconnect, $Quiet) return $true } -Verifiable
-        Mock -CommandName Initialize-GTGraphConnection -MockWith { param($Scopes, $NewSession) return $true } -Verifiable
+        Mock -CommandName Initialize-GTGraphConnection -MockWith { return $true } -Verifiable
         Mock -CommandName Get-GTGraphErrorDetails -MockWith { param($Exception, $ResourceType) return @{ LogLevel = 'Error'; Reason = 'Stub' } } -Verifiable
 
         # Helpers to capture the last Get-MgBetaUser call and to swap returned users per-test

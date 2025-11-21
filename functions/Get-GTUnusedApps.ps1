@@ -5,21 +5,26 @@ function Get-GTUnusedApps
     Identifies Service Principals that have not had any sign-ins for a specified period.
 
     .DESCRIPTION
-    This function retrieves Service Principals and analyzes their sign-in activity to identify
-    those that have been inactive for longer than the specified threshold.
+    This function retrieves Service Principals and analyzes their sign-in activity.
+    
+    PERFORMANCE:
+    - By default, uses Server-Side filtering for high performance.
+    - If -IncludeNeverUsed is specified, it performs a full directory scan (slower).
 
     .PARAMETER DaysSinceLastSignIn
     The number of days of inactivity to check for.
 
     .PARAMETER IncludeNeverUsed
     Switch to include apps that have never had a recorded sign-in.
+    WARNING: Using this switch forces a full download of all Service Principals.
 
     .EXAMPLE
     Get-GTUnusedApps -DaysSinceLastSignIn 90
-    Finds apps inactive for more than 90 days.
+    Fast. Finds apps inactive for more than 90 days.
 
-    .NOTES
-    Requires Microsoft Graph PowerShell SDK with AuditLog.Read.All permission.
+    .EXAMPLE
+    Get-GTUnusedApps -DaysSinceLastSignIn 90 -IncludeNeverUsed
+    Slower. Finds inactive apps AND apps that have never logged in.
     #>
     [CmdletBinding()]
     [OutputType([PSCustomObject])]
@@ -27,7 +32,8 @@ function Get-GTUnusedApps
         [Parameter(Mandatory = $true)]
         [int]$DaysSinceLastSignIn,
 
-        [switch]$IncludeNeverUsed
+        [switch]$IncludeNeverUsed,
+        [switch]$NewSession
     )
 
     begin
@@ -35,67 +41,103 @@ function Get-GTUnusedApps
         $modules = @('Microsoft.Graph.Beta.Applications')
         Install-GTRequiredModule -ModuleNames $modules -Verbose:$VerbosePreference
 
-        if (-not (Initialize-GTGraphConnection -Scopes 'AuditLog.Read.All'))
+        # 1. Scopes Check (Gold Standard)
+        # Application.Read.All is required to list SPs. AuditLog.Read.All is required for signInActivity.
+        $requiredScopes = @('Application.Read.All', 'AuditLog.Read.All')
+        
+        if (-not (Test-GTGraphScopes -RequiredScopes $requiredScopes -Reconnect -Quiet))
         {
-            Write-Error "Failed to initialize Microsoft Graph connection."
+            Write-Error "Failed to acquire required permissions ($($requiredScopes -join ', ')). Aborting."
+            return
+        }
+
+        # 2. Connection Initialization
+        if (-not (Initialize-GTGraphConnection -Scopes $requiredScopes -NewSession:$NewSession))
+        {
+            Write-Error "Failed to initialize session."
             return
         }
     }
 
     process
     {
+        $utcNow = Get-UTCTime
+        $thresholdDate = $utcNow.AddDays(-$DaysSinceLastSignIn)
+    
+        # Format for OData: yyyy-MM-ddTHH:mm:ssZ
+        $filterDateString = Format-ODataDateTime -DateTime $thresholdDate
+
         try
         {
-            Write-PSFMessage -Level Verbose -Message "Fetching Service Principals with sign-in activity..."
-            
             $params = @{
                 All         = $true
                 Property    = @('id', 'appId', 'displayName', 'signInActivity')
                 ErrorAction = 'Stop'
             }
 
-            $sps = Get-MgBetaServicePrincipal @params
-            $results = [System.Collections.Generic.List[PSCustomObject]]::new()
-            $now = Get-UTCTime
-
-            foreach ($sp in $sps)
+            # 3. Hybrid Filtering Strategy
+            if ($IncludeNeverUsed)
             {
-                $lastSignIn = $sp.SignInActivity.LastSignInDateTime
-                $daysInactive = $null
-
-                if ($lastSignIn)
-                {
-                    $daysInactive = (New-TimeSpan -Start $lastSignIn -End $now).Days
-                    
-                    if ($daysInactive -ge $DaysSinceLastSignIn)
-                    {
-                        $results.Add([PSCustomObject]@{
-                                DisplayName        = $sp.DisplayName
-                                AppId              = $sp.AppId
-                                LastSignInDateTime = $lastSignIn
-                                DaysInactive       = $daysInactive
-                                Status             = 'Inactive'
-                            })
-                    }
-                }
-                elseif ($IncludeNeverUsed)
-                {
-                    $results.Add([PSCustomObject]@{
-                            DisplayName        = $sp.DisplayName
-                            AppId              = $sp.AppId
-                            LastSignInDateTime = $null
-                            DaysInactive       = 'Never'
-                            Status             = 'Never Used'
-                        })
-                }
+                Write-PSFMessage -Level Verbose -Message "Fetching ALL Service Principals (IncludeNeverUsed active)..."
+                # No filter - we must scan everything to find nulls
+            }
+            else
+            {
+                # Optimization: Server-Side Filter
+                Write-PSFMessage -Level Verbose -Message "Fetching inactive Service Principals (Server-Side Filter)..."
+                $params['Filter'] = "signInActivity/lastSignInDateTime le $filterDateString"
+                Write-PSFMessage -Level Verbose -Message "Using Filter: $($params['Filter'])"
             }
 
-            Write-PSFMessage -Level Verbose -Message "Found $($results.Count) unused apps."
-            return $results
+            # 4. Pipeline Streaming
+            Get-MgBetaServicePrincipal @params | ForEach-Object {
+                $sp = $_
+                $lastSignIn = $sp.SignInActivity.LastSignInDateTime
+        
+                # Logic A: App has signed in, check if it's old
+                if ($lastSignIn)
+                {
+                    # Note: If we used the Server-Side filter, we technically don't need to check dates again,
+                    # but it doesn't hurt to double-check, especially if IncludeNeverUsed triggered a full scan.
+            
+                    # Ensure we parse UTC correctly
+                    $lastSignInUtc = $lastSignIn
+                    if ($lastSignIn -is [string]) { $lastSignInUtc = [DateTime]::Parse($lastSignIn) }
+            
+                    $daysInactive = (New-TimeSpan -Start $lastSignInUtc -End $utcNow).Days
+
+                    if ($daysInactive -ge $DaysSinceLastSignIn)
+                    {
+                        [PSCustomObject]@{
+                            DisplayName        = $sp.DisplayName
+                            AppId              = $sp.AppId
+                            Id                 = $sp.Id
+                            LastSignInDateTime = $lastSignIn
+                            DaysInactive       = $daysInactive
+                            Status             = 'Inactive'
+                        }
+                    }
+                }
+                # Logic B: App has NEVER signed in
+                elseif ($IncludeNeverUsed)
+                {
+                    [PSCustomObject]@{
+                        DisplayName        = $sp.DisplayName
+                        AppId              = $sp.AppId
+                        Id                 = $sp.Id
+                        LastSignInDateTime = $null
+                        DaysInactive       = 'Never'
+                        Status             = 'Never Used'
+                    }
+                }
+            }
         }
         catch
         {
-            Stop-PSFFunction -Message "Failed to retrieve unused apps: $($_.Exception.Message)" -ErrorRecord $_ -EnableException $true
+            # Gold Standard Error Handling
+            $err = Get-GTGraphErrorDetails -Exception $_.Exception -ResourceType 'Service Principals'
+            Write-PSFMessage -Level $err.LogLevel -Message "Failed to retrieve unused apps: $($err.Reason)"
+    
+            throw $err.ErrorMessage
         }
     }
-}

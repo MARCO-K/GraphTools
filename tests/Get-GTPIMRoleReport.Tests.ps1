@@ -1,15 +1,27 @@
 Describe "Get-GTPIMRoleReport" {
     BeforeAll {
+        # Define stubs for dependencies to ensure Mock works
+        function Install-GTRequiredModule {}
+        function Test-GTGraphScopes { return $true }
+        function Initialize-GTGraphConnection { return $true }
+        function Write-PSFMessage {}
+        function Get-GTGraphErrorDetails {}
+        function Test-GTGuid { return $true }
+        function Get-MgBetaRoleManagementDirectoryRoleDefinition {}
+        function Get-MgBetaRoleManagementDirectoryRoleEligibilityScheduleInstance {}
+        function Get-MgBetaRoleManagementDirectoryRoleAssignmentScheduleInstance {}
+
         $functionPath = "$PSScriptRoot/../functions/Get-GTPIMRoleReport.ps1"
         # Use Pester Mocks for external dependencies before dot-sourcing
-        Mock -CommandName Install-GTRequiredModule -MockWith { param($ModuleNames, $Verbose) } -Verifiable
-        Mock -CommandName Test-GTGraphScopes -MockWith { param($RequiredScopes, $Reconnect, $Quiet) return $true } -Verifiable
-        Mock -CommandName Get-MgBetaRoleManagementDirectoryRoleDefinition -MockWith { } -Verifiable
-        Mock -CommandName Get-MgBetaRoleManagementDirectoryRoleEligibilityScheduleInstance -MockWith { } -Verifiable
-        Mock -CommandName Get-MgBetaRoleManagementDirectoryRoleAssignmentScheduleInstance -MockWith { } -Verifiable
-        Mock -CommandName Test-GTGuid -MockWith { param($InputObject, $Quiet) return $true } -Verifiable
+        Mock -CommandName Install-GTRequiredModule -MockWith {} -Verifiable
+        Mock -CommandName Test-GTGraphScopes -MockWith { return $true } -Verifiable
+        Mock -CommandName Initialize-GTGraphConnection -MockWith { return $true } -Verifiable
+        Mock -CommandName Get-MgBetaRoleManagementDirectoryRoleDefinition -MockWith {} -Verifiable
+        Mock -CommandName Get-MgBetaRoleManagementDirectoryRoleEligibilityScheduleInstance -MockWith {} -Verifiable
+        Mock -CommandName Get-MgBetaRoleManagementDirectoryRoleAssignmentScheduleInstance -MockWith {} -Verifiable
+        Mock -CommandName Test-GTGuid -MockWith { return $true } -Verifiable
         Mock -CommandName Get-GTGraphErrorDetails -MockWith { return @{ LogLevel = 'Error'; Reason = 'Mock Error' } } -Verifiable
-        Mock -CommandName Write-PSFMessage -MockWith { param($Level, $Message) } -Verifiable
+        Mock -CommandName Write-PSFMessage -MockWith {} -Verifiable
 
         if (Test-Path $functionPath)
         {
