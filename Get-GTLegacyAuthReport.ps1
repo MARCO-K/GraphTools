@@ -63,7 +63,12 @@ function Get-GTLegacyAuthReport
         [Parameter(ValueFromPipeline = $true)]
         [ValidateScript({
             $ip = $null
-            [System.Net.IPAddress]::TryParse($_, [ref]$ip)
+            if ([System.Net.IPAddress]::TryParse($_, [ref]$ip)) {
+                return $true
+            }
+            else {
+                throw "The value '$_' is not a valid IPv4 or IPv6 address."
+            }
         })]
         [string[]]$IPAddress,
 
