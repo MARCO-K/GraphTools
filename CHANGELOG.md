@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.18.0] - 2025-11-21
+
 ### Added
 
 - **Test Coverage Enhancement** - Comprehensive test suite for application permission risk analysis
@@ -22,7 +24,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Covers advanced analytics features, testing framework, and development practices
   - Provides technical deep-dive complementing user-focused documentation
 
-## [0.17.0] - 2025-11-21
+- **Legacy Authentication Security Analysis** - Comprehensive legacy protocol detection and gap analysis
+  - New function `Get-GTLegacyAuthReport` to identify Legacy Authentication usage in Azure AD sign-in logs
+  - Implements defensive protocol detection (Legacy list + Modern exclusion) to reduce false positives
+  - Classifies successful legacy auth as "Security Gap" and failed attempts as "Attack Attempt"
+  - Maps error codes to descriptive failure reasons (MFA blocked, account locked, etc.)
+  - Supports targeted filtering by User Principal Name, Client App, and IP Address
+  - Pipeline support for batch analysis of users, IPs, and protocols
+  - Server-side time filtering for optimal performance
+  - Enhanced input validation with UPN regex validation and IP address format checking (IPv4 and IPv6)
+  - Standard user parameter aliases (UPN, UserPrincipalName, Users, User, UserName, UPNName)
+  - Comprehensive test coverage with 15+ test scenarios covering validation, filtering, and output formatting
+
+### Changed
 
 ### Added
 

@@ -92,6 +92,7 @@ Respond to security incidents with purpose-built cmdlets:
 | `Get-GTPolicyControlGapReport` | Analyze Conditional Access policies for security gaps |
 | `Get-GTBreakGlassPolicyReport` | Audit CA policies against emergency access accounts |
 | `Get-GTRiskyAppPermissionReport` | Audit Service Principals for high-risk permissions |
+| `Get-GTLegacyAuthReport` | Identify Legacy Authentication usage in sign-in logs |
 
 ## 📦 Installation
 
@@ -259,7 +260,7 @@ Invoke-AuditLogQuery -Operations 'FileDeleted'
 # Specific user activity over 30 days
 Invoke-AuditLogQuery -UserIds 'admin@contoso.com' -StartDays 30
 
-# Filter by IP address
+# Filter by source IP address
 Invoke-AuditLogQuery -IpAddresses '192.168.1.100' -StartDays 14
 ```
 
@@ -332,6 +333,31 @@ Get-GTRiskyAppPermissionReport -RiskLevel Critical
 
 # Pipeline support for batch analysis
 "app1-id", "app2-id" | Get-GTRiskyAppPermissionReport -PermissionType AppOnly
+```
+
+### Legacy Authentication Analysis
+
+```powershell
+# Analyze legacy authentication usage in the last 7 days
+Get-GTLegacyAuthReport
+
+# Focus on specific users
+Get-GTLegacyAuthReport -UserPrincipalName "user@contoso.com"
+
+# Check only successful legacy authentications (security gaps)
+Get-GTLegacyAuthReport -SuccessOnly
+
+# Filter by specific legacy protocol
+Get-GTLegacyAuthReport -ClientAppUsed "POP3"
+
+# Filter by source IP address
+Get-GTLegacyAuthReport -IPAddress "192.168.1.100"
+
+# IPv6 addresses are also supported
+Get-GTLegacyAuthReport -IPAddress "2001:db8::1"
+
+# Pipeline support for batch analysis
+"pop3", "imap4" | Get-GTLegacyAuthReport -DaysAgo 30
 ```
 
 ## 🎨 Parameter Flexibility
@@ -527,6 +553,7 @@ Functions will prompt for necessary permissions during execution.
 - **[Changelog](CHANGELOG.md)** - Version history and release notes
 - **[User Security Response Guide](docs/User-Security-Response.md)** - Detailed incident response procedures
 - **[Technical Highlights](docs/Technical-Highlights.md)** - Technical architecture and implementation details
+- **[Legacy Authentication Analysis](docs/Legacy-Authentication-Analysis.md)** - Comprehensive legacy protocol detection guide
 - **Function Help** - Use `Get-Help <Function-Name> -Full` for detailed documentation
 - **Examples** - Use `Get-Help <Function-Name> -Examples` for usage examples
 
