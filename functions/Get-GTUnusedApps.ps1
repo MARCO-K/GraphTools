@@ -63,7 +63,7 @@ function Get-GTUnusedApps
     {
         $utcNow = Get-UTCTime
         $thresholdDate = $utcNow.AddDays(-$DaysSinceLastSignIn)
-    
+        
         # Format for OData: yyyy-MM-ddTHH:mm:ssZ
         $filterDateString = Format-ODataDateTime -DateTime $thresholdDate
 
@@ -93,17 +93,17 @@ function Get-GTUnusedApps
             Get-MgBetaServicePrincipal @params | ForEach-Object {
                 $sp = $_
                 $lastSignIn = $sp.SignInActivity.LastSignInDateTime
-        
+                
                 # Logic A: App has signed in, check if it's old
                 if ($lastSignIn)
                 {
                     # Note: If we used the Server-Side filter, we technically don't need to check dates again,
                     # but it doesn't hurt to double-check, especially if IncludeNeverUsed triggered a full scan.
-            
+                    
                     # Ensure we parse UTC correctly
                     $lastSignInUtc = $lastSignIn
                     if ($lastSignIn -is [string]) { $lastSignInUtc = [DateTime]::Parse($lastSignIn) }
-            
+                    
                     $daysInactive = (New-TimeSpan -Start $lastSignInUtc -End $utcNow).Days
 
                     if ($daysInactive -ge $DaysSinceLastSignIn)
@@ -137,7 +137,5 @@ function Get-GTUnusedApps
             # Gold Standard Error Handling
             $err = Get-GTGraphErrorDetails -Exception $_.Exception -ResourceType 'Service Principals'
             Write-PSFMessage -Level $err.LogLevel -Message "Failed to retrieve unused apps: $($err.Reason)"
-    
-            throw $err.ErrorMessage
         }
     }

@@ -111,8 +111,8 @@ function Get-GTServicePrincipalReport
             if ($ExpandOwners) { $expand.Add('owners') }
 
             $params = @{
-                All         = $true
-                Property    = $properties
+                All = $true
+                Property = $properties
                 ErrorAction = 'Stop'
             }
             if ($expand.Count -gt 0) { $params['ExpandProperty'] = $expand }
@@ -191,17 +191,13 @@ function Get-GTServicePrincipalReport
                     $reportObject['PasswordCredentialsCount'] = if ($sp.PasswordCredentials) { $sp.PasswordCredentials.Count } else { 0 }
                     
                     # Format dates as ISO 8601 (UTC) for consistency
-                    $reportObject['KeyCredentialExpiryDates'] = if ($sp.KeyCredentials)
-                    { 
+                    $reportObject['KeyCredentialExpiryDates'] = if ($sp.KeyCredentials) { 
                         ($sp.KeyCredentials | Select-Object -ExpandProperty EndDateTime | Where-Object { $_ } | Sort-Object | ForEach-Object { $_.ToString('yyyy-MM-ddTHH:mm:ssZ') }) -join '; ' 
-                    }
-                    else { $null }
+                    } else { $null }
                     
-                    $reportObject['PasswordCredentialExpiryDates'] = if ($sp.PasswordCredentials)
-                    { 
+                    $reportObject['PasswordCredentialExpiryDates'] = if ($sp.PasswordCredentials) { 
                         ($sp.PasswordCredentials | Select-Object -ExpandProperty EndDateTime | Where-Object { $_ } | Sort-Object | ForEach-Object { $_.ToString('yyyy-MM-ddTHH:mm:ssZ') }) -join '; ' 
-                    }
-                    else { $null }
+                    } else { $null }
                 }
 
                 # Output immediately to pipeline
