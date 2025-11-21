@@ -1,4 +1,5 @@
-function Get-GTUnusedApps {
+function Get-GTUnusedApps
+{
     <#
     .SYNOPSIS
     Identifies Service Principals that have not had any sign-ins for a specified period.
@@ -29,18 +30,22 @@ function Get-GTUnusedApps {
         [switch]$IncludeNeverUsed
     )
 
-    begin {
+    begin
+    {
         $modules = @('Microsoft.Graph.Beta.Applications')
         Install-GTRequiredModule -ModuleNames $modules -Verbose:$VerbosePreference
 
-        if (-not (Initialize-GTGraphConnection -Scopes 'AuditLog.Read.All')) {
+        if (-not (Initialize-GTGraphConnection -Scopes 'AuditLog.Read.All'))
+        {
             Write-Error "Failed to initialize Microsoft Graph connection."
             return
         }
     }
 
-    process {
-        try {
+    process
+    {
+        try
+        {
             Write-PSFMessage -Level Verbose -Message "Fetching Service Principals with sign-in activity..."
             
             $params = @{
@@ -51,16 +56,19 @@ function Get-GTUnusedApps {
 
             $sps = Get-MgBetaServicePrincipal @params
             $results = [System.Collections.Generic.List[PSCustomObject]]::new()
-            $now = Get-Date
+            $now = Get-UTCTime
 
-            foreach ($sp in $sps) {
+            foreach ($sp in $sps)
+            {
                 $lastSignIn = $sp.SignInActivity.LastSignInDateTime
                 $daysInactive = $null
 
-                if ($lastSignIn) {
+                if ($lastSignIn)
+                {
                     $daysInactive = (New-TimeSpan -Start $lastSignIn -End $now).Days
                     
-                    if ($daysInactive -ge $DaysSinceLastSignIn) {
+                    if ($daysInactive -ge $DaysSinceLastSignIn)
+                    {
                         $results.Add([PSCustomObject]@{
                                 DisplayName        = $sp.DisplayName
                                 AppId              = $sp.AppId
@@ -70,7 +78,8 @@ function Get-GTUnusedApps {
                             })
                     }
                 }
-                elseif ($IncludeNeverUsed) {
+                elseif ($IncludeNeverUsed)
+                {
                     $results.Add([PSCustomObject]@{
                             DisplayName        = $sp.DisplayName
                             AppId              = $sp.AppId
@@ -84,7 +93,8 @@ function Get-GTUnusedApps {
             Write-PSFMessage -Level Verbose -Message "Found $($results.Count) unused apps."
             return $results
         }
-        catch {
+        catch
+        {
             Stop-PSFFunction -Message "Failed to retrieve unused apps: $($_.Exception.Message)" -ErrorRecord $_ -EnableException $true
         }
     }

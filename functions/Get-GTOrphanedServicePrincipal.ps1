@@ -1,4 +1,5 @@
-function Get-GTOrphanedServicePrincipal {
+function Get-GTOrphanedServicePrincipal
+{
     <#
     .SYNOPSIS
     Retrieves a list of Service Principals from Microsoft Entra ID that are orphaned or have security issues.
@@ -34,19 +35,23 @@ function Get-GTOrphanedServicePrincipal {
         [string[]]$Scope = @('Application.Read.All', 'Directory.Read.All')
     )
 
-    begin {
+    begin
+    {
         $requiredModules = @('Microsoft.Graph.Authentication', 'Microsoft.Graph.Beta.Applications')
         Install-GTRequiredModule -ModuleNames $requiredModules -Verbose:$VerbosePreference
         Initialize-GTGraphConnection -Scopes $Scope -NewSession:$NewSession
     }
 
-    process {
+    process
+    {
         $orphanedSPs = [System.Collections.Generic.List[object]]::new()
-        try {
+        try
+        {
             Write-PSFMessage -Level Verbose -Message "Fetching Service Principals from Microsoft Graph..."
             
             $properties = @('id', 'appId', 'displayName', 'servicePrincipalType', 'accountEnabled')
-            if ($CheckExpiredCredentials) {
+            if ($CheckExpiredCredentials)
+            {
                 $properties += 'keyCredentials'
                 $properties += 'passwordCredentials'
             }
@@ -54,7 +59,8 @@ function Get-GTOrphanedServicePrincipal {
             # Expand owners to check for existence and account status
             $sps = Get-MgBetaServicePrincipal -All -Property $properties -ExpandProperty 'owners' -ErrorAction Stop
         }
-        catch {
+        catch
+        {
             $errorDetails = Get-GTGraphErrorDetails -Exception $_.Exception -ResourceType 'resource'
             Write-PSFMessage -Level Error -Message "Failed to retrieve Service Principals. $($errorDetails.ErrorMessage)"
             Stop-PSFFunction -Message $errorDetails.Reason -ErrorRecord $_ -EnableException $true
@@ -63,63 +69,80 @@ function Get-GTOrphanedServicePrincipal {
 
         Write-PSFMessage -Level Debug -Message "Processing $($sps.Count) Service Principals."
 
-        foreach ($sp in $sps) {
+        foreach ($sp in $sps)
+        {
             $issues = [System.Collections.Generic.List[string]]::new()
 
             # Check 1: No Owners
-            if (-not $sp.Owners -or $sp.Owners.Count -eq 0) {
+            if (-not $sp.Owners -or $sp.Owners.Count -eq 0)
+            {
                 $issues.Add("NoOwners")
             }
-            else {
+            else
+            {
                 # Check 2: All Owners Disabled
                 $activeOwnersCount = 0
-                foreach ($owner in $sp.Owners) {
+                foreach ($owner in $sp.Owners)
+                {
                     # Check for accountEnabled property
-                    if ($owner.AdditionalProperties.ContainsKey('accountEnabled')) {
+                    if ($owner.AdditionalProperties.ContainsKey('accountEnabled'))
+                    {
                         if ($owner.AdditionalProperties['accountEnabled'] -eq $true) { $activeOwnersCount++ }
                     }
-                    elseif ($null -ne $owner.AccountEnabled) {
+                    elseif ($null -ne $owner.AccountEnabled)
+                    {
                         if ($owner.AccountEnabled -eq $true) { $activeOwnersCount++ }
                     }
-                    else {
+                    else
+                    {
                         # Assume active if unknown
                         $activeOwnersCount++ 
                     }
                 }
 
-                if ($activeOwnersCount -eq 0) {
+                if ($activeOwnersCount -eq 0)
+                {
                     $issues.Add("AllOwnersDisabled")
                 }
             }
 
             # Check 3: Expired Credentials
-            if ($CheckExpiredCredentials) {
+            if ($CheckExpiredCredentials)
+            {
                 $hasExpiredCreds = $false
                 $now = Get-Date
 
-                if ($sp.PasswordCredentials) {
-                    foreach ($cred in $sp.PasswordCredentials) {
-                        if ($cred.EndDateTime -and [datetime]$cred.EndDateTime -lt $now) {
+                if ($sp.PasswordCredentials)
+                {
+                    foreach ($cred in $sp.PasswordCredentials)
+                    {
+                        if ($cred.EndDateTime -and [datetime]$cred.EndDateTime -lt $now)
+                        {
                             $hasExpiredCreds = $true
                             break
                         }
                     }
                 }
-                if (-not $hasExpiredCreds -and $sp.KeyCredentials) {
-                    foreach ($cred in $sp.KeyCredentials) {
-                        if ($cred.EndDateTime -and [datetime]$cred.EndDateTime -lt $now) {
+                if (-not $hasExpiredCreds -and $sp.KeyCredentials)
+                {
+                    foreach ($cred in $sp.KeyCredentials)
+                    {
+                        if ($cred.EndDateTime -and [datetime]$cred.EndDateTime -lt $now)
+                        {
                             $hasExpiredCreds = $true
                             break
                         }
                     }
                 }
 
-                if ($hasExpiredCreds) {
+                if ($hasExpiredCreds)
+                {
                     $issues.Add("ExpiredCredentials")
                 }
             }
 
-            if ($issues.Count -gt 0) {
+            if ($issues.Count -gt 0)
+            {
                 $issueString = $issues -join ', '
                 Write-PSFMessage -Level Debug -Message "Found SP issue: $($sp.DisplayName) (AppID: $($sp.AppId)). Issues: $issueString"
                 

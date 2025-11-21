@@ -70,7 +70,7 @@ function Get-GTInactiveUser
     process
     {
         $results = [System.Collections.Generic.List[PSCustomObject]]::new()
-        $utcNow = (Get-Date).ToUniversalTime()
+        $utcNow = Get-UTCTime
 
         try
         {

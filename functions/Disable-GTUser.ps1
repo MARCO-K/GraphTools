@@ -72,7 +72,7 @@ Function Disable-GTUser
             # Describe the target and action for ShouldProcess
             $target = $User
             $action = "Disable user account (set AccountEnabled to False)"
-            $timeUtc = (Get-Date).ToUniversalTime().ToString('o')
+            $timeUtc = (Get-UTCTime).ToString('o')
 
             try
             {

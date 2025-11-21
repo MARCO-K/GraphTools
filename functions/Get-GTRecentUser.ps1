@@ -49,47 +49,54 @@
     Ensure you have the necessary permissions (e.g., User.Read.All, AuditLog.Read.All)
     granted to the Microsoft Graph PowerShell application or the signed-in user.
 #>
-function Get-GTRecentUser {
+function Get-GTRecentUser
+{
     [CmdletBinding(DefaultParameterSetName = 'ByDate')]
     [OutputType([Microsoft.Graph.PowerShell.Models.IMicrosoftGraphUser])]
     param (
         [Parameter(Mandatory = $false,
-                   ParameterSetName = 'ByDate',
-                   HelpMessage = 'Lookback period in hours from now. Defaults to 24.')]
+            ParameterSetName = 'ByDate',
+            HelpMessage = 'Lookback period in hours from now. Defaults to 24.')]
         [ValidateRange(1, 8760)] # Limit to a reasonable range (1 hour to 1 year)
         [int]$HoursAgo = 24,
 
         [Parameter(Mandatory = $true,
-                   ParameterSetName = 'ByUPN')]
-        [ValidateScript({$_ -match $script:GTValidationRegex.UPN})]
-        [Alias('UPN','UserName','UPNName')]
+            ParameterSetName = 'ByUPN')]
+        [ValidateScript({ $_ -match $script:GTValidationRegex.UPN })]
+        [Alias('UPN', 'UserName', 'UPNName')]
         [string]$UserPrincipalName
     )
 
     Write-Verbose "Starting search for users."
 
     # Ensure required module is available
-    if (-not (Get-Module -ListAvailable -Name Microsoft.Graph.Users)) {
+    if (-not (Get-Module -ListAvailable -Name Microsoft.Graph.Users))
+    {
         Write-Error "Required module 'Microsoft.Graph.Users' not found. Please install it first."
         return
     }
 
     # Check Graph connection status
-    if (-not (Get-MgContext)) {
+    if (-not (Get-MgContext))
+    {
         Write-Warning "Not connected to Microsoft Graph. Attempting to connect."
         # Add connection logic here if desired, or rely on user being pre-connected.
         Write-Error "Please connect to Microsoft Graph first using Connect-MgGraph with appropriate scopes (e.g., User.Read.All)."
         return
     }
 
-    try {
-        if ($PSCmdlet.ParameterSetName -eq 'ByUPN') {
+    try
+    {
+        if ($PSCmdlet.ParameterSetName -eq 'ByUPN')
+        {
             Write-Verbose "Querying Microsoft Graph for user with UPN: $UserPrincipalName"
             $recentUsers = Get-MgUser -UserId $UserPrincipalName
             Write-Verbose "Found user with UPN: $UserPrincipalName"
-        } else {
+        }
+        else
+        {
             # Calculate the cutoff time
-            $cutoffDateTime = (Get-Date).AddHours(-$HoursAgo).ToUniversalTime().ToString("yyyy-MM-ddTHH:mm:ssZ")
+            $cutoffDateTime = (Get-UTCTime).AddHours(-$HoursAgo).ToString("yyyy-MM-ddTHH:mm:ssZ")
             Write-Verbose "Searching for users created on or after $cutoffDateTime"
 
             # Construct the filter query
@@ -99,20 +106,24 @@ function Get-GTRecentUser {
             Write-Verbose "Found $userCount users created in the last $HoursAgo hours."
         }
     }
-    catch {
+    catch
+    {
         # Use centralized error handling helper to parse Graph API exceptions
         $errorDetails = Get-GTGraphErrorDetails -Exception $_.Exception -ResourceType 'user'
         
         # Log appropriate message based on error details
-        if ($errorDetails.HttpStatus -eq 403) {
+        if ($errorDetails.HttpStatus -eq 403)
+        {
             Write-Error "Failed to retrieve users. $($errorDetails.Reason)"
             Write-Warning "Permission denied. Ensure you have User.Read.All or Directory.Read.All."
             Write-PSFMessage -Level Debug -Message "Detailed error (403): $($errorDetails.ErrorMessage)"
         }
-        elseif ($errorDetails.HttpStatus) {
+        elseif ($errorDetails.HttpStatus)
+        {
             Write-Error "Failed to retrieve users. $($errorDetails.Reason)"
         }
-        else {
+        else
+        {
             Write-Error "Failed to retrieve users. Error: $($errorDetails.ErrorMessage)"
         }
         return

@@ -49,7 +49,7 @@ function Get-GTExpiringSecrets
         $results = [System.Collections.Generic.List[PSCustomObject]]::new()
         
         # 2. Date Math (Must be UTC)
-        $now = (Get-Date).ToUniversalTime()
+        $now = Get-UTCTime
         $expiryThreshold = $now.AddDays($DaysUntilExpiry)
 
         # --- Helper Logic to Avoid Duplication ---
