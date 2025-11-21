@@ -1,32 +1,38 @@
 Describe "Get-GTOrphanedGroup" {
     BeforeAll {
-        # Use Pester Mocks for dependencies
-        Mock -CommandName Install-GTRequiredModule -MockWith { } -Verifiable
-        Mock -CommandName Initialize-GTGraphConnection -MockWith { } -Verifiable
-        Mock -CommandName Write-PSFMessage -MockWith { } -Verifiable
-        Mock -CommandName Stop-PSFFunction -MockWith { } -Verifiable
-        Mock -CommandName Get-GTGraphErrorDetails -MockWith { } -Verifiable
+        # Define stub functions FIRST
+        function Install-GTRequiredModule { param([string[]]$ModuleNames, [string]$Scope, [switch]$AllowPrerelease) }
+        function Test-GTGraphScopes { param([string[]]$RequiredScopes, [switch]$Reconnect, [switch]$Quiet) return $true }
+        function Write-PSFMessage { param($Level, $Message, $ErrorRecord) }
+        function Get-GTGraphErrorDetails { param($Exception, $ResourceType) return @{ LogLevel = 'Error'; Reason = 'Mock error' } }
+        function Get-MgBetaGroup { param($All, $Property, $ExpandProperty, $ErrorAction) return @() }
 
-        # Dot-source the function in the Describe scope
+        # Dot-source the function AFTER stubs
         . "$PSScriptRoot/../functions/Get-GTOrphanedGroup.ps1"
+    }
+
+    BeforeEach {
+        # Mock Get-MgBetaGroup before each test
+        Mock -CommandName "Get-MgBetaGroup" -MockWith { return @() }
     }
 
     Context "Function Execution" {
         It "should not throw when properly configured" {
-            Mock -CommandName "Get-MgBetaGroup" -MockWith { return @() }
             { Get-GTOrphanedGroup } | Should -Not -Throw
         }
     }
 
     Context "Parameter Handling" {
         It "should accept NewSession switch" {
-            Mock -CommandName "Get-MgBetaGroup" -MockWith { return @() }
             { Get-GTOrphanedGroup -NewSession } | Should -Not -Throw
         }
 
-        It "should accept Scope parameter" {
-            Mock -CommandName "Get-MgBetaGroup" -MockWith { return @() }
-            { Get-GTOrphanedGroup -Scope 'Group.Read.All' } | Should -Not -Throw
+        It "should accept CheckEmpty switch" {
+            { Get-GTOrphanedGroup -CheckEmpty } | Should -Not -Throw
+        }
+
+        It "should accept CheckDisabledOwners switch" {
+            { Get-GTOrphanedGroup -CheckDisabledOwners } | Should -Not -Throw
         }
     }
 
@@ -38,6 +44,11 @@ Describe "Get-GTOrphanedGroup" {
                 Owners          = @()
                 Members         = @(@{Id = "m1" })
                 DeletedDateTime = $null
+                MailEnabled     = $false
+                SecurityEnabled = $true
+                GroupTypes      = @()
+                Visibility      = "Private"
+                CreatedDateTime = (Get-Date)
             }
             Mock -CommandName "Get-MgBetaGroup" -MockWith { return $mockGroup }
             
@@ -46,7 +57,7 @@ Describe "Get-GTOrphanedGroup" {
             $result[0].OrphanReason | Should -Match "NoOwners"
         }
 
-        It "should identify groups with all owners disabled" {
+        It "should identify groups with all owners disabled when CheckDisabledOwners is used" {
             $mockOwner = [PSCustomObject]@{
                 Id                   = "o1"
                 AccountEnabled       = $false
@@ -58,15 +69,20 @@ Describe "Get-GTOrphanedGroup" {
                 Owners          = @($mockOwner)
                 Members         = @(@{Id = "m1" })
                 DeletedDateTime = $null
+                MailEnabled     = $false
+                SecurityEnabled = $true
+                GroupTypes      = @()
+                Visibility      = "Private"
+                CreatedDateTime = (Get-Date)
             }
             Mock -CommandName "Get-MgBetaGroup" -MockWith { return $mockGroup }
 
-            $result = Get-GTOrphanedGroup
+            $result = Get-GTOrphanedGroup -CheckDisabledOwners
             $result.Count | Should -Be 1
             $result[0].OrphanReason | Should -Match "AllOwnersDisabled"
         }
 
-        It "should identify empty groups" {
+        It "should identify empty groups when CheckEmpty is used" {
             $mockOwner = [PSCustomObject]@{
                 Id                   = "o1"
                 AccountEnabled       = $true
@@ -78,10 +94,15 @@ Describe "Get-GTOrphanedGroup" {
                 Owners          = @($mockOwner)
                 Members         = @()
                 DeletedDateTime = $null
+                MailEnabled     = $false
+                SecurityEnabled = $true
+                GroupTypes      = @()
+                Visibility      = "Private"
+                CreatedDateTime = (Get-Date)
             }
             Mock -CommandName "Get-MgBetaGroup" -MockWith { return $mockGroup }
 
-            $result = Get-GTOrphanedGroup
+            $result = Get-GTOrphanedGroup -CheckEmpty
             $result.Count | Should -Be 1
             $result[0].OrphanReason | Should -Match "EmptyGroup"
         }

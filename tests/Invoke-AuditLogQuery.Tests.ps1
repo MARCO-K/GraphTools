@@ -1,25 +1,25 @@
-BeforeAll {
-    # Use Pester Mocks before dot-sourcing so the function file can load and calls are intercepted
-    # Mock the required modules and functions
-    Mock -ModuleName "Microsoft.Graph.Authentication" -CommandName "Install-GTRequiredModule" -MockWith { }
-    Mock -ModuleName "Microsoft.Graph.Authentication" -CommandName "Test-GTGraphScopes" -MockWith { $true }
-    Mock -ModuleName "Microsoft.Graph.Authentication" -CommandName "Set-MgRequestContext" -MockWith { }
-
-    # Mock Get-Date to return a fixed timestamp
-    $fixedNow = Get-Date '2025-10-10T00:00:00Z'
-    Mock Get-Date { $fixedNow }
-
-    ## Provide lightweight stubs for common helpers in case they are missing during discovery
-    if (-not (Get-Command Install-GTRequiredModule -ErrorAction SilentlyContinue)) { function Install-GTRequiredModule { param([string[]]$ModuleNames, [string]$Scope, [switch]$AllowPrerelease) } }
-    if (-not (Get-Command Initialize-GTGraphConnection -ErrorAction SilentlyContinue)) { function Initialize-GTGraphConnection { param([string[]]$Scopes, [switch]$NewSession, [switch]$SkipConnect) return $true } }
-    if (-not (Get-Command Test-GTGraphScopes -ErrorAction SilentlyContinue)) { function Test-GTGraphScopes { param([string[]]$RequiredScopes, [switch]$Reconnect, [switch]$Quiet) return $true } }
-    if (-not (Get-Command Write-PSFMessage -ErrorAction SilentlyContinue)) { function Write-PSFMessage { param($Level, $Message, $ErrorRecord) } }
-
-    # Dot-source the function under test
-    . "$PSScriptRoot/../functions/Invoke-AuditLogQuery.ps1"
-}
-
 Describe "Invoke-AuditLogQuery" {
+    BeforeAll {
+        # Define stub functions FIRST
+        function Install-GTRequiredModule { param([string[]]$ModuleNames, [string]$Scope, [switch]$AllowPrerelease) }
+        function Test-GTGraphScopes { param([string[]]$RequiredScopes, [switch]$Reconnect, [switch]$Quiet) return $true }
+        function Write-PSFMessage { param($Level, $Message, $ErrorRecord) }
+        function Invoke-MgGraphRequest { param($Uri, $Body, $Method) return @{} }
+
+        # Set up validation regex required by the function
+        $script:GTValidationRegex = @{
+            UPN = '^[^@\s]+@[^@\s]+\.[^@\s]+$'
+            AuditLogFilterValue = '^[a-zA-Z0-9_\-]+$'
+            AuditLogProperty = '^[a-zA-Z0-9_]+(\.[a-zA-Z0-9_]+)*$'
+        }
+
+        # Mock Get-Date to return a fixed timestamp
+        $fixedNow = Get-Date '2025-10-10T00:00:00Z'
+        Mock Get-Date { $fixedNow }
+
+        # Dot-source the function under test AFTER stubs
+        . "$PSScriptRoot/../functions/Invoke-AuditLogQuery.ps1"
+    }
     BeforeEach {
         $script:storedFilter = $null
         $mockRecords = @(
@@ -39,7 +39,7 @@ Describe "Invoke-AuditLogQuery" {
             }
         )
 
-        Mock -ModuleName "Microsoft.Graph.Authentication" -CommandName "Invoke-MgGraphRequest" -MockWith {
+        Mock -CommandName "Invoke-MgGraphRequest" -MockWith {
             param($Uri, $Body, $Method)
             if ($Uri -like "*/auditLog/queries" -and $Method -eq "POST")
             {

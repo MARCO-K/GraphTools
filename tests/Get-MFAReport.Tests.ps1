@@ -1,18 +1,18 @@
 Describe "Get-MFAReport" {
     BeforeAll {
-        # Use Pester Mocks before dot-sourcing so the function file can load and calls are intercepted
-        # Mock the required modules and functions
-        Mock -ModuleName "Microsoft.Graph.Authentication" -CommandName "Install-GTRequiredModule" -MockWith { }
-        Mock -ModuleName "Microsoft.Graph.Authentication" -CommandName "Get-MgContext" -MockWith { $true }
-        Mock -ModuleName "Microsoft.Graph.Authentication" -CommandName "Connect-MgGraph" -MockWith { }
+        # Define stub functions FIRST
+        function Install-GTRequiredModule { param([string[]]$ModuleNames, [string]$Scope, [switch]$AllowPrerelease) }
+        function Initialize-GTGraphConnection { param([string[]]$Scopes, [switch]$NewSession) return $true }
+        function Test-GTGraphScopes { param([string[]]$RequiredScopes, [switch]$Reconnect, [switch]$Quiet) return $true }
+        function Write-PSFMessage { param($Level, $Message, $ErrorRecord) }
+        function Get-MgBetaReportAuthenticationMethodUserRegistrationDetail { param($Filter) return @() }
 
-        ## Provide lightweight stubs for common helpers in case they are missing during discovery
-        if (-not (Get-Command Install-GTRequiredModule -ErrorAction SilentlyContinue)) { function Install-GTRequiredModule { param([string[]]$ModuleNames, [string]$Scope, [switch]$AllowPrerelease) } }
-        if (-not (Get-Command Initialize-GTGraphConnection -ErrorAction SilentlyContinue)) { function Initialize-GTGraphConnection { param([string[]]$Scopes, [switch]$NewSession, [switch]$SkipConnect) return $true } }
-        if (-not (Get-Command Test-GTGraphScopes -ErrorAction SilentlyContinue)) { function Test-GTGraphScopes { param([string[]]$RequiredScopes, [switch]$Reconnect, [switch]$Quiet) return $true } }
-        if (-not (Get-Command Write-PSFMessage -ErrorAction SilentlyContinue)) { function Write-PSFMessage { param($Level, $Message, $ErrorRecord) } }
+        # Set up validation regex
+        $script:GTValidationRegex = @{
+            UPN = '^[^@\s]+@[^@\s]+\.[^@\s]+$'
+        }
 
-        # Dot-source the function under test
+        # Dot-source the function under test AFTER stubs
         . "$PSScriptRoot/../functions/Get-MFAReport.ps1"
     }
     $mockReport = @(
@@ -46,7 +46,7 @@ Describe "Get-MFAReport" {
     )
 
     BeforeEach {
-        Mock -ModuleName "Microsoft.Graph.Beta.Reports" -CommandName "Get-MgBetaReportAuthenticationMethodUserRegistrationDetail" -MockWith {
+        Mock -CommandName "Get-MgBetaReportAuthenticationMethodUserRegistrationDetail" -MockWith {
             param($Filter)
             if ($Filter)
             {
