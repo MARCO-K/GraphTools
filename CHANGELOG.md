@@ -7,7 +7,42 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-## [0.16.0] - 2025-11-21
+### Added
+
+- **Test Coverage Enhancement** - Comprehensive test suite for application permission risk analysis
+  - Added `Get-GTRiskyAppPermissionReport.Tests.ps1` with full Pester test coverage
+  - Tests parameter validation, pipeline input, risk scoring logic, and error handling
+  - Mocks Microsoft Graph API calls for isolated unit testing
+  - Validates app-only and delegated permission analysis scenarios
+  - Tests custom risk definitions and filtering capabilities
+
+- **Technical Documentation** - Comprehensive technical architecture guide
+  - Added `docs/Technical-Highlights.md` with detailed technical implementation details
+  - Documents module architecture, security features, performance characteristics, and integration capabilities
+  - Covers advanced analytics features, testing framework, and development practices
+  - Provides technical deep-dive complementing user-focused documentation
+
+## [0.17.0] - 2025-11-21
+
+### Added
+
+- **Application Permission Security Analysis** - Comprehensive app permission risk assessment
+  - New function `Get-GTRiskyAppPermissionReport` to audit Service Principal permissions for security risks
+  - Analyzes both Application permissions (app roles) and Delegated permissions (OAuth grants)
+  - Implements sophisticated risk scoring (1-10 scale) with impact categories (Privilege Escalation, Data Exfiltration, etc.)
+  - Provides forensic context: who granted permissions, when, and usage patterns (last sign-in activity)
+  - Supports targeted analysis with AppId, PermissionType, and RiskLevel filtering
+  - Differentiates tenant-wide vs user-specific permission grants
+  - Includes activity monitoring (90-day usage windows) to identify dormant risky permissions
+  - Custom risk definitions support via HighRiskScopes parameter
+  - Pipeline support for batch application analysis
+
+### Changed
+
+- **UTC Time Handling** - Standardized UTC time retrieval across reporting functions (partial implementation)
+  - Added `Get-UTCTime` helper function for consistent UTC time handling
+  - Updated reporting functions `Get-GTRecentUser`, `Get-GTUnusedApps`, `Get-GTOrphanedServicePrincipal`, `Get-GTInactiveUser`, `Get-GTInactiveDevices`, and `Get-GTGuestUserReport` to use the helper
+  - Note: Other functions (e.g., `Disable-GTUser`, `Disable-GTUserDevice`, `Get-GTExpiringSecrets`) still use the old pattern and will be updated in a future release
 
 ### Added
 

@@ -91,6 +91,7 @@ Respond to security incidents with purpose-built cmdlets:
 | `Get-GTPIMRoleReport` | Report on eligible and active PIM role assignments |
 | `Get-GTPolicyControlGapReport` | Analyze Conditional Access policies for security gaps |
 | `Get-GTBreakGlassPolicyReport` | Audit CA policies against emergency access accounts |
+| `Get-GTRiskyAppPermissionReport` | Audit Service Principals for high-risk permissions |
 
 ## 📦 Installation
 
@@ -314,6 +315,25 @@ Get-GTBreakGlassPolicyReport -BreakGlassUpn "bg@contoso.com" | Where-Object { $_
 Get-GTBreakGlassPolicyReport -BreakGlassUpn "emergency@contoso.com" -NewSession
 ```
 
+### Application Permission Risk Analysis
+
+```powershell
+# Audit all Service Principals for high-risk permissions
+Get-GTRiskyAppPermissionReport
+
+# Focus on specific applications
+Get-GTRiskyAppPermissionReport -AppId "12345678-1234-1234-1234-123456789012"
+
+# Check only delegated permissions
+Get-GTRiskyAppPermissionReport -PermissionType Delegated
+
+# Find only critical risks
+Get-GTRiskyAppPermissionReport -RiskLevel Critical
+
+# Pipeline support for batch analysis
+"app1-id", "app2-id" | Get-GTRiskyAppPermissionReport -PermissionType AppOnly
+```
+
 ## 🎨 Parameter Flexibility
 
 GraphTools supports multiple parameter aliases for user identifiers, allowing you to choose the most readable option:
@@ -506,6 +526,7 @@ Functions will prompt for necessary permissions during execution.
 
 - **[Changelog](CHANGELOG.md)** - Version history and release notes
 - **[User Security Response Guide](docs/User-Security-Response.md)** - Detailed incident response procedures
+- **[Technical Highlights](docs/Technical-Highlights.md)** - Technical architecture and implementation details
 - **Function Help** - Use `Get-Help <Function-Name> -Full` for detailed documentation
 - **Examples** - Use `Get-Help <Function-Name> -Examples` for usage examples
 

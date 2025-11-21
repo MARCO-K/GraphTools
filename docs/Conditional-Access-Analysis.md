@@ -172,6 +172,7 @@ These functions complement existing GraphTools capabilities:
 - `Get-GTConditionalAccessPolicyReport` - General CA policy reporting
 - `Disable-GTUser` - User account management during incidents
 - `Revoke-GTSignOutFromAllSessions` - Session termination
+- `Get-GTRiskyAppPermissionReport` - Application permission security analysis
 
 ---
 
