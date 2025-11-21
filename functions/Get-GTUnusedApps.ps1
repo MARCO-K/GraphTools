@@ -137,8 +137,5 @@ function Get-GTUnusedApps
             # Gold Standard Error Handling
             $err = Get-GTGraphErrorDetails -Exception $_.Exception -ResourceType 'Service Principals'
             Write-PSFMessage -Level $err.LogLevel -Message "Failed to retrieve unused apps: $($err.Reason)"
-            
-            throw $err.ErrorMessage
         }
     }
-}

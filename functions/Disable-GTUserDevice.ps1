@@ -64,6 +64,8 @@
 
     Disables devices without prompting for confirmation.
 #>
+# Requires internal helper: Get-UTCTime
+
 Function Disable-GTUserDevice
 {
     [CmdletBinding(SupportsShouldProcess = $true, ConfirmImpact = 'High')]
@@ -71,8 +73,8 @@ Function Disable-GTUserDevice
     param
     (
         [Parameter(Mandatory = $true, ValueFromPipeline = $true)]
-        [ValidateScript({$_ -match $script:GTValidationRegex.UPN})]
-        [Alias('UserPrincipalName','Users','UserName','UPNName')]
+        [ValidateScript({ $_ -match $script:GTValidationRegex.UPN })]
+        [Alias('UserPrincipalName', 'Users', 'UserName', 'UPNName')]
         [string[]]$UPN,
 
         [Parameter()]
@@ -93,7 +95,8 @@ Function Disable-GTUserDevice
 
         # Graph Connection Handling
         $connectionResult = Initialize-GTGraphConnection -Scopes 'Directory.AccessAsUser.All' -NewSession:$NewSession
-        if (-not $connectionResult) {
+        if (-not $connectionResult)
+        {
             Write-PSFMessage -Level Error -Message "Failed to initialize Microsoft Graph connection. Aborting device disable operation."
             return
         }
@@ -103,7 +106,7 @@ Function Disable-GTUserDevice
     {
         foreach ($User in $UPN)
         {
-            $timeUtc = (Get-Date).ToUniversalTime().ToString('o')
+            $timeUtc = (Get-UTCTime).ToString('o')
 
             try
             {
@@ -122,14 +125,14 @@ Function Disable-GTUserDevice
                 {
                     Write-PSFMessage -Level Verbose -Message "$User - Disable Device Action - No enabled devices found"
                     $result = [PSCustomObject]@{
-                        User            = $User
-                        DeviceId        = $null
-                        DeviceName      = $null
-                        Status          = 'NoDevices'
-                        TimeUtc         = $timeUtc
-                        HttpStatus      = $null
-                        Reason          = 'No enabled devices found for user'
-                        ExceptionMessage= ''
+                        User             = $User
+                        DeviceId         = $null
+                        DeviceName       = $null
+                        Status           = 'NoDevices'
+                        TimeUtc          = $timeUtc
+                        HttpStatus       = $null
+                        Reason           = 'No enabled devices found for user'
+                        ExceptionMessage = ''
                     }
                     [void]$results.Add($result)
                     continue
@@ -138,42 +141,44 @@ Function Disable-GTUserDevice
                 # Process each device that needs to be disabled
                 foreach ($device in $devicesToDisable)
                 {
-                    $deviceTimeUtc = (Get-Date).ToUniversalTime().ToString('o')
+                    $deviceTimeUtc = (Get-UTCTime).ToString('o')
                     try
                     {
                         # Describe the target and action for ShouldProcess
                         $target = "$User - Device: $($device.DisplayName) (ID: $($device.Id))"
                         $action = "Disable device (set AccountEnabled to False)"
 
-                        if ($PSCmdlet.ShouldProcess($target, $action)) {
+                        if ($PSCmdlet.ShouldProcess($target, $action))
+                        {
                             Update-MgDevice -DeviceId $device.Id -AccountEnabled:$false -ErrorAction Stop
                             Write-PSFMessage -Level Verbose -Message "$User - Disable Device Action - Device disabled: $($device.DisplayName) (ID: $($device.Id))"
 
                             $result = [PSCustomObject]@{
-                                User            = $User
-                                DeviceId        = $device.Id
-                                DeviceName      = $device.DisplayName
-                                Status          = 'Disabled'
-                                TimeUtc         = $deviceTimeUtc
-                                HttpStatus      = $null
-                                Reason          = 'Device disabled'
-                                ExceptionMessage= ''
+                                User             = $User
+                                DeviceId         = $device.Id
+                                DeviceName       = $device.DisplayName
+                                Status           = 'Disabled'
+                                TimeUtc          = $deviceTimeUtc
+                                HttpStatus       = $null
+                                Reason           = 'Device disabled'
+                                ExceptionMessage = ''
                             }
                             [void]$results.Add($result)
                         }
-                        else {
+                        else
+                        {
                             # When -WhatIf or user declines via -Confirm, operation is not performed.
                             Write-PSFMessage -Level Verbose -Message "$User - Disable Device Action - Skipped (WhatIf/Confirmed=false): $($device.DisplayName) (ID: $($device.Id))"
 
                             $result = [PSCustomObject]@{
-                                User            = $User
-                                DeviceId        = $device.Id
-                                DeviceName      = $device.DisplayName
-                                Status          = 'Skipped'
-                                TimeUtc         = $deviceTimeUtc
-                                HttpStatus      = $null
-                                Reason          = 'Operation skipped (WhatIf/confirmation declined)'
-                                ExceptionMessage= ''
+                                User             = $User
+                                DeviceId         = $device.Id
+                                DeviceName       = $device.DisplayName
+                                Status           = 'Skipped'
+                                TimeUtc          = $deviceTimeUtc
+                                HttpStatus       = $null
+                                Reason           = 'Operation skipped (WhatIf/confirmation declined)'
+                                ExceptionMessage = ''
                             }
                             [void]$results.Add($result)
                         }
@@ -184,27 +189,30 @@ Function Disable-GTUserDevice
                         $errorDetails = Get-GTGraphErrorDetails -Exception $_.Exception -ResourceType 'device'
 
                         # Log appropriate message based on error details
-                        if ($errorDetails.HttpStatus -in 404, 403) {
+                        if ($errorDetails.HttpStatus -in 404, 403)
+                        {
                             Write-PSFMessage -Level $errorDetails.LogLevel -Message "$User - Disable Device Action - $($errorDetails.Reason) (Device: $($device.Id))"
                             Write-PSFMessage -Level Debug -Message "Detailed error ($($errorDetails.HttpStatus)): $($errorDetails.ErrorMessage)"
                         }
-                        elseif ($errorDetails.HttpStatus) {
+                        elseif ($errorDetails.HttpStatus)
+                        {
                             Write-PSFMessage -Level $errorDetails.LogLevel -Message "$User - Disable Device Action - $($errorDetails.Reason) (Device: $($device.Id))"
                         }
-                        else {
+                        else
+                        {
                             Write-PSFMessage -Level Error -Message "$User - Disable Device Action - Failed to disable device $($device.Id): $($errorDetails.ErrorMessage)"
                             Write-PSFMessage -Level Debug -Message ($_.Exception | Out-String)
                         }
 
                         $result = [PSCustomObject]@{
-                            User            = $User
-                            DeviceId        = $device.Id
-                            DeviceName      = $device.DisplayName
-                            Status          = 'Failed'
-                            TimeUtc         = $deviceTimeUtc
-                            HttpStatus      = $errorDetails.HttpStatus
-                            Reason          = $errorDetails.Reason
-                            ExceptionMessage= $errorDetails.ErrorMessage
+                            User             = $User
+                            DeviceId         = $device.Id
+                            DeviceName       = $device.DisplayName
+                            Status           = 'Failed'
+                            TimeUtc          = $deviceTimeUtc
+                            HttpStatus       = $errorDetails.HttpStatus
+                            Reason           = $errorDetails.Reason
+                            ExceptionMessage = $errorDetails.ErrorMessage
                         }
                         [void]$results.Add($result)
                     }
@@ -217,27 +225,30 @@ Function Disable-GTUserDevice
                 $errorDetails = Get-GTGraphErrorDetails -Exception $_.Exception -ResourceType 'user'
 
                 # Log appropriate message based on error details
-                if ($errorDetails.HttpStatus -in 404, 403) {
+                if ($errorDetails.HttpStatus -in 404, 403)
+                {
                     Write-PSFMessage -Level $errorDetails.LogLevel -Message "$User - Disable Device Action - $($errorDetails.Reason)"
                     Write-PSFMessage -Level Debug -Message "Detailed error ($($errorDetails.HttpStatus)): $($errorDetails.ErrorMessage)"
                 }
-                elseif ($errorDetails.HttpStatus) {
+                elseif ($errorDetails.HttpStatus)
+                {
                     Write-PSFMessage -Level $errorDetails.LogLevel -Message "$User - Disable Device Action - $($errorDetails.Reason)"
                 }
-                else {
+                else
+                {
                     Write-PSFMessage -Level Error -Message "$User - Disable Device Action - $($errorDetails.ErrorMessage)"
                     Write-PSFMessage -Level Debug -Message ($_.Exception | Out-String)
                 }
 
                 $result = [PSCustomObject]@{
-                    User            = $User
-                    DeviceId        = $null
-                    DeviceName      = $null
-                    Status          = 'Failed'
-                    TimeUtc         = $timeUtc
-                    HttpStatus      = $errorDetails.HttpStatus
-                    Reason          = $errorDetails.Reason
-                    ExceptionMessage= $errorDetails.ErrorMessage
+                    User             = $User
+                    DeviceId         = $null
+                    DeviceName       = $null
+                    Status           = 'Failed'
+                    TimeUtc          = $timeUtc
+                    HttpStatus       = $errorDetails.HttpStatus
+                    Reason           = $errorDetails.Reason
+                    ExceptionMessage = $errorDetails.ErrorMessage
                 }
                 [void]$results.Add($result)
             }
@@ -248,6 +259,6 @@ Function Disable-GTUserDevice
     {
         # Emit a single array of all per-device result objects for easier consumption by callers/automation.
         # Use ToArray() so a true array is returned instead of an ArrayList to keep type expectations simple.
-        ,$results.ToArray()
+        , $results.ToArray()
     }
 }
