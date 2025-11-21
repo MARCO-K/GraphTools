@@ -85,7 +85,7 @@ function Get-GTRecentUser
             {
                 # Calculate cutoff (UTC)
                 $cutoffDateTime = $utcNow.AddHours(-$HoursAgo)
-                $filterDateStr = $cutoffDateTime.ToString("yyyy-MM-ddTHH:mm:ssZ")
+                $filterDateStr = Format-ODataDateTime -DateTime $cutoffDateTime
                 
                 Write-PSFMessage -Level Verbose -Message "Searching for users created after $filterDateStr"
 
