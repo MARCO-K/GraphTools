@@ -65,7 +65,6 @@
     Disables devices without prompting for confirmation.
 #>
 # Requires internal helper: Get-UTCTime
-. "$PSScriptRoot/../internal/functions/Get-UTCTime.ps1"
 
 Function Disable-GTUserDevice
 {
