@@ -41,40 +41,55 @@ Describe "Invoke-AuditLogQuery" {
 
         Mock -CommandName "Invoke-MgGraphRequest" -MockWith {
             param($Uri, $Body, $Method)
-            if ($Uri -like "*/auditLog/queries" -and $Method -eq "POST")
+            # POST: Create query
+            if ($Uri -like "*graph.microsoft.com/beta/security/auditLog/queries/" -and $Method -eq "POST")
             {
-                $script:storedFilter = ($Body | ConvertFrom-Json).filter
+                $bodyObj = $Body | ConvertFrom-Json
+                $script:storedFilter = $bodyObj.filter | ConvertFrom-Json
                 return @{
                     Id     = "test-query-id"
                     status = "succeeded"
                 }
             }
-            if ($Uri -like "*/auditLog/queries/test-query-id" -and $Method -eq "GET")
+            # GET: Check query status (not records)
+            if ($Uri -eq "/beta/security/auditLog/queries/test-query-id" -and $Method -eq "GET")
             {
                 return @{
                     Id     = "test-query-id"
                     status = "succeeded"
                 }
             }
-            if ($Uri -like "*/auditLog/queries/test-query-id/records" -and $Method -eq "GET")
+            # GET: Fetch records
+            if ($Uri -eq "/beta/security/auditLog/queries/test-query-id/records" -and $Method -eq "GET")
             {
-                $records = $mockRecords
-                if ($script:storedFilter.OperationFilters)
+                $records = @($mockRecords)
+                if ($script:storedFilter -and $script:storedFilter.OperationFilters)
                 {
-                    $records = $records | Where-Object { $_.Operation -in $script:storedFilter.OperationFilters }
+                    $records = @($records | Where-Object { $_.Operation -in $script:storedFilter.OperationFilters })
                 }
-                if ($script:storedFilter.userIdsFilters)
+                if ($script:storedFilter -and $script:storedFilter.userIdsFilters)
                 {
-                    $records = $records | Where-Object { $_.UserId -in $script:storedFilter.userIdsFilters }
+                    $records = @($records | Where-Object { $_.UserId -in $script:storedFilter.userIdsFilters })
                 }
-                $startDate = Get-Date($script:storedFilter.filterStartDateTime)
-                $records = $records | Where-Object { $_.createdDateTime -ge $startDate }
+                if ($script:storedFilter -and $script:storedFilter.filterStartDateTime)
+                {
+                    $startDate = Get-Date($script:storedFilter.filterStartDateTime)
+                    $records = @($records | Where-Object { $_.createdDateTime -ge $startDate })
+                }
 
                 return @{
                     value = $records
                 }
             }
+            # DELETE: Clean up query
+            if ($Uri -eq "/beta/security/auditLog/queries/test-query-id" -and $Method -eq "DELETE")
+            {
+                return @{ status = "deleted" }
+            }
         }
+
+        # Mock Start-Sleep to avoid delays in tests
+        Mock -CommandName "Start-Sleep" -MockWith { }
     }
 
     It "should return all audit log records when no filters are applied" {
