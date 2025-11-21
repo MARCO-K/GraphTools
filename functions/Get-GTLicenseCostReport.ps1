@@ -11,24 +11,37 @@ function Get-GTLicenseCostReport
     3. "Zombie Licenses": Licenses assigned to users who haven't logged in for X days.
     4. Financial Impact: Estimated monthly costs and potential savings based on a provided price list.
 
+    .OUTPUTS
+    System.Object
+        Properties:
+            FriendlyName (string)
+            SkuPartNumber (string)
+            SkuId (string)
+            Purchased (int)
+            Assigned (int)
+            UtilizationPct (decimal)
+            Available (int)
+            InactiveAssigned (int)
+            TotalWastedUnits (int)
+            UnitPrice (decimal)
+            MonthlySpend (decimal)
+            WastedSpend (decimal)
+            Recommendation (string)
+
     .PARAMETER InactiveDays
     The threshold to consider an assigned license as "Waste" (Zombie). Default is 90 days.
 
     .PARAMETER PriceList
-    A hashtable mapping License SKU Part Numbers (e.g., 'ENTERPRISEPACK') to a monthly cost.
-    If not provided, costs default to 0.
+    A dictionary or hashtable mapping License SKU Part Numbers (e.g., 'ENTERPRISEPACK') OR SKU IDs to a monthly cost.
+    Accepts [Hashtable] or [System.Collections.Generic.Dictionary].
+
+    .PARAMETER MinWastedThreshold
+    Filter out SKUs where the 'WastedSpend' is below this amount. 
+    Useful for large tenants to hide trivial waste (e.g., $0.00). Default is 0.0.
 
     .PARAMETER NewSession
     Forces a new Microsoft Graph session.
 
-    .EXAMPLE
-    Get-GTLicenseCostReport -InactiveDays 90
-    Generates a report of utilization and waste based on 90-day inactivity.
-
-    .EXAMPLE
-    $prices = @{ 'ENTERPRISEPACK' = 32.00; 'EMS' = 10.00 }
-    Get-GTLicenseCostReport -PriceList $prices
-    Generates a report with financial calculations based on your specific contract prices.
     #>
     [CmdletBinding()]
     [OutputType([PSCustomObject])]
@@ -36,19 +49,25 @@ function Get-GTLicenseCostReport
         [ValidateRange(30, 365)]
         [int]$InactiveDays = 90,
 
-        [hashtable]$PriceList,
+        [System.Collections.IDictionary]$PriceList,
+        [System.Collections.IDictionary]$SkuNameMap,
+        [string]$SkuNameFile,
+
+        [decimal]$MinWastedThreshold = 0.0,
 
         [switch]$NewSession
     )
 
     begin
     {
+        # 1. Initialize Collection
+        $report = [System.Collections.Generic.List[PSCustomObject]]::new()
+
+        # 2. Module Check
         $modules = @('Microsoft.Graph.Identity.DirectoryManagement', 'Microsoft.Graph.Beta.Users')
         Install-GTRequiredModule -ModuleNames $modules -Verbose:$VerbosePreference
 
-        # 1. Scopes Check
-        # Organization.Read.All: Required for SubscribedSkus (License counts)
-        # User.Read.All + AuditLog.Read.All: Required to find inactive users
+        # 3. Scopes Check
         $requiredScopes = @('Organization.Read.All', 'User.Read.All', 'AuditLog.Read.All')
         
         if (-not (Test-GTGraphScopes -RequiredScopes $requiredScopes -Reconnect -Quiet))
@@ -57,54 +76,116 @@ function Get-GTLicenseCostReport
             return
         }
 
-        # 2. Connection Initialization
+        # 4. Connection Initialization
         if (-not (Initialize-GTGraphConnection -Scopes $requiredScopes -NewSession:$NewSession))
         {
             Write-Error "Failed to initialize session."
             return
         }
 
-        # 3. Load License Reference Cache (Reuse logic from Overview function if available)
+        # 5. Load License Reference Cache
         if (-not $script:GTLicenseRefCache)
         {
             Write-PSFMessage -Level Verbose -Message "Initializing License Reference Cache..."
-            # Simplified cache logic for this function (PartNumber -> FriendlyName)
-            # In a full module, this would be a shared internal helper function.
             $script:GTLicenseRefCache = @{ SkuNames = @{} }
-            try
+
+            # 5a. First honor an injected hashtable (e.g., tests or automation)
+            if ($SkuNameMap -and $SkuNameMap.Keys.Count -gt 0)
             {
-                $csvUrl = 'https://download.microsoft.com/download/e/3/e/e3e9faf2-f28b-490a-9ada-c6089a1fc5b0/Product%20names%20and%20service%20plan%20identifiers%20for%20licensing.csv'
-                $skuTable = Invoke-RestMethod -Uri $csvUrl -ErrorAction Stop | ConvertFrom-Csv
-                foreach ($row in $skuTable)
+                foreach ($k in $SkuNameMap.Keys) { $script:GTLicenseRefCache.SkuNames[[string]$k] = $SkuNameMap[$k] }
+            }
+            else
+            {
+                # 5b. Next honor an explicit file path if provided
+                if ($SkuNameFile -and (Test-Path $SkuNameFile))
                 {
-                    if ($row.GUID) { $script:GTLicenseRefCache.SkuNames[$row.GUID] = $row.Product_Display_Name }
+                    try {
+                        $json = Get-Content -Path $SkuNameFile -Raw | ConvertFrom-Json
+                        if ($json -and $json.SkuNames) {
+                            foreach ($prop in $json.SkuNames.PSObject.Properties) { $script:GTLicenseRefCache.SkuNames[$prop.Name] = $prop.Value }
+                        }
+                    } catch { Write-PSFMessage -Level Verbose -Message "Failed loading SKU names from file: $($_.Exception.Message)" }
+                }
+                else
+                {
+                    # 5c. Fallback: try the shipped fixture under module root
+                    try
+                    {
+                        $moduleRoot = Split-Path -Path $PSScriptRoot -Parent
+                        $skuJsonFile = Join-Path $moduleRoot 'data\sku-names.json'
+
+                        if (Test-Path $skuJsonFile)
+                        {
+                            $json = Get-Content -Path $skuJsonFile -Raw | ConvertFrom-Json
+                            if ($json -and $json.SkuNames)
+                            {
+                                foreach ($prop in $json.SkuNames.PSObject.Properties)
+                                {
+                                    $script:GTLicenseRefCache.SkuNames[$prop.Name] = $prop.Value
+                                }
+                            }
+                        }
+                    }
+                    catch
+                    {
+                        Write-PSFMessage -Level Verbose -Message "Failed loading SKU names fixture: $($_.Exception.Message)"
+                    }
                 }
             }
-            catch { Write-Warning "Could not download friendly names. Using SKU IDs." }
+        }
+
+        # 6. Optimize Price List (Ingest into Typed Dictionary)
+        # Using OrdinalIgnoreCase allows case-insensitive lookup (e.g. 'EnterprisePack' vs 'ENTERPRISEPACK')
+        $priceDict = [System.Collections.Generic.Dictionary[string, decimal]]::new([System.StringComparer]::OrdinalIgnoreCase)
+        
+        if ($PriceList)
+        {
+            foreach ($key in $PriceList.Keys)
+            {
+                $val = $PriceList[$key]
+                if ($null -ne $val)
+                {
+                    # Optimization: If input is already numeric, skip string parsing overhead
+                    if ($val -is [decimal] -or $val -is [int] -or $val -is [double]) 
+                    {
+                        $priceDict[[string]$key] = [decimal]$val
+                    }
+                    else 
+                    {
+                        $parsed = 0
+                        if ([decimal]::TryParse([string]$val, [System.Globalization.NumberStyles]::Any, [System.Globalization.CultureInfo]::InvariantCulture, [ref]$parsed))
+                        {
+                            $priceDict[[string]$key] = $parsed
+                        }
+                    }
+                }
+            }
         }
     }
 
     process
     {
-        $report = [System.Collections.Generic.List[PSCustomObject]]::new()
-        $utcNow = (Get-Date).ToUniversalTime()
+        $utcNow = if (Get-Command Get-UTCTime -ErrorAction SilentlyContinue) { Get-UTCTime } else { (Get-Date).ToUniversalTime() }
 
         try
         {
-            # --- Step 1: Get Inventory (Subscribed SKUs) ---
+            # --- Step 1: Get Inventory ---
             Write-PSFMessage -Level Verbose -Message "Fetching Subscription Inventory..."
             $skus = Get-MgSubscribedSku -All -ErrorAction Stop
 
-            # --- Step 2: Find Zombie Users (Inactive) ---
-            # We need to know WHICH licenses the inactive users hold.
-            # Server-Side Filter: Users who haven't signed in for X days.
+            if (-not $skus)
+            {
+                Write-PSFMessage -Level Verbose -Message "No subscriptions found in the tenant."
+                return @()
+            }
+
+            # --- Step 2: Find Zombie Users ---
             $cutoff = $utcNow.AddDays(-$InactiveDays).ToString("yyyy-MM-ddTHH:mm:ssZ")
             
             Write-PSFMessage -Level Verbose -Message "Scanning for users inactive since $cutoff..."
             
-            # We fetch only users who are inactive AND have licenses
             $userParams = @{
-                Filter           = "signInActivity/lastSignInDateTime le $cutoff and assignedLicenses/any()"
+                Filter           = "signInActivity/lastSignInDateTime le '$cutoff' and assignedLicenses/any()"
                 Property         = @('id', 'assignedLicenses')
                 ConsistencyLevel = 'eventual'
                 CountVariable    = 'InactiveCount'
@@ -115,46 +196,71 @@ function Get-GTLicenseCostReport
             $inactiveUsers = Get-MgBetaUser @userParams
             Write-PSFMessage -Level Verbose -Message "Found $InactiveCount users inactive for >$InactiveDays days."
 
-            # Aggregate Zombie Counts per SKU
-            $zombieCountBySku = @{}
+            # Aggregate Zombie Counts
+            $zombieCountBySku = [System.Collections.Generic.Dictionary[string, int]]::new()
+            
             foreach ($u in $inactiveUsers)
             {
-                foreach ($lic in $u.AssignedLicenses)
+                if (-not $u) { continue }
+                if (-not $u.PSObject.Properties.Match('assignedLicenses')) { continue }
+                
+                $assigned = $u.assignedLicenses
+                if (-not $assigned) { continue }
+
+                foreach ($lic in $assigned)
                 {
-                    if (-not $zombieCountBySku.ContainsKey($lic.SkuId)) { $zombieCountBySku[$lic.SkuId] = 0 }
-                    $zombieCountBySku[$lic.SkuId]++
+                    if (-not $lic) { continue }
+                    $sId = $lic.SkuId.ToString()
+                    
+                    if (-not $zombieCountBySku.ContainsKey($sId)) { $zombieCountBySku.Add($sId, 0) }
+                    $zombieCountBySku[$sId] += 1
                 }
             }
 
             # --- Step 3: Build Report ---
             foreach ($sku in $skus)
             {
-                # Skip "free" or "unlimited" internal SKUs if they clutter the report
-                # if ($sku.SkuPartNumber -match "FLOW_FREE") { continue }
-
-                $skuId = $sku.SkuId
+                $stringSkuId = $sku.SkuId.ToString()
                 $partNumber = $sku.SkuPartNumber
-                
+
                 # Resolve Friendly Name
-                $friendlyName = if ($script:GTLicenseRefCache.SkuNames[$skuId]) { $script:GTLicenseRefCache.SkuNames[$skuId] } else { $partNumber }
+                $friendlyName = $partNumber
+                if ($script:GTLicenseRefCache -and $script:GTLicenseRefCache.SkuNames -and $script:GTLicenseRefCache.SkuNames.ContainsKey($stringSkuId))
+                {
+                    $friendlyName = $script:GTLicenseRefCache.SkuNames[$stringSkuId]
+                }
 
                 # Counts
-                $totalPurchased = $sku.PrepaidUnits.Enabled
-                $totalAssigned = $sku.ConsumedUnits
-                $totalAvailable = $totalPurchased - $totalAssigned # Shelfware
-                $totalZombie = if ($zombieCountBySku[$skuId]) { $zombieCountBySku[$skuId] } else { 0 }
-                
-                # Financials
-                $unitPrice = 0
-                if ($PriceList -and $PriceList.ContainsKey($partNumber))
-                {
-                    $unitPrice = $PriceList[$partNumber]
+                $totalPurchased = [int]$sku.PrepaidUnits.Enabled
+                $totalAssigned = [int]$sku.ConsumedUnits
+                $totalAvailable = [math]::Max(0, $totalPurchased - $totalAssigned)
+
+                # Safe Zombie Lookup
+                $totalZombie = 0
+                if ($zombieCountBySku.ContainsKey($stringSkuId))
+                { 
+                    $totalZombie = $zombieCountBySku[$stringSkuId] 
                 }
                 
-                $totalSpend = $totalPurchased * $unitPrice
-                $shelfwareCost = $totalAvailable * $unitPrice
-                $zombieCost = $totalZombie * $unitPrice
-                $potentialSavings = $shelfwareCost + $zombieCost
+                # Financials: Optimized Dictionary Lookup (O(1))
+                $unitPrice = [decimal]0
+                if ($priceDict.Count -gt 0)
+                {
+                    # Try PartNumber first, then SkuId
+                    if (-not $priceDict.TryGetValue($partNumber, [ref]$unitPrice))
+                    {
+                        $priceDict.TryGetValue($stringSkuId, [ref]$unitPrice) | Out-Null
+                    }
+                }
+                
+                # Strict Decimal Math
+                $totalSpend = [math]::Round([decimal]($totalPurchased * $unitPrice), 2)
+                $shelfwareCost = [decimal]($totalAvailable * $unitPrice)
+                $zombieCost = [decimal]($totalZombie * $unitPrice)
+                $potentialSavings = [math]::Round([decimal]($shelfwareCost + $zombieCost), 2)
+
+                # Filter based on threshold
+                if ($potentialSavings -lt $MinWastedThreshold) { continue }
 
                 # Utilization %
                 $utilization = 0
@@ -163,28 +269,30 @@ function Get-GTLicenseCostReport
                     $utilization = [math]::Round(($totalAssigned / $totalPurchased) * 100, 1)
                 }
 
-                $report.Add([PSCustomObject]@{
+                $report.Add([PSCustomObject][ordered]@{
                         FriendlyName     = $friendlyName
                         SkuPartNumber    = $partNumber
+                        SkuId            = $stringSkuId
+                        
+                        # Inventory
                         Purchased        = $totalPurchased
                         Assigned         = $totalAssigned
                         UtilizationPct   = $utilization
                     
                         # Waste Metrics
-                        Available        = $totalAvailable # Unassigned
-                        InactiveAssigned = $totalZombie    # Assigned to inactive users
+                        Available        = $totalAvailable
+                        InactiveAssigned = $totalZombie
                         TotalWastedUnits = $totalAvailable + $totalZombie
                     
                         # Financial Metrics
                         UnitPrice        = $unitPrice
                         MonthlySpend     = $totalSpend
                         WastedSpend      = $potentialSavings
+                        
+                        # Action
                         Recommendation   = if ($totalAvailable -gt 0) { "Reduce count by $totalAvailable" } elseif ($totalZombie -gt 0) { "Reclaim $totalZombie licenses" } else { "Optimized" }
                     })
             }
-
-            # Sort by Wasted Spend (Descending) to show biggest money pits first
-            return $report | Sort-Object WastedSpend -Descending
         }
         catch
         {
@@ -192,5 +300,15 @@ function Get-GTLicenseCostReport
             Write-PSFMessage -Level $err.LogLevel -Message "Failed to generate cost report: $($err.Reason)"
             throw $err.ErrorMessage
         }
+    }
+
+    end
+    {
+        $out = @()
+        if ($report.Count -gt 0)
+        {
+            $out = $report.ToArray() | Sort-Object -Property WastedSpend -Descending
+        }
+        return $out
     }
 }

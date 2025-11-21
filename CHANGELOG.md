@@ -7,6 +7,27 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- **License Cost Reporting** - New function `Get-GTLicenseCostReport`
+  - Generates license utilization and cost optimization reports across the tenant
+  - Detects "shelfware" (unassigned licenses) and "zombie" licenses (assigned to inactive users)
+  - Accepts flexible price input via `-PriceList` (by SkuPartNumber or SkuId string) and supports decimal parsing
+  - Supports `-SkuNameMap` or `-SkuNameFile` to resolve SKU friendly names; falls back to shipped `data/sku-names.json` fixture
+  - Provides `MinWastedThreshold` to filter trivial waste and returns ordered results with `WastedSpend` and remediation recommendations
+  - Includes Pester tests and shipped fixture for deterministic CI runs
+
+### Changed
+
+- Documentation: Added `docs/Get-GTLicenseCostReport.md` explaining usage, parameters and examples
+
+## [0.19.1] - 2025-11-21
+
+### Added
+
+- Release: Minor maintenance and documentation updates (see Unreleased for details)
+
+
 ## [0.19.0] - 2025-11-21
 
 ### Added

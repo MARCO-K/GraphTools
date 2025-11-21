@@ -574,6 +574,7 @@ Functions will prompt for necessary permissions during execution.
 - **[User Security Response Guide](docs/User-Security-Response.md)** - Detailed incident response procedures
 - **[Technical Highlights](docs/Technical-Highlights.md)** - Technical architecture and implementation details
 - **[Legacy Authentication Analysis](docs/Legacy-Authentication-Analysis.md)** - Comprehensive legacy protocol detection guide
+- **[Get-GTLicenseCostReport](docs/Get-GTLicenseCostReport.md)** - License cost and waste reporting (new)
 - **Function Help** - Use `Get-Help <Function-Name> -Full` for detailed documentation
 - **Examples** - Use `Get-Help <Function-Name> -Examples` for usage examples
 
