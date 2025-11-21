@@ -1,123 +1,146 @@
-<#
-.SYNOPSIS
+function Get-GTRecentUser
+{
+    <#
+    .SYNOPSIS
     Retrieves user accounts created within a specified recent timeframe or by UPN.
 
-.DESCRIPTION
+    .DESCRIPTION
     This function queries Microsoft Entra ID to find user accounts whose 'createdDateTime'
     property falls within a defined period ending now, or it retrieves a specific user by UPN.
 
-    Requires the Microsoft.Graph.Users module.
+    It uses Server-Side filtering for performance.
 
-.PARAMETER HoursAgo
+    .PARAMETER HoursAgo
     Specifies the lookback period in hours from the current time. Defaults to 24.
 
-.PARAMETER UserPrincipalName
+    .PARAMETER UserPrincipalName
     The User Principal Name (UPN) of the user to retrieve.
-
     Aliases: UPN, UserName, UPNName
 
-.OUTPUTS
-    Microsoft.Graph.PowerShell.Models.IMicrosoftGraphUser
-    Outputs the user objects found.
+    .EXAMPLE
+    Get-GTRecentUser -HoursAgo 72
+    Retrieves users created in the last 3 days.
 
-.EXAMPLE
-    PS C:\> Get-GTRecentUser
+    .EXAMPLE
+    Get-GTRecentUser -UPN "user@contoso.com"
+    Retrieves the specified user.
 
-    Retrieves users created in the last 24 hours.
-
-.EXAMPLE
-    PS C:\> Get-GTRecentUser -HoursAgo 72
-
-    Retrieves users created in the last 72 hours (3 days).
-
-.EXAMPLE
-    PS C:\> Get-GTRecentUser -UserPrincipalName "user@contoso.com"
-
-    Retrieves the specified user using the UserPrincipalName parameter.
-
-.EXAMPLE
-    PS C:\> Get-GTRecentUser -UPN "user@contoso.com"
-
-    Retrieves the specified user using the UPN alias.
-
-.EXAMPLE
-    PS C:\> Get-GTRecentUser -UserName "user@contoso.com"
-
-    Retrieves the specified user using the UserName alias.
-
-.NOTES
-    Ensure you have the necessary permissions (e.g., User.Read.All, AuditLog.Read.All)
-    granted to the Microsoft Graph PowerShell application or the signed-in user.
-#>
-function Get-GTRecentUser {
+    .EXAMPLE
+    Get-GTRecentUser -HoursAgo 24 -Verbose
+    Retrieves users created in the last 24 hours with verbose logging.
+    #>
     [CmdletBinding(DefaultParameterSetName = 'ByDate')]
-    [OutputType([Microsoft.Graph.PowerShell.Models.IMicrosoftGraphUser])]
+    [OutputType([PSCustomObject])]
     param (
-        [Parameter(Mandatory = $false,
-                   ParameterSetName = 'ByDate',
-                   HelpMessage = 'Lookback period in hours from now. Defaults to 24.')]
-        [ValidateRange(1, 8760)] # Limit to a reasonable range (1 hour to 1 year)
+        [Parameter(Mandatory = $false, ParameterSetName = 'ByDate', HelpMessage = 'Lookback period in hours.')]
+        [ValidateRange(1, 8760)] # 1 hour to 1 year
         [int]$HoursAgo = 24,
 
-        [Parameter(Mandatory = $true,
-                   ParameterSetName = 'ByUPN')]
-        [ValidateScript({$_ -match $script:GTValidationRegex.UPN})]
-        [Alias('UPN','UserName','UPNName')]
-        [string]$UserPrincipalName
+        [Parameter(Mandatory = $true, ParameterSetName = 'ByUPN', ValueFromPipeline = $true)]
+        [ValidateScript({ $_ -match $script:GTValidationRegex.UPN })]  # Validates UPN format using regex
+        [Alias('UPN', 'UserName', 'UPNName')]
+        [string]$UserPrincipalName,
+
+        [switch]$NewSession
     )
 
-    Write-Verbose "Starting search for users."
+    begin
+    {
+        $modules = @('Microsoft.Graph.Users')
+        Install-GTRequiredModule -ModuleNames $modules -Verbose:$VerbosePreference
 
-    # Ensure required module is available
-    if (-not (Get-Module -ListAvailable -Name Microsoft.Graph.Users)) {
-        Write-Error "Required module 'Microsoft.Graph.Users' not found. Please install it first."
-        return
-    }
-
-    # Check Graph connection status
-    if (-not (Get-MgContext)) {
-        Write-Warning "Not connected to Microsoft Graph. Attempting to connect."
-        # Add connection logic here if desired, or rely on user being pre-connected.
-        Write-Error "Please connect to Microsoft Graph first using Connect-MgGraph with appropriate scopes (e.g., User.Read.All)."
-        return
-    }
-
-    try {
-        if ($PSCmdlet.ParameterSetName -eq 'ByUPN') {
-            Write-Verbose "Querying Microsoft Graph for user with UPN: $UserPrincipalName"
-            $recentUsers = Get-MgUser -UserId $UserPrincipalName
-            Write-Verbose "Found user with UPN: $UserPrincipalName"
-        } else {
-            # Calculate the cutoff time
-            $cutoffDateTime = (Get-Date).AddHours(-$HoursAgo).ToUniversalTime().ToString("yyyy-MM-ddTHH:mm:ssZ")
-            Write-Verbose "Searching for users created on or after $cutoffDateTime"
-
-            # Construct the filter query
-            $filter = "createdDateTime ge $cutoffDateTime"
-            Write-Verbose "Querying Microsoft Graph for users with filter: $filter"
-            $recentUsers = Get-MgUser -Filter $filter -ConsistencyLevel eventual -CountVariable userCount -All
-            Write-Verbose "Found $userCount users created in the last $HoursAgo hours."
-        }
-    }
-    catch {
-        # Use centralized error handling helper to parse Graph API exceptions
-        $errorDetails = Get-GTGraphErrorDetails -Exception $_.Exception -ResourceType 'user'
+        # 1. Scopes Check (Gold Standard)
+        # User.Read.All is required to read CreatedDateTime and filter users
+        $requiredScopes = @('User.Read.All')
         
-        # Log appropriate message based on error details
-        if ($errorDetails.HttpStatus -eq 403) {
-            Write-Error "Failed to retrieve users. $($errorDetails.Reason)"
-            Write-Warning "Permission denied. Ensure you have User.Read.All or Directory.Read.All."
-            Write-PSFMessage -Level Debug -Message "Detailed error (403): $($errorDetails.ErrorMessage)"
+        if (-not (Test-GTGraphScopes -RequiredScopes $requiredScopes -Reconnect -Quiet))
+        {
+            Write-Error "Failed to acquire required permissions ($($requiredScopes -join ', ')). Aborting."
+            return
         }
-        elseif ($errorDetails.HttpStatus) {
-            Write-Error "Failed to retrieve users. $($errorDetails.Reason)"
+
+        # 2. Connection Initialization
+        if (-not (Initialize-GTGraphConnection -Scopes $requiredScopes -NewSession:$NewSession))
+        {
+            Write-Error "Failed to initialize session."
+            return
         }
-        else {
-            Write-Error "Failed to retrieve users. Error: $($errorDetails.ErrorMessage)"
-        }
-        return
     }
 
-    Write-Verbose "Finished searching for users."
-    return $recentUsers
+    process
+    {
+        try
+        {
+            $results = [System.Collections.Generic.List[PSCustomObject]]::new()
+            $utcNow = (Get-Date).ToUniversalTime()
+
+            if ($PSCmdlet.ParameterSetName -eq 'ByUPN')
+            {
+                Write-PSFMessage -Level Verbose -Message "Querying Microsoft Graph for user: $UserPrincipalName"
+                
+                # Fetch single user
+                $users = @(Get-MgUser -UserId $UserPrincipalName -Property Id, DisplayName, UserPrincipalName, CreatedDateTime, AccountEnabled, UserType -ErrorAction Stop)
+            }
+            else
+            {
+                # Calculate cutoff (UTC)
+                $cutoffDateTime = $utcNow.AddHours(-$HoursAgo)
+                $filterDateStr = $cutoffDateTime.ToString("yyyy-MM-ddTHH:mm:ssZ")
+                
+                Write-PSFMessage -Level Verbose -Message "Searching for users created after $filterDateStr"
+
+                # Construct Server-Side Filter
+                # Note: createdDateTime is a DateTimeOffset, filter uses unquoted date for 'ge' operator
+                $filter = "createdDateTime ge $filterDateStr"
+                
+                Write-PSFMessage -Level Verbose -Message "Using OData Filter: $filter"
+                
+                # Fetch users with filter
+                # -ConsistencyLevel eventual is often required for complex filters, though createdDateTime usually works without it. Added for safety.
+                $users = Get-MgUser -Filter $filter -ConsistencyLevel eventual -CountVariable userCount -All -Property Id, DisplayName, UserPrincipalName, CreatedDateTime, AccountEnabled, UserType -ErrorAction Stop
+                
+                Write-PSFMessage -Level Verbose -Message "Found $userCount users."
+            }
+
+            foreach ($user in $users)
+            {
+                # Calculate age friendly string
+                $age = "Unknown"
+                if ($user.CreatedDateTime)
+                {
+                    $span = New-TimeSpan -Start $user.CreatedDateTime -End $utcNow
+                    if ($span.TotalHours -lt 24)
+                    {
+                        $age = "{0:N1} Hours" -f $span.TotalHours
+                    }
+                    else
+                    {
+                        $age = "{0:N1} Days" -f $span.TotalDays
+                    }
+                }
+
+                $results.Add([PSCustomObject]@{
+                        Id                = $user.Id
+                        DisplayName       = $user.DisplayName
+                        UserPrincipalName = $user.UserPrincipalName
+                        CreatedDateTime   = $user.CreatedDateTime
+                        Age               = $age
+                        AccountEnabled    = $user.AccountEnabled
+                        UserType          = $user.UserType
+                    })
+            }
+
+            Write-PSFMessage -Level Verbose -Message "Returning $($results.Count) users."
+
+            return $results.ToArray()
+        }
+        catch
+        {
+            # 3. Gold Standard Error Handling
+            $err = Get-GTGraphErrorDetails -Exception $_.Exception -ResourceType 'User'
+            Write-PSFMessage -Level $err.LogLevel -Message "Failed to retrieve recent users: $($err.Reason)"
+            
+            throw $err.ErrorMessage
+        }
+    }
 }
