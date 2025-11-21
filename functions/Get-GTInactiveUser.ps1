@@ -96,7 +96,7 @@ function Get-GTInactiveUser
             if ($PSBoundParameters.ContainsKey('InactiveDaysOlderThan'))
             {
                 $thresholdDate = $utcNow.AddDays(-$InactiveDaysOlderThan)
-                $filterDateStr = $thresholdDate.ToString('yyyy-MM-ddTHH:mm:ssZ')
+                $filterDateStr = Format-ODataDateTime -DateTime $thresholdDate
                 
                 # Note: This filter implicitly excludes users who have NEVER signed in (null dates).
                 # Use an unquoted DateTimeOffset literal for OData (e.g. 2023-01-01T00:00:00Z)
