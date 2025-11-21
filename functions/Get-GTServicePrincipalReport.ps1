@@ -107,7 +107,7 @@ function Get-GTServicePrincipalReport
             $expand = [System.Collections.Generic.List[string]]::new()
 
             if ($IncludeSignInActivity) { $properties.Add('signInActivity') }
-            if ($IncludeCredentials) { $properties.AddRange(@('keyCredentials', 'passwordCredentials')) }
+            if ($IncludeCredentials) { $properties.AddRange([string[]]@('keyCredentials', 'passwordCredentials')) }
             if ($ExpandOwners) { $expand.Add('owners') }
 
             $params = @{
