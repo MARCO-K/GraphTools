@@ -89,6 +89,7 @@ Respond to security incidents with purpose-built cmdlets:
 | `Get-GTUnusedApps` | Identify unused Service Principals |
 | `Get-GTInactiveDevices` | Identify inactive devices |
 | `Get-GTPIMRoleReport` | Report on eligible and active PIM role assignments |
+| `Get-GTPolicyControlGapReport` | Analyze Conditional Access policies for security gaps |
 
 ## 📦 Installation
 
@@ -101,21 +102,25 @@ Respond to security incidents with purpose-built cmdlets:
 ### Install from Repository
 
 1. Clone the repository:
+
    ```powershell
    git clone https://github.com/MARCO-K/GraphTools.git
    ```
 
 2. Copy to your PowerShell modules directory:
+
    ```powershell
    Copy-Item -Path .\GraphTools -Destination "$env:USERPROFILE\Documents\PowerShell\Modules\" -Recurse
    ```
 
 3. Import the module:
+
    ```powershell
    Import-Module GraphTools
    ```
 
 4. Verify installation:
+
    ```powershell
    Get-Command -Module GraphTools
    ```
@@ -282,6 +287,19 @@ Get-GTOrphanedServicePrincipal -Verbose
 Get-GTOrphanedServicePrincipal -CheckExpiredCredentials
 ```
 
+### Conditional Access Policy Analysis
+
+```powershell
+# Analyze all enabled Conditional Access policies for security gaps
+Get-GTPolicyControlGapReport
+
+# Check policies in reporting mode only
+Get-GTPolicyControlGapReport -State 'enabledForReportingButNotEnforced'
+
+# Force new Graph session for analysis
+Get-GTPolicyControlGapReport -NewSession
+```
+
 ## 🎨 Parameter Flexibility
 
 GraphTools supports multiple parameter aliases for user identifiers, allowing you to choose the most readable option:
@@ -344,17 +362,20 @@ Functions return structured error information including:
 
 > **Note:** The `HttpStatus` field is only present when an HTTP status code can be extracted from the error. In some cases, it may be `$null` or omitted entirely.
 
-# Example: Error response when HTTP status is not available
+### Example: Error response when HTTP status is not available
+
 @{
-    User             = 'user@contoso.com'
+    User             = '<user@contoso.com>'
     Status           = 'Failed'
     TimeUtc          = '2025-01-14T12:30:00.000Z'
     Reason           = 'Operation failed. The user could not be processed.'
     ExceptionMessage = 'Original error details...'
 }
+
 ### Logging Levels
 
 Errors are logged at appropriate levels:
+
 - **Error**: Most failures and unrecognized errors
 - **Warning**: Throttling (429) errors with retry guidance
 - **Debug**: Detailed HTTP status codes and full exception messages
@@ -386,6 +407,7 @@ GraphTools implements comprehensive input validation to protect against injectio
 All user-supplied parameters are validated before being used in API calls or filters:
 
 #### User Principal Names (UPN)
+
 ```powershell
 # UPN validation: Must be valid email format
 Invoke-AuditLogQuery -UserIds 'user@contoso.com'  # ✅ Valid
@@ -393,6 +415,7 @@ Invoke-AuditLogQuery -UserIds 'invalid-user'      # ❌ Blocked
 ```
 
 #### Operations and Record Types
+
 ```powershell
 # Operations/RecordType: Alphanumeric, hyphens, underscores only
 Invoke-AuditLogQuery -Operations 'FileDeleted','User_Logon'  # ✅ Valid
@@ -400,6 +423,7 @@ Invoke-AuditLogQuery -Operations "File'; DROP TABLE--"       # ❌ Blocked: Inje
 ```
 
 #### Properties
+
 ```powershell
 # Properties: Alphanumeric, dots (for nested properties), underscores only
 Invoke-AuditLogQuery -Properties 'Id','UserId','auditData.property'  # ✅ Valid
@@ -407,6 +431,7 @@ Invoke-AuditLogQuery -Properties "property' OR '1'='1"               # ❌ Block
 ```
 
 #### GUID Validation
+
 ```powershell
 # Internal functions use Test-GTGuid for ID validation
 # Prevents OData filter injection through user/device IDs
@@ -417,6 +442,7 @@ Test-GTGuid -InputObject $userId  # Validates before filter interpolation
 ### Protected Functions
 
 The following functions have built-in GUID validation for filter safety:
+
 - `Disable-GTUserDevice` - Validates user IDs before device queries
 - `Remove-GTUserRoleAssignments` - Validates principal IDs
 - `Remove-GTUserDelegatedPermissionGrants` - Validates OAuth grant principals

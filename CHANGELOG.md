@@ -7,7 +7,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-## [0.14.2] - 2025-11-21
+## [0.15.0] - 2025-11-21
+
+### Added
+
+- **Conditional Access Security Analysis** - New comprehensive gap analysis capabilities
+  - New function `Get-GTPolicyControlGapReport` to analyze Conditional Access policies for security gaps
+  - Detects three types of security gaps: Implicit Allow, Weak Only controls, and Weak Bypass vectors
+  - Resolves Authentication Strength GUIDs to friendly names (e.g., "Phishing Resistant")
+  - Identifies Custom Controls (3rd party MFA) and bypass scenarios
+  - Provides detailed PolicyContext showing user and application scope with exclusion awareness
+  - Includes NewSession parameter for session management consistency
 
 ### Changed
 
@@ -15,7 +25,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Added `Get-UTCTime` helper function for consistent UTC time handling
   - Updated reporting functions `Get-GTRecentUser`, `Get-GTUnusedApps`, `Get-GTOrphanedServicePrincipal`, `Get-GTInactiveUser`, `Get-GTInactiveDevices`, and `Get-GTGuestUserReport` to use the helper
   - Note: Other functions (e.g., `Disable-GTUser`, `Disable-GTUserDevice`, `Get-GTExpiringSecrets`) still use the old pattern and will be updated in a future release
-## [0.14.1] - 2025-11-21
+
+## [0.14.2] - 2025-11-21
 
 ### Added
 
@@ -212,7 +223,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 [Unreleased]: https://github.com/MARCO-K/GraphTools/compare/v0.14.2...main
 [0.14.2]: https://github.com/MARCO-K/GraphTools/compare/v0.14.1...v0.14.2
-[0.14.1]: https://github.com/MARCO-K/GraphTools/compare/v0.14.0...v0.14.1
 [0.14.0]: https://github.com/MARCO-K/GraphTools/compare/v0.13.0...v0.14.0
 [0.13.0]: https://github.com/MARCO-K/GraphTools/compare/v0.12.0...v0.13.0
 [0.12.0]: https://github.com/MARCO-K/GraphTools/compare/v0.11.0...v0.12.0
