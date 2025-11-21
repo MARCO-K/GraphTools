@@ -14,9 +14,9 @@ if (Test-Path $errorHelperFile)
 Describe "Reset-GTUserPassword" {
     BeforeAll {
         # Use Pester Mocks for external dependencies
-        Mock -CommandName Write-PSFMessage -MockWith { param($Level, $Message, $ErrorRecord) } -Verifiable
-        Mock -CommandName Install-GTRequiredModule -MockWith { param($ModuleNames, $Verbose) } -Verifiable
-        Mock -CommandName Initialize-GTGraphConnection -MockWith { param($Scopes, $NewSession) return $true } -Verifiable
+        Mock -CommandName Write-PSFMessage -MockWith { } -Verifiable
+        Mock -CommandName Install-GTRequiredModule -MockWith { } -Verifiable
+        Mock -CommandName Initialize-GTGraphConnection -MockWith { return $true } -Verifiable
         Mock -CommandName New-GTPassword -MockWith { return 'TempPassword123!' } -Verifiable
         Mock -CommandName Update-MgBetaUser -MockWith { param($UserId, $PasswordProfile, $ErrorAction) } -Verifiable
 

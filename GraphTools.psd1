@@ -4,7 +4,7 @@
     RootModule        = 'GraphTools.psm1'
 
     # Die Versionsnummer dieses Moduls
-    ModuleVersion     = '0.14.0'
+    ModuleVersion     = '0.19.0'
 
     # ID zur eindeutigen Kennzeichnung dieses Moduls
     GUID              = '7d7b2f7b-52b6-4456-86bd-293c2be584d4'

@@ -64,6 +64,8 @@
 
     Disables devices without prompting for confirmation.
 #>
+# Requires internal helper: Get-UTCTime
+
 Function Disable-GTUserDevice
 {
     [CmdletBinding(SupportsShouldProcess = $true, ConfirmImpact = 'High')]

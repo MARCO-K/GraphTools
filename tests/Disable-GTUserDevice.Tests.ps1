@@ -1,7 +1,7 @@
 # Pester tests for Disable-GTUserDevice
 # Provide lightweight stubs for common helpers in case they are missing during discovery
 if (-not (Get-Command Install-GTRequiredModule -ErrorAction SilentlyContinue)) { function Install-GTRequiredModule { param($ModuleNames, $Verbose) } }
-if (-not (Get-Command Initialize-GTGraphConnection -ErrorAction SilentlyContinue)) { function Initialize-GTGraphConnection { param($Scopes, $NewSession) return $true } }
+if (-not (Get-Command Initialize-GTGraphConnection -ErrorAction SilentlyContinue)) { function Initialize-GTGraphConnection { param([string[]]$Scopes, [switch]$NewSession, [switch]$SkipConnect) return $true } }
 if (-not (Get-Command Test-GTGraphScopes -ErrorAction SilentlyContinue)) { function Test-GTGraphScopes { param($RequiredScopes, $Reconnect, $Quiet) return $true } }
 if (-not (Get-Command Write-PSFMessage -ErrorAction SilentlyContinue)) { function Write-PSFMessage { param($Level, $Message, $ErrorRecord) } }
 # Requires Pester 5.x
@@ -33,8 +33,8 @@ Describe "Disable-GTUserDevice" -Tag 'Unit' {
         # Use Pester Mocks for external dependencies BEFORE loading the function
         # These will be replaced or configured in BeforeEach and in individual tests
         Mock -CommandName Write-PSFMessage -MockWith { param($Level, $Message, $ErrorRecord) } -Verifiable
-        Mock -CommandName Install-GTRequiredModule -MockWith { param($ModuleNames, $Verbose) } -Verifiable
-        Mock -CommandName Initialize-GTGraphConnection -MockWith { param($Scopes, $NewSession) return $true } -Verifiable
+        Mock -CommandName Install-GTRequiredModule -MockWith { } -Verifiable
+        Mock -CommandName Initialize-GTGraphConnection -MockWith { return $true } -Verifiable
         Mock -CommandName Get-MgUser -MockWith { param($UserId, $Property, $ErrorAction) } -Verifiable
         Mock -CommandName Get-MgDevice -MockWith { param($All, $Filter, $ErrorAction) } -Verifiable
         Mock -CommandName Update-MgDevice -MockWith { param($DeviceId, $AccountEnabled, $ErrorAction) } -Verifiable
@@ -45,7 +45,7 @@ Describe "Disable-GTUserDevice" -Tag 'Unit' {
 
     BeforeEach {
         # Ensure required external interactions are mocked so tests do not call real Graph modules.
-        Mock -CommandName Install-GTRequiredModule -MockWith { param($ModuleNames, $Verbose) }
+        Mock -CommandName Install-GTRequiredModule -MockWith { }
         Mock -CommandName Initialize-GTGraphConnection -MockWith { return $true }
         Mock -CommandName Write-PSFMessage -MockWith { param($Level, $Message) } # no-op
     }

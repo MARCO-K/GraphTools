@@ -1,6 +1,6 @@
 ## Provide lightweight stubs for common helpers in case they are missing during discovery
 if (-not (Get-Command Install-GTRequiredModule -ErrorAction SilentlyContinue)) { function Install-GTRequiredModule { param($ModuleNames, $Verbose) } }
-if (-not (Get-Command Initialize-GTGraphConnection -ErrorAction SilentlyContinue)) { function Initialize-GTGraphConnection { param($Scopes, $NewSession) return $true } }
+if (-not (Get-Command Initialize-GTGraphConnection -ErrorAction SilentlyContinue)) { function Initialize-GTGraphConnection { param([string[]]$Scopes, [switch]$NewSession, [switch]$SkipConnect) return $true } }
 if (-not (Get-Command Test-GTGraphScopes -ErrorAction SilentlyContinue)) { function Test-GTGraphScopes { param($RequiredScopes, $Reconnect, $Quiet) return $true } }
 if (-not (Get-Command Write-PSFMessage -ErrorAction SilentlyContinue)) { function Write-PSFMessage { param($Level, $Message, $ErrorRecord) } }
 
@@ -9,10 +9,10 @@ Describe "Get-GTInactiveDevices" {
         $functionPath = "$PSScriptRoot/../functions/Get-GTInactiveDevices.ps1"
 
         # Use Pester Mocks before dot-sourcing so the function file can load and calls are intercepted
-        Mock -CommandName Install-GTRequiredModule -MockWith { param($ModuleNames, $Verbose) } -Verifiable
+        Mock -CommandName Install-GTRequiredModule -MockWith { } -Verifiable
         Mock -CommandName Initialize-GTGraphConnection -MockWith { return $true } -Verifiable
         Mock -CommandName Test-GTGraphScopes -MockWith { param($RequiredScopes, $Reconnect, $Quiet) return $true } -Verifiable
-        Mock -CommandName Write-PSFMessage -MockWith { param($Level, $Message) } -Verifiable
+        Mock -CommandName Write-PSFMessage -MockWith { } -Verifiable
         # Stub the Graph cmdlet so dot-sourcing and runtime calls don't throw; individual It blocks will override this mock as needed
         Mock -CommandName Get-MgBetaDevice -MockWith { } -Verifiable
 
