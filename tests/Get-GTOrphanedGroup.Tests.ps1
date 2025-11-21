@@ -1,28 +1,34 @@
 Describe "Get-GTOrphanedGroup" {
     BeforeAll {
-        # Define stub functions FIRST
+        # Define stub functions FIRST (before sourcing the function)
         function Install-GTRequiredModule { param([string[]]$ModuleNames, [string]$Scope, [switch]$AllowPrerelease) }
         function Test-GTGraphScopes { param([string[]]$RequiredScopes, [switch]$Reconnect, [switch]$Quiet) return $true }
         function Write-PSFMessage { param($Level, $Message, $ErrorRecord) }
         function Get-GTGraphErrorDetails { param($Exception, $ResourceType) return @{ LogLevel = 'Error'; Reason = 'Mock error' } }
-        function Get-MgBetaGroup { param($All, $Property, $ExpandProperty, $ErrorAction) return @() }
-
-        # Dot-source the function AFTER stubs
+        
+        # Dot-source the function
         . "$PSScriptRoot/../functions/Get-GTOrphanedGroup.ps1"
-    }
-
-    BeforeEach {
-        # Mock Get-MgBetaGroup before each test
-        Mock -CommandName "Get-MgBetaGroup" -MockWith { return @() }
+        
+        # Now add Get-MgBetaGroup stub AFTER the function is loaded
+        function Get-MgBetaGroup { param($All, $Property, $ExpandProperty, $ErrorAction) return @() }
     }
 
     Context "Function Execution" {
+        BeforeEach {
+            # Mock Get-MgBetaGroup before each test in this context
+            Mock -CommandName "Get-MgBetaGroup" -MockWith { return @() }
+        }
         It "should not throw when properly configured" {
             { Get-GTOrphanedGroup } | Should -Not -Throw
         }
     }
 
     Context "Parameter Handling" {
+        BeforeEach {
+            # Mock Get-MgBetaGroup before each test in this context
+            Mock -CommandName "Get-MgBetaGroup" -MockWith { return @() }
+        }
+
         It "should accept NewSession switch" {
             { Get-GTOrphanedGroup -NewSession } | Should -Not -Throw
         }
@@ -50,7 +56,7 @@ Describe "Get-GTOrphanedGroup" {
                 Visibility      = "Private"
                 CreatedDateTime = (Get-Date)
             }
-            Mock -CommandName "Get-MgBetaGroup" -MockWith { return $mockGroup }
+            Mock -CommandName "Get-MgBetaGroup" -MockWith { return @($mockGroup) }
             
             $result = Get-GTOrphanedGroup
             $result.Count | Should -Be 1
@@ -75,7 +81,7 @@ Describe "Get-GTOrphanedGroup" {
                 Visibility      = "Private"
                 CreatedDateTime = (Get-Date)
             }
-            Mock -CommandName "Get-MgBetaGroup" -MockWith { return $mockGroup }
+            Mock -CommandName "Get-MgBetaGroup" -MockWith { return @($mockGroup) }
 
             $result = Get-GTOrphanedGroup -CheckDisabledOwners
             $result.Count | Should -Be 1
@@ -100,7 +106,7 @@ Describe "Get-GTOrphanedGroup" {
                 Visibility      = "Private"
                 CreatedDateTime = (Get-Date)
             }
-            Mock -CommandName "Get-MgBetaGroup" -MockWith { return $mockGroup }
+            Mock -CommandName "Get-MgBetaGroup" -MockWith { return @($mockGroup) }
 
             $result = Get-GTOrphanedGroup -CheckEmpty
             $result.Count | Should -Be 1
