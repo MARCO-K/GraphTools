@@ -100,7 +100,8 @@ function Get-GTPIMRoleReport
         {
             $err = Get-GTGraphErrorDetails -Exception $_.Exception -ResourceType 'RoleDefinitions'
             Write-PSFMessage -Level Warning -Message "Failed to cache roles: $($err.Reason)"
-            return
+            
+            throw $err.ErrorMessage
         }
     }
 
