@@ -1,8 +1,16 @@
 Describe "Get-GTOrphanedGroup" {
     BeforeAll {
+        # Define stubs for dependencies to ensure Mock works
+        function Install-GTRequiredModule {}
+        function Initialize-GTGraphConnection { return $true }
+        function Write-PSFMessage {}
+        function Stop-PSFFunction {}
+        function Get-GTGraphErrorDetails {}
+        function Get-MgBetaGroup {}
+
         # Use Pester Mocks for dependencies
         Mock -CommandName Install-GTRequiredModule -MockWith { } -Verifiable
-        Mock -CommandName Initialize-GTGraphConnection -MockWith { } -Verifiable
+        Mock -CommandName Initialize-GTGraphConnection -MockWith { return $true } -Verifiable
         Mock -CommandName Write-PSFMessage -MockWith { } -Verifiable
         Mock -CommandName Stop-PSFFunction -MockWith { } -Verifiable
         Mock -CommandName Get-GTGraphErrorDetails -MockWith { } -Verifiable
