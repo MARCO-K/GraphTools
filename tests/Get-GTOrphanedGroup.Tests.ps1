@@ -47,13 +47,18 @@ Describe "Get-GTOrphanedGroup" {
 
     Context "Logic Verification" {
         It "should identify groups with no owners" {
-            $mockGroup = [PSCustomObject]@{
-                Id              = "1"
-                DisplayName     = "No Owner Group"
-                Owners          = @()
-                Members         = @(@{Id = "m1" })
-                DeletedDateTime = $null
-            }
+            $mockGroup = @([PSCustomObject]@{
+                    Id              = "1"
+                    DisplayName     = "No Owner Group"
+                    Owners          = @()
+                    Members         = @(@{Id = "m1" })
+                    DeletedDateTime = $null
+                    MailEnabled     = $false
+                    SecurityEnabled = $true
+                    GroupTypes      = @()
+                    Visibility      = "Private"
+                    CreatedDateTime = (Get-Date)
+                })
             Mock -CommandName "Get-MgBetaGroup" -MockWith { return $mockGroup }
             
             $result = Get-GTOrphanedGroup
@@ -61,19 +66,24 @@ Describe "Get-GTOrphanedGroup" {
             $result[0].OrphanReason | Should -Match "NoOwners"
         }
 
-        It "should identify groups with all owners disabled" {
+        It "should identify groups with all owners disabled when -CheckDisabledOwners is used" {
             $mockOwner = [PSCustomObject]@{
                 Id                   = "o1"
                 AccountEnabled       = $false
                 AdditionalProperties = @{ accountEnabled = $false }
             }
-            $mockGroup = [PSCustomObject]@{
-                Id              = "2"
-                DisplayName     = "Disabled Owner Group"
-                Owners          = @($mockOwner)
-                Members         = @(@{Id = "m1" })
-                DeletedDateTime = $null
-            }
+            $mockGroup = @([PSCustomObject]@{
+                    Id              = "2"
+                    DisplayName     = "Disabled Owner Group"
+                    Owners          = @($mockOwner)
+                    Members         = @(@{Id = "m1" })
+                    DeletedDateTime = $null
+                    MailEnabled     = $false
+                    SecurityEnabled = $true
+                    GroupTypes      = @()
+                    Visibility      = "Private"
+                    CreatedDateTime = (Get-Date)
+                })
             Mock -CommandName "Get-MgBetaGroup" -MockWith { return $mockGroup }
 
             $result = Get-GTOrphanedGroup -CheckDisabledOwners
@@ -81,19 +91,24 @@ Describe "Get-GTOrphanedGroup" {
             $result[0].OrphanReason | Should -Match "AllOwnersDisabled"
         }
 
-        It "should identify empty groups" {
+        It "should identify empty groups when -CheckEmpty is used" {
             $mockOwner = [PSCustomObject]@{
                 Id                   = "o1"
                 AccountEnabled       = $true
                 AdditionalProperties = @{ accountEnabled = $true }
             }
-            $mockGroup = [PSCustomObject]@{
-                Id              = "3"
-                DisplayName     = "Empty Group"
-                Owners          = @($mockOwner)
-                Members         = @()
-                DeletedDateTime = $null
-            }
+            $mockGroup = @([PSCustomObject]@{
+                    Id              = "3"
+                    DisplayName     = "Empty Group"
+                    Owners          = @($mockOwner)
+                    Members         = @()
+                    DeletedDateTime = $null
+                    MailEnabled     = $false
+                    SecurityEnabled = $true
+                    GroupTypes      = @()
+                    Visibility      = "Private"
+                    CreatedDateTime = (Get-Date)
+                })
             Mock -CommandName "Get-MgBetaGroup" -MockWith { return $mockGroup }
 
             $result = Get-GTOrphanedGroup -CheckEmpty
