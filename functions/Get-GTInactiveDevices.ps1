@@ -60,7 +60,7 @@ function Get-GTInactiveDevices
         $results = [System.Collections.Generic.List[PSCustomObject]]::new()
         
         # 2. Date Math (UTC & Formatting)
-        $utcNow = (Get-Date).ToUniversalTime()
+        $utcNow = Get-UTCTime
         $thresholdDate = $utcNow.AddDays(-$InactiveDays)
         # Format for OData: yyyy-MM-ddTHH:mm:ssZ
         $filterDateString = Format-ODataDateTime -DateTime $thresholdDate
