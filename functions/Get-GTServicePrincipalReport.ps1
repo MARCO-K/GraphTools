@@ -207,7 +207,7 @@ function Get-GTServicePrincipalReport
         catch
         {
             # Gold Standard Error Handling
-            $err = Get-GTGraphErrorDetails -Exception $_.Exception -ResourceType 'Service Principals'
+            $err = Get-GTGraphErrorDetails -Exception $_.Exception -ResourceType 'resource'
             Write-PSFMessage -Level $err.LogLevel -Message "Failed to retrieve Service Principals: $($err.Reason)"
             
             throw $err.ErrorMessage
