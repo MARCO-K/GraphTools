@@ -78,7 +78,7 @@ function Get-GTOrphanedServicePrincipal
             Write-PSFMessage -Level Verbose -Message "Expanding properties: $($properties -join ', ')"
 
             # 3. UTC Date for Comparisons
-            $utcNow = (Get-Date).ToUniversalTime()
+            $utcNow = Get-UTCTime
 
             # 4. Pipeline Streaming (Memory Optimization)
             Get-MgBetaServicePrincipal -All -Property $properties -ExpandProperty 'owners' -ErrorAction Stop | ForEach-Object {

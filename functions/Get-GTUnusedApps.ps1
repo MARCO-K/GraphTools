@@ -61,7 +61,7 @@ function Get-GTUnusedApps
 
     process
     {
-        $utcNow = (Get-Date).ToUniversalTime()
+        $utcNow = Get-UTCTime
         $thresholdDate = $utcNow.AddDays(-$DaysSinceLastSignIn)
         
         # Format for OData: yyyy-MM-ddTHH:mm:ssZ

@@ -72,7 +72,7 @@ function Get-GTRecentUser
         try
         {
             $results = [System.Collections.Generic.List[PSCustomObject]]::new()
-            $utcNow = (Get-Date).ToUniversalTime()
+            $utcNow = Get-UTCTime
 
             if ($PSCmdlet.ParameterSetName -eq 'ByUPN')
             {

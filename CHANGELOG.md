@@ -7,6 +7,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.14.2] - 2025-11-21
+
+### Changed
+
+- **UTC Time Handling** - Standardized UTC time retrieval across reporting functions (partial implementation)
+  - Added `Get-UTCTime` helper function for consistent UTC time handling
+  - Updated reporting functions `Get-GTRecentUser`, `Get-GTUnusedApps`, `Get-GTOrphanedServicePrincipal`, `Get-GTInactiveUser`, `Get-GTInactiveDevices`, and `Get-GTGuestUserReport` to use the helper
+  - Note: Other functions (e.g., `Disable-GTUser`, `Disable-GTUserDevice`, `Get-GTExpiringSecrets`) still use the old pattern and will be updated in a future release
 ## [0.14.1] - 2025-11-21
 
 ### Added
@@ -202,7 +210,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
-[Unreleased]: https://github.com/MARCO-K/GraphTools/compare/v0.14.1...main
+[Unreleased]: https://github.com/MARCO-K/GraphTools/compare/v0.14.2...main
+[0.14.2]: https://github.com/MARCO-K/GraphTools/compare/v0.14.1...v0.14.2
 [0.14.1]: https://github.com/MARCO-K/GraphTools/compare/v0.14.0...v0.14.1
 [0.14.0]: https://github.com/MARCO-K/GraphTools/compare/v0.13.0...v0.14.0
 [0.13.0]: https://github.com/MARCO-K/GraphTools/compare/v0.12.0...v0.13.0
