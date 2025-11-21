@@ -23,6 +23,7 @@ Revokes all refresh tokens for a user, effectively signing them out from all app
 **Required Permissions**: `User.ReadWrite.All`
 
 **Example**:
+
 ```powershell
 Revoke-GTSignOutFromAllSessions -UPN 'user@contoso.com'
 ```
@@ -36,6 +37,7 @@ Disables a user account in Microsoft Entra ID by setting the AccountEnabled prop
 **Required Permissions**: `User.ReadWrite.All`
 
 **Example**:
+
 ```powershell
 Disable-GTUser -UPN 'user@contoso.com'
 ```
@@ -49,6 +51,7 @@ Resets a user's password to a randomly generated password.
 **Required Permissions**: `User.ReadWrite.All`
 
 **Example**:
+
 ```powershell
 Reset-GTUserPassword -UPN 'user@contoso.com'
 ```
@@ -62,6 +65,7 @@ Disables all devices registered to a user in Microsoft Entra ID.
 **Required Permissions**: `Directory.AccessAsUser.All`
 
 **Example**:
+
 ```powershell
 Disable-GTUserDevice -UPN 'user@contoso.com'
 ```
@@ -75,6 +79,7 @@ Removes all user entitlements including group memberships, licenses, role assign
 **Required Permissions**: `GroupMember.ReadWrite.All`, `Group.ReadWrite.All`, `Directory.ReadWrite.All`, `RoleManagement.ReadWrite.Directory`, `RoleEligibilitySchedule.ReadWrite.Directory`, `AdministrativeUnit.ReadWrite.All`, `EntitlementManagement.ReadWrite.All`, `DelegatedPermissionGrant.ReadWrite.All`
 
 **Examples**:
+
 ```powershell
 # Remove all entitlements (including PIM role eligibilities)
 Remove-GTUserEntitlements -UserUPNs 'user@contoso.com' -removeAll
@@ -92,6 +97,7 @@ Remove-GTUserEntitlements -UserUPNs 'user@contoso.com' `
 ```
 
 **What Gets Removed**:
+
 - Group memberships and ownerships
 - Microsoft 365 licenses
 - Directory role assignments (active roles)
@@ -160,7 +166,7 @@ To improve usability and reduce confusion, the GraphTools module supports multip
 | `-UPN` | `-UserPrincipalName`, `-Users`, `-UserName`, `-UPNName` | Single user commands (string) | Revoke-GTSignOutFromAllSessions |
 | `-UserPrincipalName` | `-UPN`, `-UserName`, `-UPNName` | Single user lookup commands (string) | Get-GTRecentUser |
 | `-UserPrincipalName` | `-UPN`, `-Users`, `-User`, `-UserName`, `-UPNName` | Report generation accepting multiple users (string[]) | Get-MFAReport |
-| `-FilterUser` | `-User`, `-UPN`, `-UserPrincipalName`, `-UserName`, `-UPNName` | Filter parameters for license queries | Get-M365LicenceOverview |
+| `-FilterUser` | `-User`, `-UPN`, `-UserPrincipalName`, `-UserName`, `-UPNName` | Filter parameters for license queries | Get-M365LicenseOverview |
 | `-UserIds` | `-Users`, `-UPN`, `-UserPrincipalName`, `-UserName`, `-UPNName` | Audit log queries accepting user arrays | Invoke-AuditLogQuery |
 
 #### When to Use Which Parameter
@@ -202,7 +208,9 @@ Invoke-AuditLogQuery -UPN 'user@contoso.com'
 GraphTools implements comprehensive input validation to protect against injection attacks:
 
 ### UPN Validation
+
 All user-supplied UPN parameters are validated against a strict email format regex pattern before use:
+
 - Pattern: `^[^@\s]+@[^@\s]+\.[^@\s]+$`
 - Validates: Basic email structure with local part, @ symbol, and domain
 - Blocks: Invalid formats, injection attempts, malformed input
@@ -219,12 +227,15 @@ Disable-GTUser -UPN '@domain.com'             # ❌ Blocked: Missing local part
 ```
 
 ### GUID Validation
+
 Internal functions that build OData filters with user/device IDs validate GUIDs before interpolation:
+
 - Pattern: `^[0-9a-fA-F]{8}-([0-9a-fA-F]{4}-){3}[0-9a-fA-F]{12}$`
 - Validates: Strict GUID format (8-4-4-4-12 hexadecimal pattern)
 - Prevents: OData filter injection through malicious ID values
 
 Protected functions:
+
 - `Disable-GTUserDevice` - Validates user IDs before device filter queries
 - `Remove-GTUserRoleAssignments` - Validates principal IDs in role queries
 - `Remove-GTUserDelegatedPermissionGrants` - Validates OAuth grant principals
@@ -232,28 +243,34 @@ Protected functions:
 - `Remove-GTUserAccessPackageAssignments` - Validates access package assignment targets
 
 ### Audit Log Parameter Validation
+
 `Invoke-AuditLogQuery` implements strict character whitelisting for all filter parameters:
 
 **Operations Parameter**: Only alphanumeric, hyphens, and underscores
+
 ```powershell
 Invoke-AuditLogQuery -Operations 'FileDeleted','User_Logon'  # ✅ Valid
 Invoke-AuditLogQuery -Operations "File'; DROP TABLE--"       # ❌ Blocked
 ```
 
 **RecordType Parameter**: Only alphanumeric, hyphens, and underscores
+
 ```powershell
 Invoke-AuditLogQuery -RecordType 'Exchange','SharePoint'     # ✅ Valid
 Invoke-AuditLogQuery -RecordType "Type' OR 1=1--"            # ❌ Blocked
 ```
 
 **Properties Parameter**: Only alphanumeric, dots (for nested properties), and underscores
+
 ```powershell
 Invoke-AuditLogQuery -Properties 'Id','auditData.property'   # ✅ Valid
 Invoke-AuditLogQuery -Properties "prop' OR '1'='1"           # ❌ Blocked
 ```
 
 ### Why This Matters
+
 These validations prevent:
+
 - **SQL Injection**: Blocks SQL command injection through parameter values
 - **OData Injection**: Prevents filter manipulation and unauthorized data access
 - **XSS Attacks**: Blocks script injection through parameters
@@ -282,6 +299,7 @@ These validations prevent:
 ⚠️ **Important**: Prior to v0.9.0, removing role assignments did not remove PIM (Privileged Identity Management) role eligibility schedules. This meant users could still activate privileged roles even after remediation.
 
 **v0.9.0+ closes this security gap** by removing both active role assignments AND PIM role eligibilities when using:
+
 - `Remove-GTUserEntitlements -removeAll`
 - `Remove-GTUserEntitlements -removePIMRoleEligibility`
 
