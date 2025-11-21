@@ -1,42 +1,47 @@
 Describe "Get-GTOrphanedGroup" {
     BeforeAll {
+        # Define stubs for dependencies to ensure Mock works
+        function Install-GTRequiredModule {}
+        function Initialize-GTGraphConnection { return $true }
+        function Test-GTGraphScopes { return $true }
+        function Write-PSFMessage {}
+        function Stop-PSFFunction {}
+        function Get-GTGraphErrorDetails {}
+        function Get-MgBetaGroup {}
+
         # Use Pester Mocks for dependencies
-        Mock -CommandName Install-GTRequiredModule -MockWith { } -Verifiable
-        Mock -CommandName Initialize-GTGraphConnection -MockWith { } -Verifiable
-        Mock -CommandName Write-PSFMessage -MockWith { } -Verifiable
-        Mock -CommandName Stop-PSFFunction -MockWith { } -Verifiable
-        Mock -CommandName Get-GTGraphErrorDetails -MockWith { } -Verifiable
+        Mock -CommandName Install-GTRequiredModule -MockWith {} -Verifiable
+        Mock -CommandName Initialize-GTGraphConnection -MockWith { return $true } -Verifiable
+        Mock -CommandName Test-GTGraphScopes -MockWith { return $true } -Verifiable
+        Mock -CommandName Write-PSFMessage -MockWith {} -Verifiable
+        Mock -CommandName Stop-PSFFunction -MockWith {} -Verifiable
+        Mock -CommandName Get-GTGraphErrorDetails -MockWith {} -Verifiable
 
         # Dot-source the function in the Describe scope
         . "$PSScriptRoot/../functions/Get-GTOrphanedGroup.ps1"
-        
-        # Now add Get-MgBetaGroup stub AFTER the function is loaded
-        function Get-MgBetaGroup { param($All, $Property, $ExpandProperty, $ErrorAction) return @() }
     }
 
     Context "Function Execution" {
-        BeforeEach {
-            # Mock Get-MgBetaGroup before each test in this context
-            Mock -CommandName "Get-MgBetaGroup" -MockWith { return @() }
-        }
         It "should not throw when properly configured" {
+            Mock -CommandName "Get-MgBetaGroup" -MockWith { return @() }
             { Get-GTOrphanedGroup } | Should -Not -Throw
         }
     }
 
     Context "Parameter Handling" {
-        BeforeEach {
-            # Mock Get-MgBetaGroup before each test in this context
-            Mock -CommandName "Get-MgBetaGroup" -MockWith { return @() }
-        }
-
         It "should accept NewSession switch" {
+            Mock -CommandName "Get-MgBetaGroup" -MockWith { return @() }
             { Get-GTOrphanedGroup -NewSession } | Should -Not -Throw
         }
 
-        It "should accept Scope parameter" {
+        It "should accept CheckEmpty switch" {
             Mock -CommandName "Get-MgBetaGroup" -MockWith { return @() }
-            { Get-GTOrphanedGroup -Scope 'Group.Read.All' } | Should -Not -Throw
+            { Get-GTOrphanedGroup -CheckEmpty } | Should -Not -Throw
+        }
+
+        It "should accept CheckDisabledOwners switch" {
+            Mock -CommandName "Get-MgBetaGroup" -MockWith { return @() }
+            { Get-GTOrphanedGroup -CheckDisabledOwners } | Should -Not -Throw
         }
     }
 
