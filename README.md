@@ -90,6 +90,7 @@ Respond to security incidents with purpose-built cmdlets:
 | `Get-GTInactiveDevices` | Identify inactive devices |
 | `Get-GTPIMRoleReport` | Report on eligible and active PIM role assignments |
 | `Get-GTPolicyControlGapReport` | Analyze Conditional Access policies for security gaps |
+| `Get-GTBreakGlassPolicyReport` | Audit CA policies against emergency access accounts |
 
 ## 📦 Installation
 
@@ -298,6 +299,19 @@ Get-GTPolicyControlGapReport -State 'enabledForReportingButNotEnforced'
 
 # Force new Graph session for analysis
 Get-GTPolicyControlGapReport -NewSession
+```
+
+### Break Glass Account Auditing
+
+```powershell
+# Audit emergency access accounts against all active CA policies
+Get-GTBreakGlassPolicyReport -BreakGlassUpn "breakglass1@contoso.com", "breakglass2@contoso.com"
+
+# Find only policies where break glass accounts are at risk
+Get-GTBreakGlassPolicyReport -BreakGlassUpn "bg@contoso.com" | Where-Object { $_.Status -eq 'RISK' }
+
+# Force new Graph session for auditing
+Get-GTBreakGlassPolicyReport -BreakGlassUpn "emergency@contoso.com" -NewSession
 ```
 
 ## 🎨 Parameter Flexibility

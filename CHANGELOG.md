@@ -7,7 +7,25 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-## [0.15.0] - 2025-11-21
+## [0.16.0] - 2025-11-21
+
+### Added
+
+- **Break Glass Account Auditing** - Critical emergency access account security validation
+  - New function `Get-GTBreakGlassPolicyReport` to audit Conditional Access policies against emergency access accounts
+  - Ensures Break Glass accounts are properly excluded from policies that could block access during incidents
+  - Resolves UPNs to Object IDs for accurate policy exclusion checking
+  - Prioritizes BLOCK policies as Critical risks vs other controls as High risks
+  - Handles complex targeting scenarios: All Users, Specific Users, Groups, and Roles
+  - Provides clear risk assessment with actionable remediation guidance
+  - Includes NewSession parameter for session management consistency
+
+### Changed
+
+- **UTC Time Handling** - Standardized UTC time retrieval across reporting functions (partial implementation)
+  - Added `Get-UTCTime` helper function for consistent UTC time handling
+  - Updated reporting functions `Get-GTRecentUser`, `Get-GTUnusedApps`, `Get-GTOrphanedServicePrincipal`, `Get-GTInactiveUser`, `Get-GTInactiveDevices`, and `Get-GTGuestUserReport` to use the helper
+  - Note: Other functions (e.g., `Disable-GTUser`, `Disable-GTUserDevice`, `Get-GTExpiringSecrets`) still use the old pattern and will be updated in a future release
 
 ### Added
 
