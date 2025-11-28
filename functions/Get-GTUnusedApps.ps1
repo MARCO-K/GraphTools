@@ -139,3 +139,9 @@ function Get-GTUnusedApps
             Write-PSFMessage -Level $err.LogLevel -Message "Failed to retrieve unused apps: $($err.Reason)"
         }
     }
+        end
+    {
+        # No cleanup required currently; placeholder for future finalization logic.
+        Write-PSFMessage -Level Verbose -Message "Get-GTUnusedApps completed."
+    }
+}
