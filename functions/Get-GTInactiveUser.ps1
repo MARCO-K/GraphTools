@@ -22,13 +22,33 @@ function Get-GTInactiveUser
     .PARAMETER InactiveDaysOlderThan
     Filter for users inactive for more than X days (Server-Side Filter).
 
+    .PARAMETER ExcludeUPN
+    Exclude specific user principal names from the output.
+
+    .PARAMETER ExcludeGlobalAdministrators
+    Exclude members of the Global Administrator role from the output.
+    If role membership cannot be resolved, the command fails to avoid unsafe cleanup actions.
+
+    .PARAMETER IncludeSignInOnlyRecords
+    Include Graph sign-in activity artifacts that have an Id and sign-in timestamps but no resolvable user profile fields.
+    By default, these records are excluded to keep cleanup candidate output actionable.
+
     .EXAMPLE
     Get-GTInactiveUser -InactiveDaysOlderThan 90
     Finds users inactive for over 3 months (efficiently).
 
+    .EXAMPLE
+    Get-GTInactiveUser -InactiveDaysOlderThan 90 -ExcludeUPN 'breakglass@contoso.com'
+    Finds users inactive for over 3 months, excluding protected accounts.
+
+    .EXAMPLE
+    Get-GTInactiveUser -InactiveDaysOlderThan 90 -ExcludeGlobalAdministrators
+    Finds users inactive for over 3 months, excluding Global Administrator members.
+
     .NOTES
-    - Requires Microsoft Graph PowerShell SDK modules: Microsoft.Graph.Authentication and Microsoft.Graph.Beta.Users
-    - Required Graph scopes: User.Read.All and AuditLog.Read.All (AuditLog.Read.All is required to populate sign-in activity)
+        - Requires Microsoft Graph PowerShell SDK module: Microsoft.Graph.Authentication
+        - Required Graph scopes: User.Read.All and AuditLog.Read.All (AuditLog.Read.All is required to populate sign-in activity)
+            Add Directory.Read.All when using -ExcludeGlobalAdministrators.
     - DaysInactive is returned as an integer number of days (floor of total days) when a last sign-in timestamp exists.
       Users who have never signed in will have DaysInactive set to $null.
     - The -NewSession switch forces a fresh Graph connection by calling Initialize-GTGraphConnection -NewSession.
@@ -43,18 +63,29 @@ function Get-GTInactiveUser
         [ValidateRange(1, 36500)]
         [int]$InactiveDaysOlderThan,
 
+        [Alias('ExcludedUPN', 'SkipUPN', 'ProtectedUPN')]
+        [string[]]$ExcludeUPN,
+
+        [switch]$ExcludeGlobalAdministrators,
+
+        [switch]$IncludeSignInOnlyRecords,
+
         [switch]$NewSession
     )
 
     begin
     {
         # Module Management
-        $modules = ('Microsoft.Graph.Authentication', 'Microsoft.Graph.Beta.Users')
-        Install-GTRequiredModule -ModuleNames $modules -Verbose
+        $modules = ('Microsoft.Graph.Authentication')
+        Install-GTRequiredModule -ModuleNames $modules
 
         # 1. Scopes Check (Gold Standard)
         # AuditLog.Read.All is MANDATORY for signInActivity. Without it, the property is null.
         $requiredScopes = @('User.Read.All', 'AuditLog.Read.All')
+        if ($ExcludeGlobalAdministrators)
+        {
+            $requiredScopes += 'Directory.Read.All'
+        }
         
         # Allow callers to request a fresh session and ensure Graph connection with required scopes
         if ($NewSession) { Write-PSFMessage -Level Verbose -Message "NewSession requested: attempting reconnection." }
@@ -71,9 +102,62 @@ function Get-GTInactiveUser
     {
         $results = [System.Collections.Generic.List[PSCustomObject]]::new()
         $utcNow = Get-UTCTime
+        $signInOnlyRecordsSkipped = 0
+        $excludedUpnSet = [System.Collections.Generic.HashSet[string]]::new([System.StringComparer]::OrdinalIgnoreCase)
+        if ($ExcludeUPN)
+        {
+            foreach ($upn in $ExcludeUPN)
+            {
+                if (-not [string]::IsNullOrWhiteSpace($upn))
+                {
+                    [void]$excludedUpnSet.Add($upn.Trim())
+                }
+            }
+            Write-PSFMessage -Level Verbose -Message "Excluding $($excludedUpnSet.Count) UPN value(s) from results."
+        }
+
+        $excludedGlobalAdminIds = [System.Collections.Generic.HashSet[string]]::new([System.StringComparer]::OrdinalIgnoreCase)
+        $excludedGlobalAdminUpns = [System.Collections.Generic.HashSet[string]]::new([System.StringComparer]::OrdinalIgnoreCase)
 
         try
         {
+            if ($ExcludeGlobalAdministrators)
+            {
+                $globalAdminTemplateId = '62e90394-69f5-4237-9190-012177145e10'
+                $encodedRoleFilter = [System.Uri]::EscapeDataString("roleTemplateId eq '$globalAdminTemplateId'")
+                $directoryRoleUri = "/v1.0/directoryRoles?`$filter=$encodedRoleFilter"
+                $directoryRoleResponse = Invoke-MgGraphRequest -Method GET -Uri $directoryRoleUri -ErrorAction Stop
+                $globalAdminRole = $null
+                if ($directoryRoleResponse -and $directoryRoleResponse.value)
+                {
+                    $globalAdminRole = $directoryRoleResponse.value | Select-Object -First 1
+                }
+
+                if ($globalAdminRole -and $globalAdminRole.id)
+                {
+                    $membersUri = "/v1.0/directoryRoles/$($globalAdminRole.id)/members?`$select=id,userPrincipalName"
+                    $membersResponse = Invoke-MgGraphRequest -Method GET -Uri $membersUri -ErrorAction Stop
+                    $roleMembers = if ($membersResponse -and $membersResponse.value) { $membersResponse.value } else { @() }
+                    foreach ($member in $roleMembers)
+                    {
+                        if ($member.id)
+                        {
+                            [void]$excludedGlobalAdminIds.Add([string]$member.id)
+                        }
+                        if ($member.userPrincipalName)
+                        {
+                            [void]$excludedGlobalAdminUpns.Add([string]$member.userPrincipalName)
+                        }
+                    }
+
+                    Write-PSFMessage -Level Verbose -Message "Excluding $($excludedGlobalAdminIds.Count) Global Administrator member(s) from results."
+                }
+                else
+                {
+                    Write-PSFMessage -Level Verbose -Message 'Global Administrator role not active in tenant. No role-based exclusions applied.'
+                }
+            }
+
             Write-PSFMessage -Level Verbose -Message "Preparing Microsoft Graph query..."
             
             # 2. Build Dynamic Server-Side Filter (Optimization)
@@ -109,29 +193,70 @@ function Get-GTInactiveUser
                 Write-PSFMessage -Level Verbose -Message "Using OData Filter: $finalFilter"
             }
 
-            $params = @{
-                All         = $true
-                Property    = @(
-                    'displayName', 'id', 'accountEnabled', 'userPrincipalName', 
-                    'createdDateTime', 'userType', 'signInActivity', 
-                    'refreshTokensValidFromDateTime'
-                )
-                ErrorAction = 'Stop'
-            }
-            
+            $selectFields = 'displayName,id,accountEnabled,userPrincipalName,createdDateTime,userType,signInActivity,refreshTokensValidFromDateTime'
+            $encodedSelect = [System.Uri]::EscapeDataString($selectFields)
+            $usersUri = "/v1.0/users?`$select=$encodedSelect&`$top=500"
             if (-not [string]::IsNullOrWhiteSpace($finalFilter))
             {
-                $params['Filter'] = $finalFilter
+                $encodedFilter = [System.Uri]::EscapeDataString($finalFilter)
+                $usersUri += "&`$filter=$encodedFilter"
             }
 
-            # Execute Query
-            $users = Get-MgBetaUser @params
+            # Execute Query via Graph REST endpoint with paging support
+            $users = [System.Collections.Generic.List[object]]::new()
+            $nextUri = $usersUri
+            while (-not [string]::IsNullOrWhiteSpace($nextUri))
+            {
+                $response = Invoke-MgGraphRequest -Method GET -Uri $nextUri -ErrorAction Stop
+                if ($response -and $response.value)
+                {
+                    foreach ($item in $response.value)
+                    {
+                        [void]$users.Add($item)
+                    }
+                }
+
+                $nextUri = if ($response) { $response.'@odata.nextLink' } else { $null }
+                if (-not [string]::IsNullOrWhiteSpace($nextUri) -and $nextUri.StartsWith('https://graph.microsoft.com', [System.StringComparison]::OrdinalIgnoreCase))
+                {
+                    $nextUri = $nextUri.Substring('https://graph.microsoft.com'.Length)
+                }
+            }
 
             $userCount = if ($users) { $users.Count } else { 0 }
             Write-PSFMessage -Level Verbose -Message "Processing $userCount users..."
 
             foreach ($user in $users)
             {
+                # Graph can return sign-in-only artifacts that contain Id + SignInActivity but no resolvable user profile fields.
+                # These are not actionable user objects for cleanup workflows, so exclude them unless explicitly requested.
+                $hasProfileData =
+                    -not [string]::IsNullOrWhiteSpace([string]$user.UserPrincipalName) -or
+                    -not [string]::IsNullOrWhiteSpace([string]$user.DisplayName) -or
+                    -not [string]::IsNullOrWhiteSpace([string]$user.UserType) -or
+                    ($null -ne $user.CreatedDateTime) -or
+                    ($null -ne $user.AccountEnabled)
+
+                if (-not $IncludeSignInOnlyRecords -and -not $hasProfileData)
+                {
+                    $signInOnlyRecordsSkipped++
+                    continue
+                }
+
+                if ($user.UserPrincipalName -and $excludedUpnSet.Contains([string]$user.UserPrincipalName))
+                {
+                    continue
+                }
+
+                if ($ExcludeGlobalAdministrators)
+                {
+                    if (($user.Id -and $excludedGlobalAdminIds.Contains([string]$user.Id)) -or
+                        ($user.UserPrincipalName -and $excludedGlobalAdminUpns.Contains([string]$user.UserPrincipalName)))
+                    {
+                        continue
+                    }
+                }
+
                 $signinActivity = $user.SignInActivity
 
                 # 3. Calculate Max Date (UTC)
@@ -197,10 +322,21 @@ function Get-GTInactiveUser
             }
 
             # Output result array
+            if ($signInOnlyRecordsSkipped -gt 0)
+            {
+                Write-PSFMessage -Level Verbose -Message "Skipped $signInOnlyRecordsSkipped sign-in-only record(s) without resolvable user profile fields. Use -IncludeSignInOnlyRecords to include them."
+            }
+
             return $results.ToArray()
         }
         catch
         {
+            if ($ExcludeGlobalAdministrators)
+            {
+                Write-Error "Failed to resolve Global Administrator membership for exclusion: $($_.Exception.Message)"
+                return
+            }
+
             $err = Get-GTGraphErrorDetails -Exception $_.Exception -ResourceType 'User Report'
             Write-PSFMessage -Level $err.LogLevel -Message "Failed to retrieve users: $($err.Reason)"
         }

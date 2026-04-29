@@ -7,10 +7,9 @@ Describe "Get-GTLicenseCostReport" {
         function Write-PSFMessage { param($Level, $Message, $ErrorRecord) }
         function Get-GTGraphErrorDetails { param($Exception, $ResourceType) return @{ LogLevel = 'Error'; Reason = $Exception.Message; ErrorMessage = $Exception.Message } }
 
-        # Provide minimal stub implementations for Graph cmdlets so dot-sourcing
+        # Provide minimal stub implementation for Graph requests so dot-sourcing
         # the function does not throw CommandNotFoundException in this environment.
-        function Get-MgSubscribedSku { param([switch]$All, $ErrorAction) }
-        function Get-MgBetaUser { param($Filter, $Property, $ConsistencyLevel, $All, $ErrorAction) }
+        function Invoke-MgGraphRequest { param($Method, $Uri, $Headers, $ErrorAction) }
         # Provide a UTC time helper used by the function under test
         # Use the module's internal UTC helper for consistency
         . "$PSScriptRoot/../internal/functions/Get-UTCTime.ps1"
@@ -52,14 +51,17 @@ Describe "Get-GTLicenseCostReport" {
     }
 
     BeforeEach {
-        Mock -CommandName "Get-MgSubscribedSku" -MockWith {
-            return $script:mockSkus
-        } -Verifiable
+        Mock -CommandName "Invoke-MgGraphRequest" -MockWith {
+            param($Method, $Uri, $Headers, $ErrorAction)
+            if ($Uri -match '/v1.0/subscribedSkus') {
+                return [PSCustomObject]@{ value = $script:mockSkus }
+            }
 
-        Mock -CommandName "Get-MgBetaUser" -MockWith {
-            param($Filter, $Property, $ConsistencyLevel, $All, $ErrorAction)
-            # Always return the set of prepared inactive users for the function's filter
-            return $script:inactiveUsers
+            if ($Uri -match '/v1.0/users') {
+                return [PSCustomObject]@{ value = $script:inactiveUsers; '@odata.count' = $script:inactiveUsers.Count }
+            }
+
+            return [PSCustomObject]@{ value = @() }
         } -Verifiable
 
         # Prepare an in-memory SKU name map and inject via -SkuNameMap when calling the function

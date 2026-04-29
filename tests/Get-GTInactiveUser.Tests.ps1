@@ -8,10 +8,33 @@ Describe "Get-GTInactiveUser" {
         Mock -CommandName Initialize-GTGraphConnection -MockWith { return $true } -Verifiable
         Mock -CommandName Get-GTGraphErrorDetails -MockWith { param($Exception, $ResourceType) return @{ LogLevel = 'Error'; Reason = 'Stub' } } -Verifiable
 
-        # Helpers to capture the last Get-MgBetaUser call and to swap returned users per-test
-        $script:LastGetMgBetaUserParams = $null
+        # Helpers to capture the last users request and to swap returned users per-test
+        $script:LastUsersRequestUri = $null
         $script:CurrentUsers = @()
-        Mock -CommandName Get-MgBetaUser -MockWith { param($All, $Property, $Filter, $ErrorAction) $script:LastGetMgBetaUserParams = $PSBoundParameters; return , $script:CurrentUsers } -Verifiable
+        Mock -CommandName Invoke-MgGraphRequest -MockWith {
+            param($Method, $Uri)
+
+            if ($Uri -like '/v1.0/users*' -or $Uri -like 'https://graph.microsoft.com/v1.0/users*') {
+                $script:LastUsersRequestUri = [string]$Uri
+                return [PSCustomObject]@{ value = @($script:CurrentUsers) }
+            }
+
+            if ($Uri -like '/v1.0/directoryRoles/role-global-admin/members*') {
+                return [PSCustomObject]@{
+                    value = @(
+                        [PSCustomObject]@{ id = 'id-admin'; userPrincipalName = 'admin@contoso.com' }
+                    )
+                }
+            }
+
+            if ($Uri -like '/v1.0/directoryRoles*') {
+                return [PSCustomObject]@{
+                    value = @([PSCustomObject]@{ id = 'role-global-admin' })
+                }
+            }
+
+            return [PSCustomObject]@{ value = @() }
+        } -Verifiable
 
         # Dot-source the function under test
         . "$PSScriptRoot/../functions/Get-GTInactiveUser.ps1"
@@ -65,7 +88,7 @@ Describe "Get-GTInactiveUser" {
         }
     }
 
-    Context "When -InactiveDaysOlderThan set, function passes Filter to Get-MgBetaUser" {
+    Context "When -InactiveDaysOlderThan set, function sends filter in Graph request" {
         BeforeEach {
             $last = (Get-Date).ToUniversalTime().AddDays(-30).ToString('o')
             $user = [PSCustomObject]@{
@@ -78,13 +101,88 @@ Describe "Get-GTInactiveUser" {
                 SignInActivity    = [PSCustomObject]@{ LastSignInDateTime = $last }
             }
             $script:CurrentUsers = , $user
-            $script:LastGetMgBetaUserParams = $null
+            $script:LastUsersRequestUri = $null
         }
 
         It "sends an OData Filter containing signInActivity/lastSignInDateTime" {
             $null = Get-GTInactiveUser -InactiveDaysOlderThan 15
-            $script:LastGetMgBetaUserParams | Should -Not -BeNullOrEmpty
-            $script:LastGetMgBetaUserParams['Filter'] | Should -Match 'signInActivity/lastSignInDateTime'
+            $script:LastUsersRequestUri | Should -Not -BeNullOrEmpty
+            $decodedUri = [System.Uri]::UnescapeDataString($script:LastUsersRequestUri)
+            $decodedUri | Should -Match 'signInActivity/lastSignInDateTime'
+        }
+    }
+
+    Context "Safety exclusions" {
+        BeforeEach {
+            $script:CurrentUsers = @(
+                [PSCustomObject]@{
+                    DisplayName       = 'Global Admin User'
+                    Id                = 'id-admin'
+                    AccountEnabled    = $true
+                    UserPrincipalName = 'admin@contoso.com'
+                    CreatedDateTime   = (Get-Date).ToString('o')
+                    UserType          = 'Member'
+                    SignInActivity    = [PSCustomObject]@{ LastSignInDateTime = (Get-Date).ToUniversalTime().AddDays(-120).ToString('o') }
+                },
+                [PSCustomObject]@{
+                    DisplayName       = 'Standard User'
+                    Id                = 'id-user'
+                    AccountEnabled    = $true
+                    UserPrincipalName = 'user@contoso.com'
+                    CreatedDateTime   = (Get-Date).ToString('o')
+                    UserType          = 'Member'
+                    SignInActivity    = [PSCustomObject]@{ LastSignInDateTime = (Get-Date).ToUniversalTime().AddDays(-120).ToString('o') }
+                }
+            )
+        }
+
+        It "excludes specific UPN values when -ExcludeUPN is used" {
+            $result = Get-GTInactiveUser -ExcludeUPN 'user@contoso.com'
+            $result.UserPrincipalName | Should -Not -Contain 'user@contoso.com'
+            $result.UserPrincipalName | Should -Contain 'admin@contoso.com'
+        }
+
+        It "excludes Global Administrator members when -ExcludeGlobalAdministrators is used" {
+            $result = Get-GTInactiveUser -ExcludeGlobalAdministrators
+            $result.UserPrincipalName | Should -Not -Contain 'admin@contoso.com'
+            $result.UserPrincipalName | Should -Contain 'user@contoso.com'
+        }
+    }
+
+    Context "Sign-in-only artifacts" {
+        BeforeEach {
+            $script:CurrentUsers = @(
+                [PSCustomObject]@{
+                    DisplayName       = 'Real User'
+                    Id                = 'id-real'
+                    AccountEnabled    = $true
+                    UserPrincipalName = 'real@contoso.com'
+                    CreatedDateTime   = (Get-Date).ToString('o')
+                    UserType          = 'Member'
+                    SignInActivity    = [PSCustomObject]@{ LastSignInDateTime = (Get-Date).ToUniversalTime().AddDays(-100).ToString('o') }
+                },
+                [PSCustomObject]@{
+                    DisplayName       = $null
+                    Id                = 'id-artifact'
+                    AccountEnabled    = $null
+                    UserPrincipalName = $null
+                    CreatedDateTime   = $null
+                    UserType          = $null
+                    SignInActivity    = [PSCustomObject]@{ LastSignInDateTime = (Get-Date).ToUniversalTime().AddDays(-100).ToString('o') }
+                }
+            )
+        }
+
+        It "skips sign-in-only artifacts by default" {
+            $result = Get-GTInactiveUser
+            $result.Id | Should -Contain 'id-real'
+            $result.Id | Should -Not -Contain 'id-artifact'
+        }
+
+        It "includes sign-in-only artifacts when -IncludeSignInOnlyRecords is used" {
+            $result = Get-GTInactiveUser -IncludeSignInOnlyRecords
+            $result.Id | Should -Contain 'id-real'
+            $result.Id | Should -Contain 'id-artifact'
         }
     }
 }

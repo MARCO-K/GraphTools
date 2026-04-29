@@ -27,26 +27,28 @@ Describe "Get-GTGuestUserReport" {
 
     Context "Parameter Validation" {
         It "should accept PendingOnly switch" {
-            Mock -CommandName "Get-MgBetaUser" -MockWith { return @() }
+            Mock -CommandName "Invoke-MgGraphRequest" -MockWith { [PSCustomObject]@{ value = @() } }
             { Get-GTGuestUserReport -PendingOnly } | Should -Not -Throw
         }
 
         It "should accept DaysSinceCreation parameter" {
-            Mock -CommandName "Get-MgBetaUser" -MockWith { return @() }
+            Mock -CommandName "Invoke-MgGraphRequest" -MockWith { [PSCustomObject]@{ value = @() } }
             { Get-GTGuestUserReport -DaysSinceCreation 30 } | Should -Not -Throw
         }
     }
 
     Context "Functionality" {
         It "should use server-side filter for pending users" {
-            Mock -CommandName "Get-MgBetaUser" -MockWith { return @() } -ParameterFilter { 
-                $Filter -match "externalUserState eq 'PendingAcceptance'" -and $Filter -match "userType eq 'Guest'"
+            Mock -CommandName "Invoke-MgGraphRequest" -MockWith { [PSCustomObject]@{ value = @() } } -ParameterFilter {
+                $Uri -match '/v1.0/users' -and
+                [System.Uri]::UnescapeDataString([string]$Uri) -match "externalUserState eq 'PendingAcceptance'" -and
+                [System.Uri]::UnescapeDataString([string]$Uri) -match "userType eq 'Guest'"
             }
 
             Get-GTGuestUserReport -PendingOnly
             
             # Verification is done via the ParameterFilter in the Mock
-            Assert-MockCalled "Get-MgBetaUser" -Times 1
+            Assert-MockCalled "Invoke-MgGraphRequest" -Times 1
         }
 
         It "should filter by creation date correctly (client-side)" {
@@ -66,11 +68,11 @@ Describe "Get-GTGuestUserReport" {
                     SignInActivity    = [PSCustomObject]@{ LastSignInDateTime = (Get-Date).ToUniversalTime().AddDays(-5) }
                 }
             )
-            Mock -CommandName "Get-MgBetaUser" -MockWith { return $mockUsers }
+            Mock -CommandName "Invoke-MgGraphRequest" -MockWith { [PSCustomObject]@{ value = $mockUsers } }
 
             $results = Get-GTGuestUserReport -DaysSinceCreation 30
-            $results.Count | Should -Be 1
-            $results[0].Id | Should -Be "2"
+            @($results).Count | Should -Be 1
+            @($results)[0].Id | Should -Be "2"
         }
     }
 }

@@ -50,13 +50,13 @@ function Get-M365LicenseOverview
     begin
     {
         # 1. Module Check
-        $requiredModules = @('Microsoft.Graph.Beta.Users', 'Microsoft.Graph.Beta.Identity.DirectoryManagement')
+        $requiredModules = @('Microsoft.Graph.Authentication')
         Install-GTRequiredModule -ModuleNames $requiredModules -Verbose:$VerbosePreference
 
         # 2. Scopes Check
         $requiredScopes = @('User.Read.All', 'Organization.Read.All', 'AuditLog.Read.All')
         
-        if (-not (Test-GTGraphScopes -RequiredScopes $requiredScopes -Reconnect -Quiet))
+        if (-not (Test-GTGraphScopes -RequiredScopes $requiredScopes -Reconnect:$true -Quiet:$true))
         {
             Write-Error "Failed to acquire required permissions ($($requiredScopes -join ', ')). Aborting."
             return
@@ -80,16 +80,18 @@ function Get-M365LicenseOverview
                 # Note: Microsoft rotates these URLs, so the scraping fallback is essential.
                 $csvUrl = 'https://download.microsoft.com/download/e/3/e/e3e9faf2-f28b-490a-9ada-c6089a1fc5b0/Product%20names%20and%20service%20plan%20identifiers%20for%20licensing.csv'
                 try {
-                    $skuTable = Invoke-RestMethod -Uri $csvUrl -ErrorAction Stop | ConvertFrom-Csv
+                    $csvPayload = Invoke-RestMethod -Uri $csvUrl -ErrorAction Stop
+                    $skuTable = if ($csvPayload -is [string]) { $csvPayload | ConvertFrom-Csv } else { @($csvPayload) }
                 }
                 catch {
                     Write-PSFMessage -Level Verbose -Message "Direct CSV download failed, attempting to scrape documentation page..."
                     $pageUrl = 'https://learn.microsoft.com/en-us/entra/identity/users/licensing-service-plan-reference'
                     $pageContent = Invoke-WebRequest -Uri $pageUrl -UseBasicParsing -ErrorAction Stop
-                    $csvLink = $pageContent.Links | Where-Object href -match 'licensing\.csv' | Select-Object -First 1 -ExpandProperty href
+                    $csvLink = $pageContent.Links | Where-Object href -match '\.csv' | Select-Object -First 1 -ExpandProperty href
 
                     if (-not $csvLink) { throw "Could not find CSV link on Microsoft documentation page." }
-                    $skuTable = Invoke-RestMethod -Uri $csvLink -ErrorAction Stop | ConvertFrom-Csv
+                    $csvPayload = Invoke-RestMethod -Uri $csvLink -ErrorAction Stop
+                    $skuTable = if ($csvPayload -is [string]) { $csvPayload | ConvertFrom-Csv } else { @($csvPayload) }
                 }
                 
                 # Build optimized lookup tables
@@ -122,12 +124,17 @@ function Get-M365LicenseOverview
     {
         try
         {
+            if ($FilterUser -and $FilterUser.Contains('@') -and $FilterUser -notmatch '^[^@\s]+@[^@\s]+\.[^@\s]+$') {
+                throw "FilterUser must be either a prefix (for startsWith) or a valid UPN."
+            }
+
             # 5. Build Dynamic Filter
             $filterParts = [System.Collections.Generic.List[string]]::new()
             $utcNow = (Get-Date).ToUniversalTime()
 
             if ($FilterUser) {
-                $filterParts.Add("startsWith(userPrincipalName, '$FilterUser')")
+                $escapedFilterUser = $FilterUser.Replace("'", "''")
+                $filterParts.Add("startsWith(userPrincipalName, '$escapedFilterUser')")
             }
 
             if ($DaysInactive) {
@@ -135,70 +142,93 @@ function Get-M365LicenseOverview
                 $filterParts.Add("signInActivity/lastSignInDateTime le $cutoff")
             }
 
-            $params = @{
-                All              = $true
-                Property         = @('id','userPrincipalName','displayName','signInActivity','assignedLicenses')
-                ConsistencyLevel = 'eventual'
-                ErrorAction      = 'Stop'
-            }
+            $selectFields = 'id,userPrincipalName,displayName,signInActivity,assignedLicenses'
+            $encodedSelect = [System.Uri]::EscapeDataString($selectFields)
+            $nextUri = "/v1.0/users?`$select=$encodedSelect&`$top=999"
 
             if ($filterParts.Count -gt 0) {
                 $filterStr = $filterParts -join ' and '
                 Write-PSFMessage -Level Verbose -Message "Using OData Filter: $filterStr"
-                $params['Filter'] = $filterStr
+                $encodedFilter = [System.Uri]::EscapeDataString($filterStr)
+                $nextUri += "&`$filter=$encodedFilter"
             }
 
             # 6. Process Users
-            Get-MgBetaUser @params | ForEach-Object {
-                $user = $_
-                
-                if (-not $user.AssignedLicenses) { return }
+            while (-not [string]::IsNullOrWhiteSpace($nextUri)) {
+                $response = Invoke-MgGraphRequest -Method GET -Uri $nextUri -Headers @{ ConsistencyLevel = 'eventual' } -ErrorAction Stop
+                $users = @()
+                if ($response -and ($response.PSObject.Properties.Name -contains 'value')) {
+                    $users = @($response.value)
+                }
+                elseif ($response -is [System.Collections.IEnumerable] -and -not ($response -is [string])) {
+                    $users = @($response)
+                }
 
-                foreach ($license in $user.AssignedLicenses)
-                {
-                    # Lookup SKU Name
-                    $skuName = if ($script:GTLicenseRefCache.SkuNames.ContainsKey($license.SkuId)) { 
-                        $script:GTLicenseRefCache.SkuNames[$license.SkuId] 
-                    } else { 
-                        $license.SkuId
+                foreach ($user in $users) {
+                    if ($FilterUser -and (-not [string]$user.UserPrincipalName -or -not ([string]$user.UserPrincipalName).StartsWith($FilterUser, [System.StringComparison]::OrdinalIgnoreCase))) {
+                        continue
                     }
 
-                    # Filter by SKU (Client-side)
-                    if ($FilterLicenseSKU -and $skuName -notmatch $FilterLicenseSKU) { continue }
+                    if (-not $user.AssignedLicenses) { continue }
 
-                    # Iterate actual assigned plans
-                    foreach ($assignedPlan in $license.ServicePlans)
+                    foreach ($license in $user.AssignedLicenses)
                     {
-                        # Lookup Plan Name
-                        $planName = if ($script:GTLicenseRefCache.PlanNames.ContainsKey($assignedPlan.ServicePlanId)) {
-                            $script:GTLicenseRefCache.PlanNames[$assignedPlan.ServicePlanId]
+                        # Lookup SKU Name
+                        $skuName = if ($script:GTLicenseRefCache.SkuNames.ContainsKey($license.SkuId)) {
+                            $script:GTLicenseRefCache.SkuNames[$license.SkuId]
                         } else {
-                            $assignedPlan.ServicePlanId
+                            $license.SkuId
                         }
 
-                        # Filter by Service Plan (Client-side)
-                        if ($FilterServicePlan -and $planName -notmatch $FilterServicePlan) { continue }
+                        # Filter by SKU (Client-side)
+                        if ($FilterLicenseSKU -and $skuName -notmatch $FilterLicenseSKU) { continue }
 
-                        # Calculate Days Inactive
-                        $daysInactiveStr = "Never"
-                        if ($user.SignInActivity.LastSignInDateTime) {
-                            # Use New-TimeSpan for robust calculation
-                            $lastSignIn = [DateTime]::Parse($user.SignInActivity.LastSignInDateTime)
-                            $days = (New-TimeSpan -Start $lastSignIn -End $utcNow).Days
-                            $daysInactiveStr = $days
-                        }
+                        # Iterate actual assigned plans
+                        foreach ($assignedPlan in $license.ServicePlans)
+                        {
+                            # Lookup Plan Name
+                            $planName = if ($script:GTLicenseRefCache.PlanNames.ContainsKey($assignedPlan.ServicePlanId)) {
+                                $script:GTLicenseRefCache.PlanNames[$assignedPlan.ServicePlanId]
+                            } else {
+                                $assignedPlan.ServicePlanId
+                            }
 
-                        # Create Output
-                        [PSCustomObject]@{
-                            UserPrincipalName        = $user.UserPrincipalName
-                            DisplayName              = $user.DisplayName
-                            LicenseSKU               = $skuName
-                            ServicePlan              = $planName
-                            ProvisioningStatus       = $assignedPlan.ProvisioningStatus
-                            LastInteractiveSignIn    = $user.SignInActivity.LastSignInDateTime
-                            DaysInactive             = $daysInactiveStr
+                            # Filter by Service Plan (Client-side)
+                            if ($FilterServicePlan -and $planName -notmatch $FilterServicePlan) { continue }
+
+                            # Calculate Days Inactive
+                            $daysInactiveStr = "Never"
+                            if ($user.SignInActivity.LastSignInDateTime) {
+                                # Use New-TimeSpan for robust calculation
+                                $lastSignIn = [DateTime]::Parse($user.SignInActivity.LastSignInDateTime)
+                                $days = (New-TimeSpan -Start $lastSignIn -End $utcNow).Days
+                                $daysInactiveStr = $days
+
+                                if ($DaysInactive -and $days -lt $DaysInactive) {
+                                    continue
+                                }
+                            }
+
+                            # Create Output
+                            [PSCustomObject]@{
+                                UserPrincipalName        = $user.UserPrincipalName
+                                DisplayName              = $user.DisplayName
+                                LicenseSKU               = $skuName
+                                ServicePlan              = $planName
+                                ProvisioningStatus       = $assignedPlan.ProvisioningStatus
+                                LastInteractiveSignIn    = $user.SignInActivity.LastSignInDateTime
+                                DaysInactive             = $daysInactiveStr
+                            }
                         }
                     }
+                }
+
+                $nextUri = $null
+                if ($response -and ($response.PSObject.Properties.Name -contains '@odata.nextLink')) {
+                    $nextUri = [string]$response.'@odata.nextLink'
+                }
+                if (-not [string]::IsNullOrWhiteSpace($nextUri) -and $nextUri.StartsWith('https://graph.microsoft.com', [System.StringComparison]::OrdinalIgnoreCase)) {
+                    $nextUri = $nextUri.Substring('https://graph.microsoft.com'.Length)
                 }
             }
         }
