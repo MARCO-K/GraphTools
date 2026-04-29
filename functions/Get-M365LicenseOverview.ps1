@@ -133,7 +133,8 @@ function Get-M365LicenseOverview
             $utcNow = (Get-Date).ToUniversalTime()
 
             if ($FilterUser) {
-                $filterParts.Add("startsWith(userPrincipalName, '$FilterUser')")
+                $escapedFilterUser = $FilterUser.Replace("'", "''")
+                $filterParts.Add("startsWith(userPrincipalName, '$escapedFilterUser')")
             }
 
             if ($DaysInactive) {

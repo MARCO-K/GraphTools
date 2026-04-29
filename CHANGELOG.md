@@ -36,6 +36,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - Changelog maintenance: Resolved previously committed merge conflict markers in this file.
 - `Get-GTInactiveUser`: Removed forced `-Verbose` from dependency installation call so normal executions stay quiet unless caller explicitly requests verbose output.
+- `Get-M365LicenseOverview`: Escaped single quotes in `-FilterUser` before building OData `startsWith` filters to prevent invalid filters and unintended semantics.
 
 ## [0.19.1] - 2025-11-21
 
