@@ -7,8 +7,8 @@ function Get-GTGuestUserReport
     .DESCRIPTION
     This function retrieves guest users from Microsoft Entra ID and reports on their status.
     It leverages server-side filtering for performance when querying pending users.
-    
-    It includes 'LastSignInDateTime' which requires AuditLog permissions.
+
+    It includes LastSignInDateTime which requires AuditLog permissions.
 
     .PARAMETER PendingOnly
     Switch to return only users who haven't accepted the invitation.
@@ -38,14 +38,10 @@ function Get-GTGuestUserReport
     begin
     {
         $modules = @('Microsoft.Graph.Authentication')
-        Install-GTRequiredModule -ModuleNames $modules
-
-        # 1. Scopes Check
-        # AuditLog.Read.All is required to populate the 'signInActivity' property reliably.
         $requiredScopes = @('User.Read.All', 'AuditLog.Read.All')
-        if (-not (Test-GTGraphScopes -RequiredScopes $requiredScopes -Reconnect -Quiet))
+
+        if (-not (Initialize-GTBeginBlock -ModuleNames $modules -RequiredScopes $requiredScopes -ValidateScopes -ScopeValidationErrorMessage "Failed to acquire required permissions ($($requiredScopes -join ', ')). Aborting."))
         {
-            Write-Error "Failed to acquire required permissions ($($requiredScopes -join ', ')). Aborting."
             return
         }
     }
@@ -68,7 +64,7 @@ function Get-GTGuestUserReport
                 $filterParts.Add("externalUserState eq 'PendingAcceptance'")
             }
 
-            $finalFilter = $filterParts -join ' and '
+            $finalFilter = New-GTODataFilter -Clauses $filterParts
             
             Write-PSFMessage -Level Verbose -Message "Using Filter: $finalFilter"
 
@@ -76,25 +72,7 @@ function Get-GTGuestUserReport
             $encodedSelect = [System.Uri]::EscapeDataString($selectFields)
             $encodedFilter = [System.Uri]::EscapeDataString($finalFilter)
             $nextUri = "/v1.0/users?`$select=$encodedSelect&`$filter=$encodedFilter&`$top=999"
-
-            $guests = [System.Collections.Generic.List[object]]::new()
-            while (-not [string]::IsNullOrWhiteSpace($nextUri))
-            {
-                $response = Invoke-MgGraphRequest -Method GET -Uri $nextUri -ErrorAction Stop
-                if ($response -and $response.value)
-                {
-                    foreach ($item in $response.value)
-                    {
-                        [void]$guests.Add($item)
-                    }
-                }
-
-                $nextUri = if ($response) { $response.'@odata.nextLink' } else { $null }
-                if (-not [string]::IsNullOrWhiteSpace($nextUri) -and $nextUri.StartsWith('https://graph.microsoft.com', [System.StringComparison]::OrdinalIgnoreCase))
-                {
-                    $nextUri = $nextUri.Substring('https://graph.microsoft.com'.Length)
-                }
-            }
+            $guests = Invoke-GTGraphPagedRequest -Uri $nextUri
 
             Write-PSFMessage -Level Verbose -Message "Found $($guests.Count) guest users."
 

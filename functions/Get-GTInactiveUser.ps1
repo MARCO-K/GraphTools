@@ -59,7 +59,7 @@ function Get-GTInactiveUser
         [switch]$DisabledUsersOnly,
         [switch]$ExternalUsersOnly,
         [switch]$NeverLoggedIn,
-        
+
         [ValidateRange(1, 36500)]
         [int]$InactiveDaysOlderThan,
 
@@ -75,25 +75,15 @@ function Get-GTInactiveUser
 
     begin
     {
-        # Module Management
         $modules = ('Microsoft.Graph.Authentication')
-        Install-GTRequiredModule -ModuleNames $modules
-
-        # 1. Scopes Check (Gold Standard)
-        # AuditLog.Read.All is MANDATORY for signInActivity. Without it, the property is null.
         $requiredScopes = @('User.Read.All', 'AuditLog.Read.All')
         if ($ExcludeGlobalAdministrators)
         {
             $requiredScopes += 'Directory.Read.All'
         }
-        
-        # Allow callers to request a fresh session and ensure Graph connection with required scopes
-        if ($NewSession) { Write-PSFMessage -Level Verbose -Message "NewSession requested: attempting reconnection." }
 
-        $connected = Initialize-GTGraphConnection -Scopes $requiredScopes -NewSession:$NewSession
-        if (-not $connected)
+        if (-not (Initialize-GTBeginBlock -ModuleNames $modules -RequiredScopes $requiredScopes -InitializeConnection -NewSession:$NewSession -ConnectionErrorMessage "Failed to acquire required permissions ($($requiredScopes -join ', ')). Aborting."))
         {
-            Write-Error "Failed to acquire required permissions ($($requiredScopes -join ', ')). Aborting."
             return
         }
     }
@@ -187,7 +177,7 @@ function Get-GTInactiveUser
                 $filterParts.Add("signInActivity/lastSignInDateTime le $filterDateStr")
             }
 
-            $finalFilter = $filterParts -join ' and '
+            $finalFilter = New-GTODataFilter -Clauses $filterParts
             if (-not [string]::IsNullOrWhiteSpace($finalFilter))
             {
                 Write-PSFMessage -Level Verbose -Message "Using OData Filter: $finalFilter"
@@ -202,26 +192,8 @@ function Get-GTInactiveUser
                 $usersUri += "&`$filter=$encodedFilter"
             }
 
-            # Execute Query via Graph REST endpoint with paging support
-            $users = [System.Collections.Generic.List[object]]::new()
-            $nextUri = $usersUri
-            while (-not [string]::IsNullOrWhiteSpace($nextUri))
-            {
-                $response = Invoke-MgGraphRequest -Method GET -Uri $nextUri -ErrorAction Stop
-                if ($response -and $response.value)
-                {
-                    foreach ($item in $response.value)
-                    {
-                        [void]$users.Add($item)
-                    }
-                }
-
-                $nextUri = if ($response) { $response.'@odata.nextLink' } else { $null }
-                if (-not [string]::IsNullOrWhiteSpace($nextUri) -and $nextUri.StartsWith('https://graph.microsoft.com', [System.StringComparison]::OrdinalIgnoreCase))
-                {
-                    $nextUri = $nextUri.Substring('https://graph.microsoft.com'.Length)
-                }
-            }
+            # Execute query via shared paging helper
+            $users = Invoke-GTGraphPagedRequest -Uri $usersUri
 
             $userCount = if ($users) { $users.Count } else { 0 }
             Write-PSFMessage -Level Verbose -Message "Processing $userCount users..."
