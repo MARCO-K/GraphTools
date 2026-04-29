@@ -5,7 +5,7 @@ function Get-UTCTime
     Gets the current UTC time as a DateTime object.
 
     .DESCRIPTION
-    Returns the current UTC time using (Get-Date).ToUniversalTime().
+    Returns the current UTC time using [DateTime]::UtcNow.
     This provides consistent UTC time handling across the GraphTools module.
 
     .EXAMPLE
@@ -23,5 +23,5 @@ function Get-UTCTime
     [OutputType([DateTime])]
     param()
 
-    (Get-Date).ToUniversalTime()
+    [DateTime]::UtcNow
 }

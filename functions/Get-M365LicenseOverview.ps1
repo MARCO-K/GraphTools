@@ -113,7 +113,7 @@ function Get-M365LicenseOverview
 
             # 5. Build Dynamic Filter
             $filterParts = [System.Collections.Generic.List[string]]::new()
-            $utcNow = (Get-Date).ToUniversalTime()
+            $utcNow = Get-UTCTime
 
             if ($FilterUser) {
                 $escapedFilterUser = $FilterUser.Replace("'", "''")

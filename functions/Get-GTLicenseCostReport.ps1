@@ -165,7 +165,7 @@ function Get-GTLicenseCostReport
 
     process
     {
-        $utcNow = if (Get-Command Get-UTCTime -ErrorAction SilentlyContinue) { Get-UTCTime } else { (Get-Date).ToUniversalTime() }
+        $utcNow = Get-UTCTime
 
         try
         {
