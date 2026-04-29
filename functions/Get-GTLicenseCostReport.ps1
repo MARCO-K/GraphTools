@@ -64,7 +64,7 @@ function Get-GTLicenseCostReport
         $report = [System.Collections.Generic.List[PSCustomObject]]::new()
 
         # 2. Module Check
-        $modules = @('Microsoft.Graph.Identity.DirectoryManagement', 'Microsoft.Graph.Beta.Users')
+        $modules = @('Microsoft.Graph.Authentication')
         Install-GTRequiredModule -ModuleNames $modules -Verbose:$VerbosePreference
 
         # 3. Scopes Check
@@ -171,7 +171,25 @@ function Get-GTLicenseCostReport
         {
             # --- Step 1: Get Inventory ---
             Write-PSFMessage -Level Verbose -Message "Fetching Subscription Inventory..."
-            $skus = Get-MgSubscribedSku -All -ErrorAction Stop
+            $skus = [System.Collections.Generic.List[object]]::new()
+            $nextSkuUri = "/v1.0/subscribedSkus?`$select=skuId,skuPartNumber,prepaidUnits,consumedUnits&`$top=999"
+            while (-not [string]::IsNullOrWhiteSpace($nextSkuUri))
+            {
+                $skuResponse = Invoke-MgGraphRequest -Method GET -Uri $nextSkuUri -ErrorAction Stop
+                if ($skuResponse -and $skuResponse.value)
+                {
+                    foreach ($skuItem in $skuResponse.value)
+                    {
+                        [void]$skus.Add($skuItem)
+                    }
+                }
+
+                $nextSkuUri = if ($skuResponse) { $skuResponse.'@odata.nextLink' } else { $null }
+                if (-not [string]::IsNullOrWhiteSpace($nextSkuUri) -and $nextSkuUri.StartsWith('https://graph.microsoft.com', [System.StringComparison]::OrdinalIgnoreCase))
+                {
+                    $nextSkuUri = $nextSkuUri.Substring('https://graph.microsoft.com'.Length)
+                }
+            }
 
             if (-not $skus)
             {
@@ -183,18 +201,41 @@ function Get-GTLicenseCostReport
             $cutoff = $utcNow.AddDays(-$InactiveDays).ToString("yyyy-MM-ddTHH:mm:ssZ")
             
             Write-PSFMessage -Level Verbose -Message "Scanning for users inactive since $cutoff..."
-            
-            $userParams = @{
-                Filter           = "signInActivity/lastSignInDateTime le '$cutoff' and assignedLicenses/any()"
-                Property         = @('id', 'assignedLicenses')
-                ConsistencyLevel = 'eventual'
-                CountVariable    = 'InactiveCount'
-                All              = $true
-                ErrorAction      = 'Stop'
+
+            $inactiveUsers = [System.Collections.Generic.List[object]]::new()
+            $inactiveFilter = "signInActivity/lastSignInDateTime le $cutoff and assignedLicenses/any()"
+            $encodedFilter = [System.Uri]::EscapeDataString($inactiveFilter)
+            $encodedSelect = [System.Uri]::EscapeDataString('id,assignedLicenses,signInActivity')
+            $nextUserUri = "/v1.0/users?`$select=$encodedSelect&`$filter=$encodedFilter&`$count=true&`$top=999"
+            $inactiveCount = 0
+            while (-not [string]::IsNullOrWhiteSpace($nextUserUri))
+            {
+                $userResponse = Invoke-MgGraphRequest -Method GET -Uri $nextUserUri -Headers @{ ConsistencyLevel = 'eventual' } -ErrorAction Stop
+                if ($userResponse -and $userResponse.value)
+                {
+                    foreach ($inactiveUser in $userResponse.value)
+                    {
+                        [void]$inactiveUsers.Add($inactiveUser)
+                    }
+                }
+
+                if ($userResponse -and $userResponse.'@odata.count')
+                {
+                    $inactiveCount = [int]$userResponse.'@odata.count'
+                }
+
+                $nextUserUri = if ($userResponse) { $userResponse.'@odata.nextLink' } else { $null }
+                if (-not [string]::IsNullOrWhiteSpace($nextUserUri) -and $nextUserUri.StartsWith('https://graph.microsoft.com', [System.StringComparison]::OrdinalIgnoreCase))
+                {
+                    $nextUserUri = $nextUserUri.Substring('https://graph.microsoft.com'.Length)
+                }
             }
 
-            $inactiveUsers = Get-MgBetaUser @userParams
-            Write-PSFMessage -Level Verbose -Message "Found $InactiveCount users inactive for >$InactiveDays days."
+            if ($inactiveCount -eq 0)
+            {
+                $inactiveCount = $inactiveUsers.Count
+            }
+            Write-PSFMessage -Level Verbose -Message "Found $inactiveCount users inactive for >$InactiveDays days."
 
             # Aggregate Zombie Counts
             $zombieCountBySku = [System.Collections.Generic.Dictionary[string, int]]::new()

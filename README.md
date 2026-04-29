@@ -159,6 +159,12 @@ Get-MFAReport -UsersWithoutMFA -NoGuestUser
 # Users inactive for 90+ days
 Get-GTInactiveUser -InactiveDaysOlderThan 90
 
+# Exclude protected users and Global Administrators from candidate list
+Get-GTInactiveUser -InactiveDaysOlderThan 90 -ExcludeUPN 'breakglass@contoso.com' -ExcludeGlobalAdministrators
+
+# Include unresolved sign-in artifacts (off by default to keep output actionable)
+Get-GTInactiveUser -InactiveDaysOlderThan 90 -IncludeSignInOnlyRecords
+
 # Disabled external accounts
 Get-GTInactiveUser -DisabledUsersOnly -ExternalUsersOnly
 ```

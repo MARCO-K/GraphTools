@@ -22,9 +22,10 @@ function Get-GTGuestUserReport
     Returns all guest users who have not yet accepted their invitation.
     
         .NOTES
-        Requires the Microsoft Graph PowerShell SDK (Microsoft.Graph.Users) and the following Graph scopes:
-            - User.Read.All
-            - AuditLog.Read.All (to populate signInActivity/LastSignInDateTime)
+            Requires the Microsoft Graph PowerShell SDK module: Microsoft.Graph.Authentication
+            Required Graph scopes:
+                - User.Read.All
+                - AuditLog.Read.All (to populate signInActivity/LastSignInDateTime)
     #>
     [CmdletBinding()]
     [OutputType([PSCustomObject])]
@@ -36,9 +37,8 @@ function Get-GTGuestUserReport
 
     begin
     {
-        $modules = @('Microsoft.Graph.Users')
-        # Prefer the standard -Verbose switch; do not pass $VerbosePreference to a switch parameter
-        Install-GTRequiredModule -ModuleNames $modules -Verbose
+        $modules = @('Microsoft.Graph.Authentication')
+        Install-GTRequiredModule -ModuleNames $modules
 
         # 1. Scopes Check
         # AuditLog.Read.All is required to populate the 'signInActivity' property reliably.
@@ -72,14 +72,29 @@ function Get-GTGuestUserReport
             
             Write-PSFMessage -Level Verbose -Message "Using Filter: $finalFilter"
 
-            $params = @{
-                All         = $true
-                Filter      = $finalFilter
-                Property    = @('id', 'displayName', 'userPrincipalName', 'createdDateTime', 'externalUserState', 'externalUserStateChangeDateTime', 'signInActivity')
-                ErrorAction = 'Stop'
-            }
+            $selectFields = 'id,displayName,userPrincipalName,createdDateTime,externalUserState,externalUserStateChangeDateTime,signInActivity'
+            $encodedSelect = [System.Uri]::EscapeDataString($selectFields)
+            $encodedFilter = [System.Uri]::EscapeDataString($finalFilter)
+            $nextUri = "/v1.0/users?`$select=$encodedSelect&`$filter=$encodedFilter&`$top=999"
 
-            $guests = Get-MgBetaUser @params
+            $guests = [System.Collections.Generic.List[object]]::new()
+            while (-not [string]::IsNullOrWhiteSpace($nextUri))
+            {
+                $response = Invoke-MgGraphRequest -Method GET -Uri $nextUri -ErrorAction Stop
+                if ($response -and $response.value)
+                {
+                    foreach ($item in $response.value)
+                    {
+                        [void]$guests.Add($item)
+                    }
+                }
+
+                $nextUri = if ($response) { $response.'@odata.nextLink' } else { $null }
+                if (-not [string]::IsNullOrWhiteSpace($nextUri) -and $nextUri.StartsWith('https://graph.microsoft.com', [System.StringComparison]::OrdinalIgnoreCase))
+                {
+                    $nextUri = $nextUri.Substring('https://graph.microsoft.com'.Length)
+                }
+            }
 
             Write-PSFMessage -Level Verbose -Message "Found $($guests.Count) guest users."
 

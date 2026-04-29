@@ -189,6 +189,14 @@ All functions MUST follow these conventions:
 
 ### Code Patterns to Follow
 
+**Graph API Access Pattern (Required):**
+
+- Prefer `Invoke-MgGraphRequest` for Graph data retrieval and mutations.
+- Prefer `v1.0` Graph endpoints by default.
+- Use `beta` endpoints only when the required property or endpoint is unavailable in `v1.0`.
+- When using `beta`, add a short inline justification comment and keep scope usage minimal.
+- Implement explicit paging handling when using `Invoke-MgGraphRequest` (`@odata.nextLink`).
+
 **UPN Validation**: All user parameters must validate against the regex defined in `internal/functions/GTValidation.ps1`:
 
 ```powershell
@@ -200,8 +208,8 @@ $script:GTValidationRegex = @{
 **Module Dependencies**: Functions handle their own module installation:
 
 ```powershell
-$modules = ('Microsoft.Graph.Authentication', 'Microsoft.Graph.Beta.Users')
-Install-GTRequiredModule -ModuleNames $modules -Verbose
+$modules = ('Microsoft.Graph.Authentication')
+Install-GTRequiredModule -ModuleNames $modules
 ```
 
 **Graph Connection**: Always initialize Graph connection with required scopes:
@@ -237,7 +245,7 @@ end {
 When creating tests for new functions:
 
 1. **Source the function**: `. "$PSScriptRoot/../functions/YourFunction.ps1"`
-2. **Mock Microsoft Graph cmdlets**: All `*-MgBeta*` cmdlets must be mocked
+2. **Mock Microsoft Graph requests**: Prefer mocking `Invoke-MgGraphRequest` and assert request URI/filter behavior
 3. **Test parameter validation**: Ensure invalid UPNs throw errors
 4. **Test pipeline input**: Verify single and multiple values from pipeline
 5. **Test switch parameters**: Verify filtering and behavior changes
