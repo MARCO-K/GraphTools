@@ -4,8 +4,8 @@
 
 **GraphTools** is a PowerShell module providing Microsoft Entra ID (Azure AD) security management, incident response, and reporting capabilities via Microsoft Graph API. The module is designed for IT security professionals to manage user accounts, security incidents, MFA status, licensing, and audit logs.
 
--   **Repository Size**: ~936KB with 64 files
--   **Primary Language**: PowerShell (50 .ps1 files)
+-   **Repository Size**: ~110 files in this repository snapshot
+-   **Primary Language**: PowerShell (87 `.ps1` files in this repository snapshot)
 -   **Module Type**: PowerShell Script Module (.psm1 with .psd1 manifest)
 -   **Target Platforms**: PowerShell 5.0+ and PowerShell 7+
 -   **Main Dependencies**: PSFramework (≥1.9.270), Microsoft.Graph.Beta.Reports (≥2.25.0), Microsoft Graph SDK modules
@@ -16,10 +16,10 @@
 GraphTools/
 ├── GraphTools.psd1          # Module manifest (version, dependencies, metadata)
 ├── GraphTools.psm1          # Module loader (dot-sources all functions)
-├── functions/               # 15 public cmdlets (exported to users; note: one file, Get-GTEntraRolesFromWeb, is missing the standard .ps1 extension)
+├── functions/               # 28 public scripts (27 .ps1 cmdlets + Get-GTEntraRolesFromWeb without .ps1 extension)
 ├── internal/
-│   └── functions/          # 22 internal helper functions (not exported)
-├── tests/                   # 15 Pester test files (.Tests.ps1)
+│   └── functions/          # 27 internal helper functions (not exported)
+├── tests/                   # 33 Pester test files (.Tests.ps1)
 ├── docs/                    # User-Security-Response.md guide
 ├── en-us/                   # Help text and localization strings
 ├── .github/
@@ -32,7 +32,7 @@ GraphTools/
 
 ### Key Files by Purpose
 
--   **Module Entry Point**: `GraphTools.psd1` (manifest) → `GraphTools.psm1` (loader)
+-   **Module Entry Point**: `GraphTools.psd1` (manifest) -> `GraphTools.psm1` (loader)
 -   **Validation**: `internal/functions/GTValidation.ps1` - UPN regex validation
 -   **Graph Connection**: `internal/functions/Initialize-GTGraphConnection.ps1` - Connection management
 -   **Module Installation**: `internal/functions/Install-GTRequiredModule.ps1` - Dependency handling
@@ -49,12 +49,12 @@ GraphTools/
 -   `Disable-GTUserDevice` - Disable registered devices
 -   `Remove-GTUserEntitlements` - Remove all access rights
 
-**Reporting & Analytics** (9 cmdlets):
+**Reporting & Analytics** (representative cmdlets):
 
 -   `Get-MFAReport` - MFA status and methods
 -   `Get-M365LicenseOverview` - License utilization
 -   `Invoke-AuditLogQuery` - Audit log queries
--   `Get-GTInactiveUsers` - Dormant accounts
+-   `Get-GTInactiveUser` - Dormant accounts
 -   `Get-GTRecentUser` - Recently created accounts
 -   `Get-GTConditionalAccessPolicyReport` - CA policy analysis
 -   `Get-GTPolicyControlGapReport` - Policy gaps
@@ -65,17 +65,17 @@ GraphTools/
 
 ### Prerequisites
 
-**CRITICAL**: This environment does NOT have internet access to PSGallery. The module requires:
+In constrained sandbox environments, internet access to PSGallery may be unavailable. The module requires:
 
 -   PSFramework (≥1.9.270)
 -   Microsoft.Graph.Beta.Reports (≥2.25.0)
 -   Various Microsoft.Graph.\* modules (loaded on-demand by functions)
 
-These dependencies are declared in `GraphTools.psd1` but cannot be installed in this sandboxed environment. Functions will fail at runtime if dependencies are missing.
+These dependencies are declared in `GraphTools.psd1`. If they are unavailable in your environment, Graph cmdlets can fail at runtime.
 
 ### Module Loading
 
-**DO NOT attempt to import the module** in this environment. Running `Import-Module ./GraphTools.psd1` will fail because required modules are not available and PSGallery is not accessible.
+Importing the module may fail in restricted environments if required modules are not available. Prefer static review when dependency installation is blocked.
 
 ### Linting with PSScriptAnalyzer
 
@@ -116,7 +116,7 @@ Invoke-Pester -Path ./tests/Disable-GTUser.Tests.ps1
 Invoke-Pester -Path ./tests/ -Output Detailed
 ```
 
-**Note**: Tests cannot run in this environment without mock dependencies.
+**Note**: Unit tests that rely on mocks can run without live Graph access, but tests that require unavailable modules or connectivity can fail in restricted environments.
 
 ### No Build Step Required
 
@@ -282,11 +282,11 @@ Describe "YourFunction" {
 **When making code changes**:
 
 1. Edit `.ps1` files directly - no build step needed
-2. Review syntax and structure manually (PSScriptAnalyzer not available)
+2. Review syntax and structure manually when PSScriptAnalyzer is unavailable
 3. Follow existing patterns from other functions
 4. Add tests following existing test patterns
 5. Update function help if parameters change
-6. Do NOT try to run the module or tests (dependencies unavailable)
+6. Run tests when dependencies are available; otherwise rely on static validation and mocks
 
 **Parameter changes**:
 
@@ -317,9 +317,9 @@ When adding or modifying functions, you MUST update the documentation:
 
 -   **Module Manifest**: `/GraphTools.psd1` - version, author, dependencies
 -   **Module Loader**: `/GraphTools.psm1` - imports all functions
--   **Public Functions**: `/functions/*.ps1` - exported cmdlets (14 files)
--   **Internal Functions**: `/internal/functions/*.ps1` - helpers (22 files)
--   **Tests**: `/tests/*.Tests.ps1` - Pester tests (14 files)
+-   **Public Functions**: `/functions/*.ps1` - exported cmdlets (27 `.ps1` files, plus `Get-GTEntraRolesFromWeb` without extension)
+-   **Internal Functions**: `/internal/functions/*.ps1` - helpers (27 files)
+-   **Tests**: `/tests/*.Tests.ps1` - Pester tests (33 files)
 -   **Documentation**: `/README.md`, `/docs/User-Security-Response.md`, `/CHANGELOG.md`
 -   **CI Workflow**: `/.github/workflows/powershell.yml` - PSScriptAnalyzer
 -   **Help Files**: `/en-us/about_GraphTools.help.txt`, `/en-us/strings.psd1`
@@ -344,7 +344,7 @@ Before submitting changes, ensure:
 
 ## Trust These Instructions
 
-These instructions are comprehensive and validated against the actual repository structure. **Only perform additional exploration if**:
+These instructions summarize current repository patterns. **Perform additional exploration if**:
 
 -   Information here is incomplete or unclear
 -   You encounter unexpected errors suggesting these instructions are incorrect

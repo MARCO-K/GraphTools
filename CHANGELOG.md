@@ -20,6 +20,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Changed
 
 - Documentation: Added `docs/Get-GTLicenseCostReport.md` explaining usage, parameters and examples
+- Repository layout: Moved `Get-GTAdminCountReport.ps1` and `Get-GTLegacyAuthReport.ps1` into `functions/` so module loading and tests use the same path.
+- Development guidance: Updated `.github/copilot-instructions.md` to match current file counts, function naming, and environment wording.
+
+### Fixed
+
+- Changelog maintenance: Resolved previously committed merge conflict markers in this file.
 
 ## [0.19.1] - 2025-11-21
 
@@ -27,12 +33,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - Release: Minor maintenance and documentation updates (see Unreleased for details)
 
-
 ## [0.19.0] - 2025-11-21
 
 ### Added
 
-<<<<<<< Updated upstream
 - **Administrative Role Security Analysis** - Comprehensive admin role assignment auditing
   - New function `Get-GTAdminCountReport` to analyze Directory Role assignments and member counts
   - Implements risk tier classification (Tier 0 Critical, Tier 1 High, Tier 2 Standard) for security prioritization
@@ -133,24 +137,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
-=======
->>>>>>> Stashed changes
 - **Orphaned Resource Detection** - Enhanced capabilities to identify unmanaged resources
   - New function `Get-GTOrphanedServicePrincipal` to detect Service Principals with no owners, disabled owners, or expired credentials
   - added `Get-GTOrphanedServicePrincipal` to the module export list
 
 ### Changed
 
-<<<<<<< Updated upstream
 - **Date Formatting** - Standardized OData date formatting across functions
   - Added `Format-ODataDateTime` helper function for consistent ISO 8601 formatting
   - Updated `Get-GTRecentUser`, `Get-GTUnusedApps`, `Get-GTInactiveUser`, `Get-GTInactiveDevices` to use the helper
-=======
 - **Get-GTOrphanedGroup** - Enhanced detection logic
   - Now identifies groups where *all* owners are disabled (previously only checked for zero owners)
   - Now identifies empty groups (no members)
   - Added `OrphanReason` property to output object for better classification
->>>>>>> Stashed changes
 
 ### Security
 
