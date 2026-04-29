@@ -125,7 +125,7 @@ function Get-GTInactiveUser
             {
                 $globalAdminTemplateId = '62e90394-69f5-4237-9190-012177145e10'
                 $encodedRoleFilter = [System.Uri]::EscapeDataString("roleTemplateId eq '$globalAdminTemplateId'")
-                $directoryRoleUri = "/beta/directoryRoles?`$filter=$encodedRoleFilter"
+                $directoryRoleUri = "/v1.0/directoryRoles?`$filter=$encodedRoleFilter"
                 $directoryRoleResponse = Invoke-MgGraphRequest -Method GET -Uri $directoryRoleUri -ErrorAction Stop
                 $globalAdminRole = $null
                 if ($directoryRoleResponse -and $directoryRoleResponse.value)
@@ -135,7 +135,7 @@ function Get-GTInactiveUser
 
                 if ($globalAdminRole -and $globalAdminRole.id)
                 {
-                    $membersUri = "/beta/directoryRoles/$($globalAdminRole.id)/members?`$select=id,userPrincipalName"
+                    $membersUri = "/v1.0/directoryRoles/$($globalAdminRole.id)/members?`$select=id,userPrincipalName"
                     $membersResponse = Invoke-MgGraphRequest -Method GET -Uri $membersUri -ErrorAction Stop
                     $roleMembers = if ($membersResponse -and $membersResponse.value) { $membersResponse.value } else { @() }
                     foreach ($member in $roleMembers)
@@ -195,7 +195,7 @@ function Get-GTInactiveUser
 
             $selectFields = 'displayName,id,accountEnabled,userPrincipalName,createdDateTime,userType,signInActivity,refreshTokensValidFromDateTime'
             $encodedSelect = [System.Uri]::EscapeDataString($selectFields)
-            $usersUri = "/beta/users?`$select=$encodedSelect&`$top=999"
+            $usersUri = "/v1.0/users?`$select=$encodedSelect&`$top=500"
             if (-not [string]::IsNullOrWhiteSpace($finalFilter))
             {
                 $encodedFilter = [System.Uri]::EscapeDataString($finalFilter)

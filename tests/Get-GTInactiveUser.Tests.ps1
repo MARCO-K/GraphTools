@@ -14,12 +14,12 @@ Describe "Get-GTInactiveUser" {
         Mock -CommandName Invoke-MgGraphRequest -MockWith {
             param($Method, $Uri)
 
-            if ($Uri -like '/beta/users*' -or $Uri -like 'https://graph.microsoft.com/beta/users*') {
+            if ($Uri -like '/v1.0/users*' -or $Uri -like 'https://graph.microsoft.com/v1.0/users*') {
                 $script:LastUsersRequestUri = [string]$Uri
                 return [PSCustomObject]@{ value = @($script:CurrentUsers) }
             }
 
-            if ($Uri -like '/beta/directoryRoles/role-global-admin/members*') {
+            if ($Uri -like '/v1.0/directoryRoles/role-global-admin/members*') {
                 return [PSCustomObject]@{
                     value = @(
                         [PSCustomObject]@{ id = 'id-admin'; userPrincipalName = 'admin@contoso.com' }
@@ -27,7 +27,7 @@ Describe "Get-GTInactiveUser" {
                 }
             }
 
-            if ($Uri -like '/beta/directoryRoles*') {
+            if ($Uri -like '/v1.0/directoryRoles*') {
                 return [PSCustomObject]@{
                     value = @([PSCustomObject]@{ id = 'role-global-admin' })
                 }

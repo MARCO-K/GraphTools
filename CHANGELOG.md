@@ -28,6 +28,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Development guidance: Updated `.github/copilot-instructions.md` to match current file counts, function naming, and environment wording.
 - `Get-GTInactiveUser`: Sign-in-only artifact records (Id + sign-in timestamps with no user profile fields) are now excluded by default for safer cleanup targeting; added opt-in switch `-IncludeSignInOnlyRecords`.
 - `Get-GTInactiveUser`: Replaced `Get-MgBetaUser` calls with direct `Invoke-MgGraphRequest` usage (with paging) to reduce SDK surface dependency to `Microsoft.Graph.Authentication`.
+- `Get-GTInactiveUser`: Switched role and user queries from `/beta` to `/v1.0` endpoints (`/directoryRoles` and `/users` with `signInActivity`) based on current Microsoft Graph REST documentation.
 - Reporting refactor: Migrated `Get-GTGuestUserReport`, `Get-GTLicenseCostReport`, and `Get-M365LicenseOverview` from `Get-MgBetaUser`/SDK-specific user calls to `Invoke-MgGraphRequest` with explicit paging.
 - Endpoint preference: Updated reporting queries to prefer `v1.0` endpoints where supported.
 - Instructions: Updated `.github/copilot-instructions.md` to require `Invoke-MgGraphRequest` usage and `v1.0`-first endpoint selection (use `beta` only when necessary).
