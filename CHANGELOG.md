@@ -35,6 +35,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - DRY refactor: Added internal helper `Initialize-GTBeginBlock` and adopted it in `Get-GTInactiveUser`, `Get-GTGuestUserReport`, and `Get-M365LicenseOverview` to centralize module/scopes/connection bootstrap logic.
 - DRY refactor: Added internal helper `New-GTODataFilter` and adopted it in `Get-GTInactiveUser`, `Get-GTGuestUserReport`, and `Get-M365LicenseOverview` to centralize OData filter composition.
 - DRY refactor: Added internal helper `Invoke-GTGraphPagedRequest` and adopted it in `Get-GTInactiveUser`, `Get-GTGuestUserReport`, and `Get-M365LicenseOverview` to centralize Microsoft Graph paging/nextLink handling.
+- UTC standardization: Replaced remaining direct `(Get-Date).ToUniversalTime()` calls with `Get-UTCTime` in public functions and aligned `Get-UTCTime` implementation to `[DateTime]::UtcNow`.
 
 ### Fixed
 
@@ -42,6 +43,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `Get-GTInactiveUser`: Removed forced `-Verbose` from dependency installation call so normal executions stay quiet unless caller explicitly requests verbose output.
 - `Get-M365LicenseOverview`: Escaped single quotes in `-FilterUser` before building OData `startsWith` filters to prevent invalid filters and unintended semantics.
 - `Initialize-GTBeginBlock`: Fixed execution order when both `-InitializeConnection` and `-ValidateScopes` are specified. Connection is now established before scope validation, preventing false failures when no prior `Get-MgContext` exists.
+- Tests (`Get-GTLegacyAuthReport`, `Get-GTRiskyAppPermissionReport`): Added missing `Get-UTCTime` stub so test suites work in isolation after those functions adopted the helper.
 
 ## [0.19.1] - 2025-11-21
 
