@@ -42,6 +42,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `Get-GTInactiveUser`: Removed forced `-Verbose` from dependency installation call so normal executions stay quiet unless caller explicitly requests verbose output.
 - `Get-M365LicenseOverview`: Escaped single quotes in `-FilterUser` before building OData `startsWith` filters to prevent invalid filters and unintended semantics.
 - `Initialize-GTBeginBlock`: Fixed execution order when both `-InitializeConnection` and `-ValidateScopes` are specified. Connection is now established before scope validation, preventing false failures when no prior `Get-MgContext` exists.
+- Tests (`Get-GTGuestUserReport`, `Get-GTInactiveUser`, `Get-M365LicenseOverview`): Added missing `Get-UTCTime.ps1` dot-source in `BeforeAll` to prevent `Get-UTCTime is not recognized` failures when tests run in isolation.
 
 ## [0.19.1] - 2025-11-21
 

@@ -34,6 +34,7 @@
         . "$PSScriptRoot/../internal/functions/Initialize-GTBeginBlock.ps1"
         . "$PSScriptRoot/../internal/functions/New-GTODataFilter.ps1"
         . "$PSScriptRoot/../internal/functions/Invoke-GTGraphPagedRequest.ps1"
+        . "$PSScriptRoot/../internal/functions/Get-UTCTime.ps1"
 
         # Dot-source the function under test
         . "$PSScriptRoot/../functions/Get-M365LicenseOverview.ps1"
