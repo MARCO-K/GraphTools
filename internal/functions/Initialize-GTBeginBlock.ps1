@@ -1,4 +1,5 @@
-function Initialize-GTBeginBlock {
+function Initialize-GTBeginBlock
+{
     <#
     .SYNOPSIS
     Standardizes common begin-block Graph initialization steps.
@@ -13,11 +14,15 @@ function Initialize-GTBeginBlock {
     .PARAMETER RequiredScopes
     Scopes required by the operation.
 
-    .PARAMETER ValidateScopes
-    When set, validates scopes using Test-GTGraphScopes.
-
     .PARAMETER InitializeConnection
     When set, initializes Graph connection using Initialize-GTGraphConnection.
+    When combined with -ValidateScopes, connection is established first so that
+    scope validation has a valid context to check against.
+
+    .PARAMETER ValidateScopes
+    When set, validates scopes using Test-GTGraphScopes.
+    Requires an active Graph context. When combined with -InitializeConnection,
+    the connection is always established before validation runs.
 
     .PARAMETER NewSession
     Passed to Initialize-GTGraphConnection when InitializeConnection is set.
@@ -56,20 +61,25 @@ function Initialize-GTBeginBlock {
 
     Install-GTRequiredModule -ModuleNames $ModuleNames -Verbose:$VerbosePreference
 
-    if ($ValidateScopes) {
-        if (-not (Test-GTGraphScopes -RequiredScopes $RequiredScopes -Reconnect:$true -Quiet:$true)) {
-            Write-Error $ScopeValidationErrorMessage
+    if ($InitializeConnection)
+    {
+        if ($NewSession)
+        {
+            Write-PSFMessage -Level Verbose -Message 'NewSession requested: attempting reconnection.'
+        }
+
+        if (-not (Initialize-GTGraphConnection -Scopes $RequiredScopes -NewSession:$NewSession))
+        {
+            Write-Error $ConnectionErrorMessage
             return $false
         }
     }
 
-    if ($InitializeConnection) {
-        if ($NewSession) {
-            Write-PSFMessage -Level Verbose -Message 'NewSession requested: attempting reconnection.'
-        }
-
-        if (-not (Initialize-GTGraphConnection -Scopes $RequiredScopes -NewSession:$NewSession)) {
-            Write-Error $ConnectionErrorMessage
+    if ($ValidateScopes)
+    {
+        if (-not (Test-GTGraphScopes -RequiredScopes $RequiredScopes -Reconnect:$true -Quiet:$true))
+        {
+            Write-Error $ScopeValidationErrorMessage
             return $false
         }
     }
