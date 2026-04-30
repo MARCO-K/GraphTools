@@ -32,12 +32,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Reporting refactor: Migrated `Get-GTGuestUserReport`, `Get-GTLicenseCostReport`, and `Get-M365LicenseOverview` from `Get-MgBetaUser`/SDK-specific user calls to `Invoke-MgGraphRequest` with explicit paging.
 - Endpoint preference: Updated reporting queries to prefer `v1.0` endpoints where supported.
 - Instructions: Updated `.github/copilot-instructions.md` to require `Invoke-MgGraphRequest` usage and `v1.0`-first endpoint selection (use `beta` only when necessary).
+- DRY refactor: Added internal helper `Initialize-GTBeginBlock` and adopted it in `Get-GTInactiveUser`, `Get-GTGuestUserReport`, and `Get-M365LicenseOverview` to centralize module/scopes/connection bootstrap logic.
+- DRY refactor: Added internal helper `New-GTODataFilter` and adopted it in `Get-GTInactiveUser`, `Get-GTGuestUserReport`, and `Get-M365LicenseOverview` to centralize OData filter composition.
+- DRY refactor: Added internal helper `Invoke-GTGraphPagedRequest` and adopted it in `Get-GTInactiveUser`, `Get-GTGuestUserReport`, and `Get-M365LicenseOverview` to centralize Microsoft Graph paging/nextLink handling.
 
 ### Fixed
 
 - Changelog maintenance: Resolved previously committed merge conflict markers in this file.
 - `Get-GTInactiveUser`: Removed forced `-Verbose` from dependency installation call so normal executions stay quiet unless caller explicitly requests verbose output.
 - `Get-M365LicenseOverview`: Escaped single quotes in `-FilterUser` before building OData `startsWith` filters to prevent invalid filters and unintended semantics.
+- `Initialize-GTBeginBlock`: Fixed execution order when both `-InitializeConnection` and `-ValidateScopes` are specified. Connection is now established before scope validation, preventing false failures when no prior `Get-MgContext` exists.
 
 ## [0.19.1] - 2025-11-21
 

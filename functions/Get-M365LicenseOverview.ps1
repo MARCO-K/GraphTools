@@ -5,12 +5,7 @@ function Get-M365LicenseOverview
     Retrieves Microsoft 365 license information with detailed service plan analysis.
 
     .DESCRIPTION
-    This function provides a comprehensive view of user licenses and service plans.
     It downloads the official Microsoft Licensing CSV to map GUIDs to Friendly Names.
-
-    PERFORMANCE:
-    - Caches the Microsoft CSV in a script-scope variable to avoid re-downloading every run.
-    - Uses Server-Side filtering for User and Date queries.
 
     .PARAMETER FilterLicenseSKU
     Filters results by specific license SKU (e.g., "E5"). Accepts partial matches.
@@ -49,23 +44,11 @@ function Get-M365LicenseOverview
 
     begin
     {
-        # 1. Module Check
         $requiredModules = @('Microsoft.Graph.Authentication')
-        Install-GTRequiredModule -ModuleNames $requiredModules -Verbose:$VerbosePreference
-
-        # 2. Scopes Check
         $requiredScopes = @('User.Read.All', 'Organization.Read.All', 'AuditLog.Read.All')
-        
-        if (-not (Test-GTGraphScopes -RequiredScopes $requiredScopes -Reconnect:$true -Quiet:$true))
-        {
-            Write-Error "Failed to acquire required permissions ($($requiredScopes -join ', ')). Aborting."
-            return
-        }
 
-        # 3. Connection
-        if (-not (Initialize-GTGraphConnection -Scopes $requiredScopes -NewSession:$NewSession))
+        if (-not (Initialize-GTBeginBlock -ModuleNames $requiredModules -RequiredScopes $requiredScopes -ValidateScopes -InitializeConnection -NewSession:$NewSession -ScopeValidationErrorMessage "Failed to acquire required permissions ($($requiredScopes -join ', ')). Aborting." -ConnectionErrorMessage 'Failed to initialize session.'))
         {
-            Write-Error "Failed to initialize session."
             return
         }
 
@@ -146,25 +129,16 @@ function Get-M365LicenseOverview
             $encodedSelect = [System.Uri]::EscapeDataString($selectFields)
             $nextUri = "/v1.0/users?`$select=$encodedSelect&`$top=999"
 
-            if ($filterParts.Count -gt 0) {
-                $filterStr = $filterParts -join ' and '
+            $filterStr = New-GTODataFilter -Clauses $filterParts
+            if (-not [string]::IsNullOrWhiteSpace($filterStr)) {
                 Write-PSFMessage -Level Verbose -Message "Using OData Filter: $filterStr"
                 $encodedFilter = [System.Uri]::EscapeDataString($filterStr)
                 $nextUri += "&`$filter=$encodedFilter"
             }
 
             # 6. Process Users
-            while (-not [string]::IsNullOrWhiteSpace($nextUri)) {
-                $response = Invoke-MgGraphRequest -Method GET -Uri $nextUri -Headers @{ ConsistencyLevel = 'eventual' } -ErrorAction Stop
-                $users = @()
-                if ($response -and ($response.PSObject.Properties.Name -contains 'value')) {
-                    $users = @($response.value)
-                }
-                elseif ($response -is [System.Collections.IEnumerable] -and -not ($response -is [string])) {
-                    $users = @($response)
-                }
-
-                foreach ($user in $users) {
+            $users = Invoke-GTGraphPagedRequest -Uri $nextUri -Headers @{ ConsistencyLevel = 'eventual' }
+            foreach ($user in $users) {
                     if ($FilterUser -and (-not [string]$user.UserPrincipalName -or -not ([string]$user.UserPrincipalName).StartsWith($FilterUser, [System.StringComparison]::OrdinalIgnoreCase))) {
                         continue
                     }
@@ -221,15 +195,6 @@ function Get-M365LicenseOverview
                             }
                         }
                     }
-                }
-
-                $nextUri = $null
-                if ($response -and ($response.PSObject.Properties.Name -contains '@odata.nextLink')) {
-                    $nextUri = [string]$response.'@odata.nextLink'
-                }
-                if (-not [string]::IsNullOrWhiteSpace($nextUri) -and $nextUri.StartsWith('https://graph.microsoft.com', [System.StringComparison]::OrdinalIgnoreCase)) {
-                    $nextUri = $nextUri.Substring('https://graph.microsoft.com'.Length)
-                }
             }
         }
         catch

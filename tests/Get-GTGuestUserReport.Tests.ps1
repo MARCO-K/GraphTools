@@ -14,6 +14,10 @@ Describe "Get-GTGuestUserReport" {
         Mock -CommandName Test-GTGraphScopes -MockWith { param($RequiredScopes, $Reconnect, $Quiet) return $true } -Verifiable
         Mock -CommandName Write-PSFMessage -MockWith { } -Verifiable
 
+        . "$PSScriptRoot/../internal/functions/Initialize-GTBeginBlock.ps1"
+        . "$PSScriptRoot/../internal/functions/New-GTODataFilter.ps1"
+        . "$PSScriptRoot/../internal/functions/Invoke-GTGraphPagedRequest.ps1"
+
         if (Test-Path $functionPath)
         {
             # Dot-source the function under test
