@@ -62,11 +62,13 @@ function Get-GTGraphErrorDetails
     $httpStatus = $null
     $errorMsg = $Exception.Message
 
-    # Attempt to extract status code from common locations used by HTTP-based SDK exceptions
+    # Attempt to extract status code from common locations used by HTTP-based SDK exceptions.
+    # [int] cast handles both numeric values and HttpStatusCode enum members.
     if ($Exception.Response -and $Exception.Response.StatusCode) {
         try { $httpStatus = [int]$Exception.Response.StatusCode } catch {}
     }
-    if (-not $httpStatus -and $Exception.InnerException.Response -and $Exception.InnerException.Response.StatusCode) {
+    if (-not $httpStatus -and $Exception.InnerException -and
+        $Exception.InnerException.Response -and $Exception.InnerException.Response.StatusCode) {
         try { $httpStatus = [int]$Exception.InnerException.Response.StatusCode } catch {}
     }
 
@@ -74,6 +76,7 @@ function Get-GTGraphErrorDetails
     if (-not $httpStatus) {
         if ($errorMsg -imatch '\b404\b' -or $errorMsg -imatch 'not found') { $httpStatus = 404 }
         elseif ($errorMsg -imatch '\b403\b' -or $errorMsg -imatch 'Insufficient privileges') { $httpStatus = 403 }
+        elseif ($errorMsg -imatch '\b401\b' -or $errorMsg -imatch 'Unauthorized') { $httpStatus = 401 }
         elseif ($errorMsg -imatch '\b429\b' -or $errorMsg -imatch 'throttl') { $httpStatus = 429 }
         elseif ($errorMsg -imatch '\b400\b' -or $errorMsg -imatch 'Bad Request') { $httpStatus = 400 }
     }
@@ -83,14 +86,13 @@ function Get-GTGraphErrorDetails
     $logLevel = 'Error'
 
     switch ($httpStatus) {
-        404 {
-            # Security best practice: Use a generic error message for 404 and 403 to prevent enumeration.
+        { $_ -in @(403, 404) } {
+            # Security best practice: generic message for 403/404 to prevent enumeration.
             $reason = "Operation failed. The $ResourceType could not be processed."
             $logLevel = 'Error'
         }
-        403 {
-            # Security best practice: Use a generic error message for 404 and 403 to prevent enumeration.
-            $reason = "Operation failed. The $ResourceType could not be processed."
+        401 {
+            $reason = 'Unauthorized (401). The token may be expired or missing required audience/scopes.'
             $logLevel = 'Error'
         }
         429 {
