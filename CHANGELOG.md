@@ -46,6 +46,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Tests (`Get-GTGuestUserReport`, `Get-GTInactiveUser`, `Get-M365LicenseOverview`): Added missing `Get-UTCTime.ps1` dot-source in `BeforeAll` to prevent `Get-UTCTime is not recognized` failures when tests run in isolation.
 - Tests (`Get-GTLegacyAuthReport`, `Get-GTRiskyAppPermissionReport`): Added missing `Get-UTCTime` stub so test suites work in isolation after those functions adopted the helper.
 - `Get-GTGraphErrorDetails`: Explicit null-guard on `InnerException` before accessing `.Response`; merged duplicate 403/404 `switch` cases; added 401 Unauthorized detection and message; updated tests to cover 401 and removed redundant stubs duplicated inside `BeforeAll`.
+- `Get-GTGraphErrorDetails` tests: Simplified helper file path composition to a single `Join-Path -Path ... -ChildPath '..\\internal\\functions\\Get-GTGraphErrorDetails.ps1'` call for clearer PowerShell 5.1-compatible test setup.
 
 ## [0.19.1] - 2025-11-21
 
