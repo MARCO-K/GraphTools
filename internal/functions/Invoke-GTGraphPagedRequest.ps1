@@ -12,7 +12,7 @@ function Invoke-GTGraphPagedRequest {
     Initial relative Microsoft Graph URI.
 
     .PARAMETER Headers
-    Optional headers passed to Invoke-MgGraphRequest.
+    Optional hashtable of HTTP headers passed to Invoke-MgGraphRequest (e.g. @{ ConsistencyLevel = 'eventual' }).
 
     .OUTPUTS
     System.Object[]
@@ -42,8 +42,10 @@ function Invoke-GTGraphPagedRequest {
         $response = Invoke-MgGraphRequest @requestParams
 
         if ($response -and ($response.PSObject.Properties.Name -contains 'value')) {
-            foreach ($item in @($response.value)) {
-                [void]$results.Add($item)
+            if ($null -ne $response.value) {
+                foreach ($item in $response.value) {
+                    [void]$results.Add($item)
+                }
             }
         }
         elseif ($response -is [System.Collections.IEnumerable] -and -not ($response -is [string])) {
