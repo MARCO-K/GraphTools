@@ -48,7 +48,7 @@ function Get-GTServicePrincipalReport
         $displayNameList = [System.Collections.Generic.List[string]]::new()
 
         # Module Management
-        $requiredModules = @('Microsoft.Graph.Authentication', 'Microsoft.Graph.Beta.Applications')
+        $requiredModules = @('Microsoft.Graph.Authentication')
         Install-GTRequiredModule -ModuleNames $requiredModules -Verbose:$VerbosePreference
 
         # 1. Scopes Definition
@@ -110,76 +110,64 @@ function Get-GTServicePrincipalReport
             if ($IncludeCredentials) { $properties.AddRange([string[]]@('keyCredentials', 'passwordCredentials')) }
             if ($ExpandOwners) { $expand.Add('owners') }
 
-            $params = @{
-                All = $true
-                Property = $properties
-                ErrorAction = 'Stop'
-            }
-            if ($expand.Count -gt 0) { $params['ExpandProperty'] = $expand }
+            # --- Build URI ---
+            # signInActivity requires beta endpoint; v1.0 used otherwise
+            $apiVersion = if ($IncludeSignInActivity) { 'beta' } else { 'v1.0' }
+            $selectStr = $properties -join ','
+            $expandStr = if ($expand.Count -gt 0) { "&`$expand=$($expand -join ',')" } else { '' }
 
-            # --- Execute Query with Fallback Logic ---
-            # We use a scriptblock to encapsulate the retry logic while keeping the pipeline open
-            $ExecuteGraphQuery = {
-                if ($filter)
+            $baseUri = "$apiVersion/servicePrincipals?`$select=$selectStr$expandStr"
+
+            # --- Execute Query ---
+            $sps = if ($filter)
+            {
+                Write-PSFMessage -Level Verbose -Message "Fetching Service Principals with filter: $filter"
+                try
                 {
-                    Write-PSFMessage -Level Verbose -Message "Fetching Service Principals with filter: $filter"
-                    $params['Filter'] = $filter
-                    try
-                    {
-                        Get-MgBetaServicePrincipal @params
-                    }
-                    catch
-                    {
-                        # Fallback logic for filters
-                        $errMsg = $_.Exception.Message
-                        if ($fallbackFilter -and ($errMsg -match 'Invalid|unsupported|not supported|Bad Request|400'))
-                        {
-                            Write-PSFMessage -Level Warning -Message "Graph rejected 'IN' filter. Retrying with 'OR' filter."
-                            $params['Filter'] = $fallbackFilter
-                            Get-MgBetaServicePrincipal @params
-                        }
-                        else
-                        {
-                            throw $_ # Re-throw if it's not a filter issue
-                        }
-                    }
+                    Invoke-GTGraphPagedRequest -Uri "$baseUri&`$filter=$([Uri]::EscapeDataString($filter))" -Headers @{ ConsistencyLevel = 'eventual' }
                 }
-                else
+                catch
                 {
-                    Write-PSFMessage -Level Verbose -Message "Fetching ALL Service Principals..."
-                    Get-MgBetaServicePrincipal @params
+                    $errMsg = $_.Exception.Message
+                    if ($fallbackFilter -and ($errMsg -match 'Invalid|unsupported|not supported|Bad Request|400'))
+                    {
+                        Write-PSFMessage -Level Warning -Message "Graph rejected 'IN' filter. Retrying with 'OR' filter."
+                        Invoke-GTGraphPagedRequest -Uri "$baseUri&`$filter=$([Uri]::EscapeDataString($fallbackFilter))"
+                    }
+                    else { throw $_ }
                 }
             }
+            else
+            {
+                Write-PSFMessage -Level Verbose -Message "Fetching ALL Service Principals..."
+                Invoke-GTGraphPagedRequest -Uri $baseUri
+            }
 
-            # --- Process & Stream Output ---
-            # We invoke the scriptblock and pipe results directly to ForEach-Object
-            & $ExecuteGraphQuery | ForEach-Object {
-                $sp = $_
+            # --- Process & Output ---
+            foreach ($sp in $sps)
+            {
                 
                 $reportObject = [ordered]@{
-                    DisplayName          = $sp.DisplayName
-                    ObjectId             = $sp.Id
-                    AppId                = $sp.AppId
-                    ServicePrincipalType = $sp.ServicePrincipalType
-                    AccountEnabled       = $sp.AccountEnabled
+                    DisplayName          = $sp.displayName
+                    ObjectId             = $sp.id
+                    AppId                = $sp.appId
+                    ServicePrincipalType = $sp.servicePrincipalType
+                    AccountEnabled       = $sp.accountEnabled
                 }
 
                 if ($IncludeSignInActivity)
                 {
-                    $reportObject['LastSignInDateTime'] = if ($sp.SignInActivity) { $sp.SignInActivity.LastSignInDateTime } else { $null }
-                    $reportObject['LastSignInRequestId'] = if ($sp.SignInActivity) { $sp.SignInActivity.LastSignInRequestId } else { $null }
+                    $reportObject['LastSignInDateTime'] = if ($sp.signInActivity) { $sp.signInActivity.lastSignInDateTime } else { $null }
+                    $reportObject['LastSignInRequestId'] = if ($sp.signInActivity) { $sp.signInActivity.lastSignInRequestId } else { $null }
                 }
 
                 if ($ExpandOwners)
                 {
                     $ownerDisplayNames = @()
-                    if ($sp.Owners)
+                    if ($sp.owners)
                     {
-                        $ownerDisplayNames = $sp.Owners | ForEach-Object {
-                            # Handle dynamic object properties safely
-                            if ($_.AdditionalProperties -and $_.AdditionalProperties.ContainsKey('displayName')) { $_.AdditionalProperties['displayName'] }
-                            elseif ($_.DisplayName) { $_.DisplayName }
-                            else { "Unknown" }
+                        $ownerDisplayNames = $sp.owners | ForEach-Object {
+                            if ($_.displayName) { $_.displayName } else { 'Unknown' }
                         }
                     }
                     $reportObject['OwnerDisplayNames'] = $ownerDisplayNames -join '; '
@@ -187,16 +175,15 @@ function Get-GTServicePrincipalReport
 
                 if ($IncludeCredentials)
                 {
-                    $reportObject['KeyCredentialsCount'] = if ($sp.KeyCredentials) { $sp.KeyCredentials.Count } else { 0 }
-                    $reportObject['PasswordCredentialsCount'] = if ($sp.PasswordCredentials) { $sp.PasswordCredentials.Count } else { 0 }
+                    $reportObject['KeyCredentialsCount'] = if ($sp.keyCredentials) { $sp.keyCredentials.Count } else { 0 }
+                    $reportObject['PasswordCredentialsCount'] = if ($sp.passwordCredentials) { $sp.passwordCredentials.Count } else { 0 }
                     
-                    # Format dates as ISO 8601 (UTC) for consistency
-                    $reportObject['KeyCredentialExpiryDates'] = if ($sp.KeyCredentials) { 
-                        ($sp.KeyCredentials | Select-Object -ExpandProperty EndDateTime | Where-Object { $_ } | Sort-Object | ForEach-Object { $_.ToString('yyyy-MM-ddTHH:mm:ssZ') }) -join '; ' 
+                    $reportObject['KeyCredentialExpiryDates'] = if ($sp.keyCredentials) { 
+                        ($sp.keyCredentials | ForEach-Object { $_.endDateTime } | Where-Object { $_ } | Sort-Object | ForEach-Object { ([datetime]$_).ToString('yyyy-MM-ddTHH:mm:ssZ') }) -join '; ' 
                     } else { $null }
                     
-                    $reportObject['PasswordCredentialExpiryDates'] = if ($sp.PasswordCredentials) { 
-                        ($sp.PasswordCredentials | Select-Object -ExpandProperty EndDateTime | Where-Object { $_ } | Sort-Object | ForEach-Object { $_.ToString('yyyy-MM-ddTHH:mm:ssZ') }) -join '; ' 
+                    $reportObject['PasswordCredentialExpiryDates'] = if ($sp.passwordCredentials) { 
+                        ($sp.passwordCredentials | ForEach-Object { $_.endDateTime } | Where-Object { $_ } | Sort-Object | ForEach-Object { ([datetime]$_).ToString('yyyy-MM-ddTHH:mm:ssZ') }) -join '; ' 
                     } else { $null }
                 }
 

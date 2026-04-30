@@ -38,7 +38,7 @@ function Get-GTUnusedApps
 
     begin
     {
-        $modules = @('Microsoft.Graph.Beta.Applications')
+        $modules = @('Microsoft.Graph.Authentication')
         Install-GTRequiredModule -ModuleNames $modules -Verbose:$VerbosePreference
 
         # 1. Scopes Check (Gold Standard)
@@ -69,30 +69,27 @@ function Get-GTUnusedApps
 
         try
         {
-            $params = @{
-                All         = $true
-                Property    = @('id', 'appId', 'displayName', 'signInActivity')
-                ErrorAction = 'Stop'
-            }
+            # 3. Build URI with Hybrid Filtering Strategy
+            # beta required: signInActivity is not available on servicePrincipals in v1.0
+            $baseUri = "beta/servicePrincipals?`$select=id,appId,displayName,signInActivity"
 
-            # 3. Hybrid Filtering Strategy
             if ($IncludeNeverUsed)
             {
                 Write-PSFMessage -Level Verbose -Message "Fetching ALL Service Principals (IncludeNeverUsed active)..."
-                # No filter - we must scan everything to find nulls
+                $uri = $baseUri
             }
             else
             {
                 # Optimization: Server-Side Filter
                 Write-PSFMessage -Level Verbose -Message "Fetching inactive Service Principals (Server-Side Filter)..."
-                $params['Filter'] = "signInActivity/lastSignInDateTime le $filterDateString"
-                Write-PSFMessage -Level Verbose -Message "Using Filter: $($params['Filter'])"
+                $uri = "$baseUri&`$filter=$([Uri]::EscapeDataString("signInActivity/lastSignInDateTime le $filterDateString"))"
+                Write-PSFMessage -Level Verbose -Message "Using Filter: signInActivity/lastSignInDateTime le $filterDateString"
             }
 
-            # 4. Pipeline Streaming
-            Get-MgBetaServicePrincipal @params | ForEach-Object {
-                $sp = $_
-                $lastSignIn = $sp.SignInActivity.LastSignInDateTime
+            # 4. Collect and Process
+            $sps = Invoke-GTGraphPagedRequest -Uri $uri
+            foreach ($sp in $sps) {
+                $lastSignIn = $sp.signInActivity.lastSignInDateTime
                 
                 # Logic A: App has signed in, check if it's old
                 if ($lastSignIn)
@@ -109,9 +106,9 @@ function Get-GTUnusedApps
                     if ($daysInactive -ge $DaysSinceLastSignIn)
                     {
                         [PSCustomObject]@{
-                            DisplayName        = $sp.DisplayName
-                            AppId              = $sp.AppId
-                            Id                 = $sp.Id
+                            DisplayName        = $sp.displayName
+                            AppId              = $sp.appId
+                            Id                 = $sp.id
                             LastSignInDateTime = $lastSignIn
                             DaysInactive       = $daysInactive
                             Status             = 'Inactive'
@@ -122,9 +119,9 @@ function Get-GTUnusedApps
                 elseif ($IncludeNeverUsed)
                 {
                     [PSCustomObject]@{
-                        DisplayName        = $sp.DisplayName
-                        AppId              = $sp.AppId
-                        Id                 = $sp.Id
+                        DisplayName        = $sp.displayName
+                        AppId              = $sp.appId
+                        Id                 = $sp.id
                         LastSignInDateTime = $null
                         DaysInactive       = 'Never'
                         Status             = 'Never Used'

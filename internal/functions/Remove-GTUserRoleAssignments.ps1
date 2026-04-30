@@ -43,7 +43,8 @@ function Remove-GTUserRoleAssignments
         # Validate that User.Id is a GUID to prevent OData injection
         Test-GTGuid -InputObject $User.Id | Out-Null
         
-        $roleAssignments = Get-MgBetaRoleManagementDirectoryRoleAssignment -Filter "principalId eq '$($User.Id)'" -ExpandProperty roleDefinition -All -ErrorAction Stop
+        # beta required: PIM roleManagement endpoints are only available in the beta API
+        $roleAssignments = Invoke-GTGraphPagedRequest -Uri "beta/roleManagement/directory/roleAssignments?`$filter=$([Uri]::EscapeDataString(\"principalId eq '$($User.Id)'\"))&`$expand=roleDefinition&`$select=id,roleDefinitionId"
 
         if ($roleAssignments)
         {
@@ -51,18 +52,18 @@ function Remove-GTUserRoleAssignments
             {
                 $action = 'RemoveRoleAssignment'
                 $output = $OutputBase + @{
-                    ResourceName = $roleAssignment.RoleDefinition.DisplayName
+                    ResourceName = $roleAssignment.roleDefinition.displayName
                     ResourceType = 'DirectoryRole'
-                    ResourceId   = $roleAssignment.Id
+                    ResourceId   = $roleAssignment.id
                     Action       = $action
                 }
 
                 try
                 {
-                    if ($PSCmdlet.ShouldProcess($roleAssignment.RoleDefinition.DisplayName, $action))
+                    if ($PSCmdlet.ShouldProcess($roleAssignment.roleDefinition.displayName, $action))
                     {
-                        Write-PSFMessage -Level Verbose -Message "Removing role assignment $($roleAssignment.RoleDefinition.DisplayName) from user $($User.UserPrincipalName)"
-                        Remove-MgBetaRoleManagementDirectoryRoleAssignment -UnifiedRoleAssignmentId $roleAssignment.Id -ErrorAction Stop
+                        Write-PSFMessage -Level Verbose -Message "Removing role assignment $($roleAssignment.roleDefinition.displayName) from user $($User.UserPrincipalName)"
+                        Invoke-MgGraphRequest -Method DELETE -Uri "beta/roleManagement/directory/roleAssignments/$($roleAssignment.id)" -ErrorAction Stop
                         $output['Status'] = 'Success'
                     }
                 }

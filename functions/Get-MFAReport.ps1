@@ -71,7 +71,7 @@ function Get-MFAReport
             throw "You cannot use -AdminsOnly and -UsersWithoutMFA together."
         }
         # Module Management
-        $modules = ('Microsoft.Graph.Authentication', 'Microsoft.Graph.Beta.Reports')
+        $modules = ('Microsoft.Graph.Authentication')
         Install-GTRequiredModule -ModuleNames $modules -Verbose
 
         # Graph Connection Handling
@@ -97,12 +97,14 @@ function Get-MFAReport
         # Data Collection
         try
         {
-            $params = @{ All = $true; ErrorAction = 'Stop' }
+            # beta required: authenticationMethodsUserRegistrationDetails is not available in v1.0
+            $baseUri = 'beta/reports/authenticationMethodsUserRegistrationDetails'
             if ($UPNList.Count -gt 0) {
                 $filterString = "userPrincipalName in ('" + ($UPNList -join "','") + "')"
-                $params.Filter = $filterString
+                $report = Invoke-GTGraphPagedRequest -Uri "$baseUri?`$filter=$([Uri]::EscapeDataString($filterString))"
+            } else {
+                $report = Invoke-GTGraphPagedRequest -Uri $baseUri
             }
-            $report = Get-MgBetaReportAuthenticationMethodUserRegistrationDetail @params
         }
         catch
         {
@@ -127,18 +129,18 @@ function Get-MFAReport
         $MFAList = foreach ($item in $report)
         {
             [PSCustomObject][ordered]@{
-                UPN                                    = $item.UserPrincipalName
-                DisplayName                            = $item.UserDisplayName
-                IsAdmin                                = $item.IsAdmin
-                UserType                               = $item.UserType
-                MethodCount                            = $item.MethodsRegistered.Count
-                RegisteredMethods                      = $item.MethodsRegistered
-                UserPreferredAuthMethod                = $item.UserPreferredMethodForSecondaryAuthentication
-                IsSystemPreferredAuthenticationEnabled = $item.IsSystemPreferredAuthenticationMethodEnabled
-                IsPasswordlessCapable                  = $item.IsPasswordlessCapable
-                IsMfaRegistered                        = $item.IsMfaRegistered
-                IsMfaCapable                           = $item.IsMfaCapable
-                SystemPreferredAuthenticationMethod    = $item.SystemPreferredAuthenticationMethods -join ','
+                UPN                                    = $item.userPrincipalName
+                DisplayName                            = $item.userDisplayName
+                IsAdmin                                = $item.isAdmin
+                UserType                               = $item.userType
+                MethodCount                            = $item.methodsRegistered.Count
+                RegisteredMethods                      = $item.methodsRegistered
+                UserPreferredAuthMethod                = $item.userPreferredMethodForSecondaryAuthentication
+                IsSystemPreferredAuthenticationEnabled = $item.isSystemPreferredAuthenticationMethodEnabled
+                IsPasswordlessCapable                  = $item.isPasswordlessCapable
+                IsMfaRegistered                        = $item.isMfaRegistered
+                IsMfaCapable                           = $item.isMfaCapable
+                SystemPreferredAuthenticationMethod    = $item.systemPreferredAuthenticationMethods -join ','
             }
         }
 

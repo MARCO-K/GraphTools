@@ -39,7 +39,7 @@ function Get-GTOrphanedServicePrincipal
 
     begin
     {
-        $modules = @('Microsoft.Graph.Beta.Applications')
+        $modules = @('Microsoft.Graph.Authentication')
         Install-GTRequiredModule -ModuleNames $modules -Verbose:$VerbosePreference
 
         # 1. Scopes Check (Gold Standard)
@@ -80,13 +80,15 @@ function Get-GTOrphanedServicePrincipal
             # 3. UTC Date for Comparisons
             $utcNow = Get-UTCTime
 
-            # 4. Pipeline Streaming (Memory Optimization)
-            Get-MgBetaServicePrincipal -All -Property $properties -ExpandProperty 'owners' -ErrorAction Stop | ForEach-Object {
-                $sp = $_
+            # 4. Collect SPs (with streaming-like processing via foreach)
+            $selectStr = $properties -join ','
+            $sps = Invoke-GTGraphPagedRequest -Uri "v1.0/servicePrincipals?`$select=$selectStr&`$expand=owners"
+            foreach ($sp in $sps) {
+                $sp = $sp
                 $issues = [System.Collections.Generic.List[string]]::new()
 
                 # --- Check 1: No Owners ---
-                if (-not $sp.Owners -or $sp.Owners.Count -eq 0)
+                if (-not $sp.owners -or $sp.owners.Count -eq 0)
                 {
                     $issues.Add("NoOwners")
                 }
@@ -96,19 +98,14 @@ function Get-GTOrphanedServicePrincipal
                     $activeOwners = 0
                     $statusUnknown = 0
 
-                    foreach ($owner in $sp.Owners)
+                    foreach ($owner in $sp.owners)
                     {
                         $isEnabled = $null
                         
-                        # Try standard property access
-                        if ($null -ne $owner.AccountEnabled)
+                        # Invoke-MgGraphRequest returns hashtables; access accountEnabled directly
+                        if ($null -ne $owner.accountEnabled)
                         {
-                            $isEnabled = $owner.AccountEnabled
-                        }
-                        # Try dictionary access (common in Graph SDK dynamic objects)
-                        elseif ($owner.AdditionalProperties -and $owner.AdditionalProperties.ContainsKey('accountEnabled'))
-                        {
-                            $isEnabled = $owner.AdditionalProperties['accountEnabled']
+                            $isEnabled = $owner.accountEnabled
                         }
 
                         if ($null -ne $isEnabled)
@@ -134,11 +131,11 @@ function Get-GTOrphanedServicePrincipal
                     $hasExpiredCreds = $false
 
                     # Check Secrets
-                    if ($sp.PasswordCredentials)
+                    if ($sp.passwordCredentials)
                     {
-                        foreach ($cred in $sp.PasswordCredentials)
+                        foreach ($cred in $sp.passwordCredentials)
                         {
-                            if ($cred.EndDateTime -and $cred.EndDateTime -lt $utcNow)
+                            if ($cred.endDateTime -and $cred.endDateTime -lt $utcNow)
                             {
                                 $hasExpiredCreds = $true
                                 break
@@ -147,11 +144,11 @@ function Get-GTOrphanedServicePrincipal
                     }
 
                     # Check Certificates
-                    if (-not $hasExpiredCreds -and $sp.KeyCredentials)
+                    if (-not $hasExpiredCreds -and $sp.keyCredentials)
                     {
-                        foreach ($cred in $sp.KeyCredentials)
+                        foreach ($cred in $sp.keyCredentials)
                         {
-                            if ($cred.EndDateTime -and $cred.EndDateTime -lt $utcNow)
+                            if ($cred.endDateTime -and $cred.endDateTime -lt $utcNow)
                             {
                                 $hasExpiredCreds = $true
                                 break
@@ -172,11 +169,11 @@ function Get-GTOrphanedServicePrincipal
                     Write-PSFMessage -Level Debug -Message "Found SP issue: $($sp.DisplayName) (AppID: $($sp.AppId)). Issues: $issueString"
                     
                     [PSCustomObject]@{
-                        DisplayName          = $sp.DisplayName
-                        ObjectId             = $sp.Id
-                        AppId                = $sp.AppId
-                        ServicePrincipalType = $sp.ServicePrincipalType
-                        AccountEnabled       = $sp.AccountEnabled
+                        DisplayName          = $sp.displayName
+                        ObjectId             = $sp.id
+                        AppId                = $sp.appId
+                        ServicePrincipalType = $sp.servicePrincipalType
+                        AccountEnabled       = $sp.accountEnabled
                         OrphanReason         = $issueString
                     }
                 }

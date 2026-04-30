@@ -50,7 +50,8 @@ function Remove-GTPIMRoleEligibility
         # Validate that User.Id is a GUID to prevent OData injection
         Test-GTGuid -InputObject $User.Id | Out-Null
         
-        $roleEligibilitySchedules = Get-MgBetaRoleManagementDirectoryRoleEligibilitySchedule -Filter "principalId eq '$($User.Id)'" -ExpandProperty roleDefinition -All -ErrorAction Stop
+        # beta required: PIM roleManagement endpoints are only available in the beta API
+        $roleEligibilitySchedules = Invoke-GTGraphPagedRequest -Uri "beta/roleManagement/directory/roleEligibilitySchedules?`$filter=$([Uri]::EscapeDataString(\"principalId eq '$($User.Id)'\"))&`$expand=roleDefinition"
 
         if ($roleEligibilitySchedules)
         {
@@ -58,18 +59,18 @@ function Remove-GTPIMRoleEligibility
             {
                 $action = 'RemovePIMRoleEligibility'
                 $output = $OutputBase + @{
-                    ResourceName = $schedule.RoleDefinition.DisplayName
+                    ResourceName = $schedule.roleDefinition.displayName
                     ResourceType = 'PIMRoleEligibility'
-                    ResourceId   = $schedule.Id
+                    ResourceId   = $schedule.id
                     Action       = $action
                 }
 
                 try
                 {
-                    if ($PSCmdlet.ShouldProcess($schedule.RoleDefinition.DisplayName, $action))
+                    if ($PSCmdlet.ShouldProcess($schedule.roleDefinition.displayName, $action))
                     {
-                        Write-PSFMessage -Level Verbose -Message "Removing PIM role eligibility $($schedule.RoleDefinition.DisplayName) from user $($User.UserPrincipalName)"
-                        Remove-MgBetaRoleManagementDirectoryRoleEligibilitySchedule -UnifiedRoleEligibilityScheduleId $schedule.Id -ErrorAction Stop
+                        Write-PSFMessage -Level Verbose -Message "Removing PIM role eligibility $($schedule.roleDefinition.displayName) from user $($User.UserPrincipalName)"
+                        Invoke-MgGraphRequest -Method DELETE -Uri "beta/roleManagement/directory/roleEligibilitySchedules/$($schedule.id)" -ErrorAction Stop
                         $output['Status'] = 'Success'
                     }
                 }
@@ -80,14 +81,14 @@ function Remove-GTPIMRoleEligibility
                     
                     # Log appropriate message based on error details
                     if ($errorDetails.HttpStatus -in 404, 403) {
-                        Write-PSFMessage -Level $errorDetails.LogLevel -Message "Failed to remove PIM role eligibility $($schedule.RoleDefinition.DisplayName) from user $($User.UserPrincipalName) - $($errorDetails.Reason)"
+                        Write-PSFMessage -Level $errorDetails.LogLevel -Message "Failed to remove PIM role eligibility $($schedule.roleDefinition.displayName) from user $($User.UserPrincipalName) - $($errorDetails.Reason)"
                         Write-PSFMessage -Level Debug -Message "Detailed error ($($errorDetails.HttpStatus)): $($errorDetails.ErrorMessage)"
                     }
                     elseif ($errorDetails.HttpStatus) {
-                        Write-PSFMessage -Level $errorDetails.LogLevel -Message "Failed to remove PIM role eligibility $($schedule.RoleDefinition.DisplayName) from user $($User.UserPrincipalName) - $($errorDetails.Reason)"
+                        Write-PSFMessage -Level $errorDetails.LogLevel -Message "Failed to remove PIM role eligibility $($schedule.roleDefinition.displayName) from user $($User.UserPrincipalName) - $($errorDetails.Reason)"
                     }
                     else {
-                        Write-PSFMessage -Level Error -Message "Failed to remove PIM role eligibility $($schedule.RoleDefinition.DisplayName) from user $($User.UserPrincipalName). $($errorDetails.ErrorMessage)"
+                        Write-PSFMessage -Level Error -Message "Failed to remove PIM role eligibility $($schedule.roleDefinition.displayName) from user $($User.UserPrincipalName). $($errorDetails.ErrorMessage)"
                     }
                     $output['Status'] = "Failed: $($errorDetails.Reason)"
                 }

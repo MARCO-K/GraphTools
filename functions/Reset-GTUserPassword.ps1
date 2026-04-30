@@ -49,7 +49,7 @@ Function Reset-GTUserPassword
     begin
     {
         # Module Management
-        $modules = ('Microsoft.Graph.Authentication', 'Microsoft.Graph.Beta.Users')
+        $modules = ('Microsoft.Graph.Authentication')
         Install-GTRequiredModule -ModuleNames $modules -Verbose
 
         # Graph Connection Handling
@@ -73,7 +73,7 @@ Function Reset-GTUserPassword
                         password                      = $Password
                     }
 
-                    Update-MgBetaUser -UserId $User -PasswordProfile $Passwordprofile -ErrorAction Stop
+                    Invoke-MgGraphRequest -Method PATCH -Uri ("v1.0/users/{0}" -f $User) -Body @{ passwordProfile = $Passwordprofile } -ContentType 'application/json' -ErrorAction Stop
                     Write-PSFMessage -Level Verbose -Message "$User - Reset Password Action - Password reset to random value"
                 }
                 catch

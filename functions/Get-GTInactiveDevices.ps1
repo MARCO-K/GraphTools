@@ -42,7 +42,7 @@ function Get-GTInactiveDevices
 
     begin
     {
-        $modules = @('Microsoft.Graph.Identity.DirectoryManagement')
+        $modules = @('Microsoft.Graph.Authentication')
         # Prefer the standard -Verbose switch; do not pass $VerbosePreference to a switch parameter
         Install-GTRequiredModule -ModuleNames $modules -Verbose
 
@@ -91,14 +91,8 @@ function Get-GTInactiveDevices
             $finalFilter = $filterParts -join ' and '
             Write-PSFMessage -Level Verbose -Message "Using OData Filter: $finalFilter"
 
-            $params = @{
-                All         = $true
-                Filter      = $finalFilter
-                Property    = @('id', 'displayName', 'operatingSystem', 'approximateLastSignInDateTime', 'accountEnabled')
-                ErrorAction = 'Stop'
-            }
-
-            $devices = Get-MgBetaDevice @params
+            $uri = "v1.0/devices?`$filter=$([Uri]::EscapeDataString($finalFilter))&`$select=id,displayName,operatingSystem,approximateLastSignInDateTime,accountEnabled"
+            $devices = Invoke-GTGraphPagedRequest -Uri $uri
 
             $deviceCount = if ($devices) { $devices.Count } else { 0 }
             Write-PSFMessage -Level Verbose -Message "Found $deviceCount inactive devices."
@@ -106,12 +100,12 @@ function Get-GTInactiveDevices
             foreach ($device in $devices)
             {
                 $daysInactive = $null
-                if ($device.ApproximateLastSignInDateTime)
+                if ($device.approximateLastSignInDateTime)
                 {
                     # Normalize to UTC and calculate days (use TotalDays and floor)
                     try
                     {
-                        $lastSignInUtc = ([DateTime]$device.ApproximateLastSignInDateTime).ToUniversalTime()
+                        $lastSignInUtc = ([DateTime]$device.approximateLastSignInDateTime).ToUniversalTime()
                     }
                     catch
                     {
@@ -126,11 +120,11 @@ function Get-GTInactiveDevices
                 }
 
                 $results.Add([PSCustomObject]@{
-                        DisplayName                   = $device.DisplayName
-                        DeviceId                      = $device.Id
-                        OperatingSystem               = $device.OperatingSystem
-                        ApproximateLastSignInDateTime = $device.ApproximateLastSignInDateTime
-                        AccountEnabled                = $device.AccountEnabled
+                        DisplayName                   = $device.displayName
+                        DeviceId                      = $device.id
+                        OperatingSystem               = $device.operatingSystem
+                        ApproximateLastSignInDateTime = $device.approximateLastSignInDateTime
+                        AccountEnabled                = $device.accountEnabled
                         DaysInactive                  = $daysInactive
                     })
             }

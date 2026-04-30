@@ -47,7 +47,7 @@ function Remove-GTUserDelegatedPermissionGrants
         
         # Get all OAuth2 permission grants for the user
         # These are delegated permissions granted to apps on behalf of the user
-        $permissionGrants = Get-MgBetaOauth2PermissionGrant -Filter "principalId eq '$($User.Id)'" -All -ErrorAction Stop
+        $permissionGrants = Invoke-GTGraphPagedRequest -Uri "v1.0/oauth2PermissionGrants?`$filter=$([Uri]::EscapeDataString(\"principalId eq '$($User.Id)'\"))"
 
         if ($permissionGrants)
         {
@@ -58,8 +58,8 @@ function Remove-GTUserDelegatedPermissionGrants
                 # Get service principal details for better logging
                 try
                 {
-                    $servicePrincipal = Get-MgBetaServicePrincipal -ServicePrincipalId $grant.ClientId -ErrorAction SilentlyContinue
-                    $appName = if ($servicePrincipal) { $servicePrincipal.DisplayName } else { "App-$($grant.ClientId)" }
+                    $spResp = Invoke-MgGraphRequest -Method GET -Uri "v1.0/servicePrincipals/$($grant.clientId)?`$select=displayName" -ErrorAction SilentlyContinue
+                    $appName = if ($spResp) { $spResp.displayName } else { "App-$($grant.clientId)" }
                 }
                 catch
                 {
@@ -69,20 +69,20 @@ function Remove-GTUserDelegatedPermissionGrants
                 $output = $OutputBase + @{
                     ResourceName = $appName
                     ResourceType = 'OAuth2PermissionGrant'
-                    ResourceId   = $grant.Id
+                    ResourceId   = $grant.id
                     Action       = $action
                 }
 
                 try
                 {
                     # Get the scope details for logging
-                    $scopes = if ($grant.Scope) { $grant.Scope } else { "Default scopes" }
+                    $scopes = if ($grant.scope) { $grant.scope } else { "Default scopes" }
 
                     if ($PSCmdlet.ShouldProcess("$appName (Scopes: $scopes)", $action))
                     {
                         Write-PSFMessage -Level Verbose -Message "Removing delegated permission grant for application '$appName' from user $($User.UserPrincipalName). Scopes: $scopes"
 
-                        Remove-MgBetaOauth2PermissionGrant -OAuth2PermissionGrantId $grant.Id -ErrorAction Stop
+                        Invoke-MgGraphRequest -Method DELETE -Uri "v1.0/oauth2PermissionGrants/$($grant.id)" -ErrorAction Stop
                         $output['Status'] = 'Success'
 
                         Write-PSFMessage -Level Verbose -Message "Successfully removed delegated permissions for '$appName'"

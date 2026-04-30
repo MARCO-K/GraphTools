@@ -33,7 +33,7 @@ function Get-GTExpiringSecrets
 
     begin
     {
-        $modules = @('Microsoft.Graph.Applications')
+        $modules = @('Microsoft.Graph.Authentication')
         Install-GTRequiredModule -ModuleNames $modules -Verbose
 
         $requiredScopes = @('Application.Read.All')
@@ -59,41 +59,41 @@ function Get-GTExpiringSecrets
             foreach ($item in $ItemList)
             {
                 # Process Secrets (PasswordCredentials)
-                foreach ($cred in $item.PasswordCredentials)
+                foreach ($cred in $item.passwordCredentials)
                 {
-                    if ($cred.EndDateTime -and $cred.EndDateTime -le $expiryThreshold -and $cred.EndDateTime -ge $now)
+                    if ($cred.endDateTime -and $cred.endDateTime -le $expiryThreshold -and $cred.endDateTime -ge $now)
                     {
                         # Use TotalDays and round up so partial days count as a day remaining
-                        $daysRemaining = [math]::Ceiling((New-TimeSpan -Start $now -End $cred.EndDateTime).TotalDays)
+                        $daysRemaining = [math]::Ceiling((New-TimeSpan -Start $now -End $cred.endDateTime).TotalDays)
                         $results.Add([PSCustomObject]@{
-                                Name           = $item.DisplayName
-                                AppId          = $item.AppId
-                                Id             = $item.Id
+                                Name           = $item.displayName
+                                AppId          = $item.appId
+                                Id             = $item.id
                                 ResourceType   = $ResourceType
                                 CredentialType = 'Secret'
-                                KeyId          = $cred.KeyId
-                                Hint           = $cred.Hint # Useful to identify which secret it is
-                                ExpiryDate     = $cred.EndDateTime
+                                KeyId          = $cred.keyId
+                                Hint           = $cred.hint # Useful to identify which secret it is
+                                ExpiryDate     = $cred.endDateTime
                                 DaysRemaining  = $daysRemaining
                             })
                     }
                 }
 
                 # Process Certificates (KeyCredentials)
-                foreach ($cred in $item.KeyCredentials)
+                foreach ($cred in $item.keyCredentials)
                 {
-                    if ($cred.EndDateTime -and $cred.EndDateTime -le $expiryThreshold -and $cred.EndDateTime -ge $now)
+                    if ($cred.endDateTime -and $cred.endDateTime -le $expiryThreshold -and $cred.endDateTime -ge $now)
                     {
-                        $daysRemaining = [math]::Ceiling((New-TimeSpan -Start $now -End $cred.EndDateTime).TotalDays)
+                        $daysRemaining = [math]::Ceiling((New-TimeSpan -Start $now -End $cred.endDateTime).TotalDays)
                         $results.Add([PSCustomObject]@{
-                                Name           = $item.DisplayName
-                                AppId          = $item.AppId
-                                Id             = $item.Id
+                                Name           = $item.displayName
+                                AppId          = $item.appId
+                                Id             = $item.id
                                 ResourceType   = $ResourceType
                                 CredentialType = 'Certificate'
-                                KeyId          = $cred.KeyId
+                                KeyId          = $cred.keyId
                                 Hint           = $null # Certs don't have hints, usually thumbprint is in customKeyIdentifier
-                                ExpiryDate     = $cred.EndDateTime
+                                ExpiryDate     = $cred.endDateTime
                                 DaysRemaining  = $daysRemaining
                             })
                     }
@@ -107,8 +107,7 @@ function Get-GTExpiringSecrets
             if ($Scope -in 'All', 'Applications')
             {
                 Write-PSFMessage -Level Verbose -Message "Scanning Applications..."
-                # Optimization: Select only needed properties to reduce bandwidth
-                $apps = Get-MgBetaApplication -All -Property Id, AppId, DisplayName, KeyCredentials, PasswordCredentials -ErrorAction Stop
+                $apps = Invoke-GTGraphPagedRequest -Uri "v1.0/applications?`$select=id,appId,displayName,keyCredentials,passwordCredentials"
                 & $ProcessCredentials -ItemList $apps -ResourceType 'Application'
             }
 
@@ -116,7 +115,7 @@ function Get-GTExpiringSecrets
             if ($Scope -in 'All', 'ServicePrincipals')
             {
                 Write-PSFMessage -Level Verbose -Message "Scanning Service Principals..."
-                $sps = Get-MgBetaServicePrincipal -All -Property Id, AppId, DisplayName, KeyCredentials, PasswordCredentials -ErrorAction Stop
+                $sps = Invoke-GTGraphPagedRequest -Uri "v1.0/servicePrincipals?`$select=id,appId,displayName,keyCredentials,passwordCredentials"
                 & $ProcessCredentials -ItemList $sps -ResourceType 'ServicePrincipal'
             }
 

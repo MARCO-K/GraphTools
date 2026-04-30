@@ -46,7 +46,7 @@ function Get-GTRecentUser
 
     begin
     {
-        $modules = @('Microsoft.Graph.Users')
+        $modules = @('Microsoft.Graph.Authentication')
         Install-GTRequiredModule -ModuleNames $modules -Verbose:$VerbosePreference
 
         # 1. Scopes Check (Gold Standard)
@@ -79,7 +79,8 @@ function Get-GTRecentUser
                 Write-PSFMessage -Level Verbose -Message "Querying Microsoft Graph for user: $UserPrincipalName"
                 
                 # Fetch single user
-                $users = @(Get-MgUser -UserId $UserPrincipalName -Property Id, DisplayName, UserPrincipalName, CreatedDateTime, AccountEnabled, UserType -ErrorAction Stop)
+                $resp = Invoke-MgGraphRequest -Method GET -Uri "v1.0/users/$UserPrincipalName?`$select=id,displayName,userPrincipalName,createdDateTime,accountEnabled,userType" -ErrorAction Stop
+                $users = @([PSCustomObject]@{ id = $resp.id; displayName = $resp.displayName; userPrincipalName = $resp.userPrincipalName; createdDateTime = $resp.createdDateTime; accountEnabled = $resp.accountEnabled; userType = $resp.userType })
             }
             else
             {
@@ -90,25 +91,23 @@ function Get-GTRecentUser
                 Write-PSFMessage -Level Verbose -Message "Searching for users created after $filterDateStr"
 
                 # Construct Server-Side Filter
-                # Note: createdDateTime is a DateTimeOffset, filter uses unquoted date for 'ge' operator
                 $filter = "createdDateTime ge $filterDateStr"
                 
                 Write-PSFMessage -Level Verbose -Message "Using OData Filter: $filter"
                 
-                # Fetch users with filter
-                # -ConsistencyLevel eventual is often required for complex filters, though createdDateTime usually works without it. Added for safety.
-                $users = Get-MgUser -Filter $filter -ConsistencyLevel eventual -CountVariable userCount -All -Property Id, DisplayName, UserPrincipalName, CreatedDateTime, AccountEnabled, UserType -ErrorAction Stop
+                # Fetch users with filter; ConsistencyLevel eventual needed for $count and createdDateTime filter
+                $users = Invoke-GTGraphPagedRequest -Uri "v1.0/users?`$filter=$([Uri]::EscapeDataString($filter))&`$select=id,displayName,userPrincipalName,createdDateTime,accountEnabled,userType&`$count=true" -Headers @{ ConsistencyLevel = 'eventual' }
                 
-                Write-PSFMessage -Level Verbose -Message "Found $userCount users."
+                Write-PSFMessage -Level Verbose -Message "Found $($users.Count) users."
             }
 
             foreach ($user in $users)
             {
                 # Calculate age friendly string
                 $age = "Unknown"
-                if ($user.CreatedDateTime)
+                if ($user.createdDateTime)
                 {
-                    $span = New-TimeSpan -Start $user.CreatedDateTime -End $utcNow
+                    $span = New-TimeSpan -Start $user.createdDateTime -End $utcNow
                     if ($span.TotalHours -lt 24)
                     {
                         $age = "{0:N1} Hours" -f $span.TotalHours
@@ -120,13 +119,13 @@ function Get-GTRecentUser
                 }
 
                 $results.Add([PSCustomObject]@{
-                        Id                = $user.Id
-                        DisplayName       = $user.DisplayName
-                        UserPrincipalName = $user.UserPrincipalName
-                        CreatedDateTime   = $user.CreatedDateTime
+                        Id                = $user.id
+                        DisplayName       = $user.displayName
+                        UserPrincipalName = $user.userPrincipalName
+                        CreatedDateTime   = $user.createdDateTime
                         Age               = $age
-                        AccountEnabled    = $user.AccountEnabled
-                        UserType          = $user.UserType
+                        AccountEnabled    = $user.accountEnabled
+                        UserType          = $user.userType
                     })
             }
 

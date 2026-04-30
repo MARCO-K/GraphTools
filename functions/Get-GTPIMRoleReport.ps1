@@ -46,7 +46,7 @@ function Get-GTPIMRoleReport
     begin
     {
         # 1. Module Check
-        $modules = @('Microsoft.Graph.Identity.Governance', 'Microsoft.Graph.Users')
+        $modules = @('Microsoft.Graph.Authentication')
         Install-GTRequiredModule -ModuleNames $modules -Verbose:$VerbosePreference
 
         # 2. Scope Check
@@ -74,17 +74,18 @@ function Get-GTPIMRoleReport
 
         try
         {
-            $allRoles = Get-MgBetaRoleManagementDirectoryRoleDefinition -All -Property Id, DisplayName -ErrorAction Stop
+            # beta required: PIM roleManagement endpoints are only available in the beta API
+            $allRoles = Invoke-GTGraphPagedRequest -Uri "beta/roleManagement/directory/roleDefinitions?`$select=id,displayName"
             $roleCache = @{}
             
             foreach ($role in $allRoles)
             {
-                $roleCache[$role.Id] = $role.DisplayName
+                $roleCache[$role.id] = $role.displayName
                 
                 # Optimization: Find the ID for the requested RoleName immediately
-                if ($RoleName -and $role.DisplayName -eq $RoleName)
+                if ($RoleName -and $role.displayName -eq $RoleName)
                 {
-                    $targetRoleDefId = $role.Id
+                    $targetRoleDefId = $role.id
                 }
             }
             Write-PSFMessage -Level Verbose -Message "Cached $($roleCache.Count) roles."
@@ -115,7 +116,7 @@ function Get-GTPIMRoleReport
 
                 foreach ($assignment in $AssignmentList)
                 {
-                    $roleDefId = $assignment.RoleDefinitionId
+                    $roleDefId = $assignment.roleDefinitionId
                     $roleDisplayName = if ($roleCache.ContainsKey($roleDefId)) { $roleCache[$roleDefId] } else { $roleDefId }
 
                     # Handle Principal Details
@@ -124,10 +125,10 @@ function Get-GTPIMRoleReport
                     $principalType = "Unknown"
 
                     # Determine principal type based on @odata.type (User, Group, or ServicePrincipal)
-                    if ($assignment.Principal)
+                    if ($assignment.principal)
                     {
-                        $principalName = $assignment.Principal.DisplayName
-                        $odataType = $assignment.Principal.AdditionalProperties['@odata.type']
+                        $principalName = $assignment.principal.displayName
+                        $odataType = $assignment.principal.'@odata.type'
 
                         if ($odataType -match 'group')
                         {
@@ -137,20 +138,20 @@ function Get-GTPIMRoleReport
                         elseif ($odataType -match 'servicePrincipal')
                         {
                             $principalType = 'ServicePrincipal'
-                            $principalUPN = $assignment.Principal.AdditionalProperties['appId']
+                            $principalUPN = $assignment.principal.appId
                         }
                         else
                         {
                             $principalType = 'User'
-                            $principalUPN = $assignment.Principal.AdditionalProperties['userPrincipalName']
+                            $principalUPN = $assignment.principal.userPrincipalName
                         }
                     }
 
                     # Determine State
-                    $state = $assignment.AssignmentState
+                    $state = $assignment.assignmentState
                     if ($Type -eq 'Active')
                     {
-                        $state = if ($assignment.AssignmentType -eq 'Assigned') { 'Assigned (Permanent)' } else { 'Activated (Time-bound)' }
+                        $state = if ($assignment.assignmentType -eq 'Assigned') { 'Assigned (Permanent)' } else { 'Activated (Time-bound)' }
                     }
 
                     # Stream Object to Pipeline
@@ -158,13 +159,13 @@ function Get-GTPIMRoleReport
                         User              = $principalName
                         UserPrincipalName = $principalUPN
                         PrincipalType     = $principalType
-                        UserId            = $assignment.PrincipalId
+                        UserId            = $assignment.principalId
                         Role              = $roleDisplayName
                         RoleId            = $roleDefId
                         Type              = $Type
                         AssignmentState   = $state
-                        StartDateTime     = $assignment.StartDateTime
-                        EndDateTime       = $assignment.EndDateTime
+                        StartDateTime     = $assignment.startDateTime
+                        EndDateTime       = $assignment.endDateTime
                     }
                 }
             }
@@ -177,26 +178,20 @@ function Get-GTPIMRoleReport
             
             $finalFilter = $filterParts -join ' and '
             
-            $params = @{
-                All            = $true
-                ExpandProperty = 'principal'
-                ErrorAction    = 'Stop'
-            }
-            if ($finalFilter)
-            {
+            $filterSuffix = if ($finalFilter) {
                 Write-PSFMessage -Level Verbose -Message "Using OData Filter: $finalFilter"
-                $params['Filter'] = $finalFilter 
-            }
+                "&`$filter=$([Uri]::EscapeDataString($finalFilter))"
+            } else { '' }
 
             # 1. Fetch Eligible Assignments
             Write-PSFMessage -Level Verbose -Message "Fetching Eligible Assignments..."
-            $eligibleAssignments = Get-MgBetaRoleManagementDirectoryRoleEligibilityScheduleInstance @params
+            $eligibleAssignments = Invoke-GTGraphPagedRequest -Uri "beta/roleManagement/directory/roleEligibilityScheduleInstances?`$expand=principal$filterSuffix"
             Write-PSFMessage -Level Verbose -Message "Fetched $($eligibleAssignments.Count) eligible assignments."
             & $ProcessAssignment -AssignmentList $eligibleAssignments -Type 'Eligible'
 
             # 2. Fetch Active Assignments
             Write-PSFMessage -Level Verbose -Message "Fetching Active Assignments..."
-            $activeAssignments = Get-MgBetaRoleManagementDirectoryRoleAssignmentScheduleInstance @params
+            $activeAssignments = Invoke-GTGraphPagedRequest -Uri "beta/roleManagement/directory/roleAssignmentScheduleInstances?`$expand=principal$filterSuffix"
             Write-PSFMessage -Level Verbose -Message "Fetched $($activeAssignments.Count) active assignments."
             & $ProcessAssignment -AssignmentList $activeAssignments -Type 'Active'
         }

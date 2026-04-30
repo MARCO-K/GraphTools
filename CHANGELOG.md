@@ -7,7 +7,35 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-### Added
+### Changed
+
+- **SDK dependency elimination** - Migrated all public functions and internal helpers to use only `Microsoft.Graph.Authentication` as the required SDK module. All Graph API calls now use `Invoke-MgGraphRequest` (single resource) or `Invoke-GTGraphPagedRequest` (paged collections) instead of individual `Microsoft.Graph.*` SDK cmdlets.
+  - `Disable-GTUserDevice` — replaced `Get-MgUser`, `Get-MgDevice`, `Update-MgDevice` with REST calls
+  - `Get-GTBreakGlassPolicyReport` — replaced `Get-MgUser`, `Get-MgIdentityConditionalAccessPolicy`
+  - `Get-GTLegacyAuthReport` — replaced streaming `Get-MgAuditLogSignIn` with `Invoke-GTGraphPagedRequest` + `foreach`
+  - `Get-GTRiskyAppPermissionReport` — replaced `Get-MgBetaServicePrincipal`, `Get-MgBetaOauth2PermissionGrant`, `Get-MgUser`
+  - `Get-GTPIMRoleReport` — replaced `Get-MgBetaRoleManagementDirectory*` cmdlets; `beta` endpoints kept with justification comment
+  - `Get-MFAReport` — replaced `Get-MgBetaReportAuthenticationMethodUserRegistrationDetail`; `beta` endpoint kept with justification comment
+  - `Remove-GTUserEntitlements` — replaced `Get-MgBetaUser` with `Invoke-MgGraphRequest`; removed non-Auth SDK modules
+  - `Remove-GTPIMRoleEligibility` — replaced `Get-MgUser`, `Get-MgBetaRoleManagement*` cmdlets; `beta` endpoints kept with justification
+  - `internal/Remove-GTUserAppRoleAssignments` — replaced `Get-MgBetaUserAppRoleAssignment`, `Remove-MgBetaUserAppRoleAssignment`
+  - `internal/Remove-GTUserGroupMemberships` — replaced `Get-MgBetaUserTransitiveMemberOfAsGroup`, `Remove-MgBetaGroupMemberByRef`
+  - `internal/Remove-GTUserAdministrativeUnitMemberships` — replaced `Get-MgBetaUserMemberOf`, `Remove-MgBetaDirectoryAdministrativeUnitMemberByRef`
+  - `internal/Remove-GTUserEnterpriseAppOwnership` — replaced `Get-MgBetaUserOwnedObject`, `Get-MgBetaApplicationOwner`, `Get-MgBetaServicePrincipalOwner`, and `Remove-MgBeta*OwnerByRef` calls
+  - `internal/Remove-GTUserDelegatedPermissionGrants` — replaced `Get-MgBetaOauth2PermissionGrant`, `Get-MgBetaServicePrincipal`, `Remove-MgBetaOauth2PermissionGrant`
+  - `internal/Remove-GTUserGroupOwnerships` — replaced `Get-MgBetaUserOwnedObject`, `Get-MgBetaGroupOwner`, `Remove-MgBetaGroupOwnerByRef`
+  - `internal/Remove-GTUserLicenses` — replaced `Get-MgBetaUserLicenseDetail`, `Set-MgBetaUserLicense`
+  - `internal/Remove-GTUserRoleAssignments` — replaced `Get-MgBetaRoleManagementDirectoryRoleAssignment`, `Remove-MgBetaRoleManagementDirectoryRoleAssignment`
+  - `internal/Remove-GTPIMRoleEligibilityInternal` — replaced `Get-MgBetaRoleManagementDirectoryRoleEligibilitySchedule`, `Remove-MgBetaRoleManagementDirectoryRoleEligibilitySchedule`
+  - `internal/Remove-GTUserServicePrincipalOwnerships` — replaced `Get-MgBetaServicePrincipal`, `Remove-MgBetaServicePrincipalOwnerByRef`
+- **`GraphTools.psd1`** — removed `Microsoft.Graph.Beta.Reports` from `RequiredModules`; only `PSFramework` is now a hard dependency at module level. All Graph SDK modules are loaded on-demand via `Install-GTRequiredModule` using only `Microsoft.Graph.Authentication`.
+- **beta endpoint audit** — all functions validated against Microsoft Learn docs; `beta` is now used only where the property or endpoint is genuinely unavailable in `v1.0`:
+  - `signInActivity` on servicePrincipal (not in v1.0): `Get-GTUnusedApps`, `Get-GTServicePrincipalReport` (when `-IncludeSignInActivity`), `Get-GTRiskyAppPermissionReport`
+  - `authenticationMethodsUserRegistrationDetails` (not in v1.0): `Get-MFAReport`
+  - PIM `roleManagement/directory/*` endpoints: `Get-GTPIMRoleReport`, `Remove-GTPIMRoleEligibility`, `internal/Remove-GTUserRoleAssignments`, `internal/Remove-GTPIMRoleEligibilityInternal`
+- **Property casing** — all REST response property accesses updated from PascalCase (SDK) to camelCase (REST); output `PSCustomObject` property names preserved in PascalCase for backward compatibility
+- **AdditionalProperties eliminated** — all `$obj.AdditionalProperties['key']` patterns replaced with direct property access `$obj.key`
+- **`return` → `continue`** in `Get-GTLegacyAuthReport` filter loop (was inside `ForEach-Object`, now inside `foreach`)
 
 - **License Cost Reporting** - New function `Get-GTLicenseCostReport`
   - Generates license utilization and cost optimization reports across the tenant

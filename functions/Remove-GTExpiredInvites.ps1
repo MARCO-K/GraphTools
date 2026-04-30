@@ -29,7 +29,7 @@ function Remove-GTExpiredInvites {
     )
 
     begin {
-        $modules = @('Microsoft.Graph.Users')
+        $modules = @('Microsoft.Graph.Authentication')
         Install-GTRequiredModule -ModuleNames $modules -Verbose:$VerbosePreference
 
         if (-not (Initialize-GTGraphConnection -Scopes 'User.ReadWrite.All')) {
@@ -63,7 +63,7 @@ function Remove-GTExpiredInvites {
                 if ($PSCmdlet.ShouldProcess("$($guest.DisplayName) ($($guest.UserPrincipalName))", "Remove Guest User (Expired Invite)")) {
                     if ($Force -or $PSCmdlet.ShouldContinue("Are you sure you want to delete guest user '$($guest.DisplayName)'?", "Confirm Deletion")) {
                         try {
-                            Remove-MgUser -UserId $guest.Id -ErrorAction Stop
+                            Invoke-MgGraphRequest -Method DELETE -Uri "v1.0/users/$($guest.Id)" -ErrorAction Stop
                             Write-PSFMessage -Level Output -Message "Removed guest user: $($guest.DisplayName)"
                         }
                         catch {

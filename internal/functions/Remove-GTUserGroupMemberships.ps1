@@ -40,14 +40,14 @@ function Remove-GTUserGroupMemberships
         [System.Collections.Generic.List[PSObject]]$Results
     )
 
-    $Groups = Get-MgBetaUserTransitiveMemberOfAsGroup -UserId $User.Id -All -ErrorAction Stop | Where-Object { $_.GroupTypes -ne 'DynamicMembership' }
+    $Groups = Invoke-GTGraphPagedRequest -Uri "v1.0/users/$($User.Id)/transitiveMemberOf/microsoft.graph.group?`$select=id,displayName,groupTypes" | Where-Object { $_.groupTypes -ne 'DynamicMembership' }
     foreach ($Group in $Groups)
     {
         $action = 'RemoveGroupMembership'
         $output = $OutputBase + @{
-            ResourceName = $Group.DisplayName
+            ResourceName = $Group.displayName
             ResourceType = 'Group'
-            ResourceId   = $Group.Id
+            ResourceId   = $Group.id
             Action       = $action
         }
 
@@ -55,8 +55,8 @@ function Remove-GTUserGroupMemberships
         {
             if ($PSCmdlet.ShouldProcess($Group.DisplayName, $action))
             {
-                Write-PSFMessage -Level Verbose -Message "Removing user $($User.UserPrincipalName) from group $($Group.DisplayName)"
-                Remove-MgBetaGroupMemberByRef -GroupId $Group.Id -DirectoryObjectId $User.Id -ErrorAction Stop
+                Write-PSFMessage -Level Verbose -Message "Removing user $($User.UserPrincipalName) from group $($Group.displayName)"
+                Invoke-MgGraphRequest -Method DELETE -Uri "v1.0/groups/$($Group.id)/members/$($User.Id)/`$ref" -ErrorAction Stop
                 $output['Status'] = 'Success'
             }
         }

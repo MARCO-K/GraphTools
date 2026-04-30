@@ -37,7 +37,7 @@ function Get-GTBreakGlassPolicyReport
 
     begin
     {
-        $modules = @('Microsoft.Graph.Identity.SignIns', 'Microsoft.Graph.Users')
+        $modules = @('Microsoft.Graph.Authentication')
         Install-GTRequiredModule -ModuleNames $modules -Verbose:$VerbosePreference
 
         # 1. Scopes Check
@@ -60,21 +60,25 @@ function Get-GTBreakGlassPolicyReport
         Write-PSFMessage -Level Verbose -Message "Resolving Break Glass UPNs to Object IDs..."
         $bgAccounts = @()
         
-        foreach ($upn in $BreakGlassUpn) {
-            try {
-                $user = Get-MgUser -UserId $upn -Property Id, UserPrincipalName -ErrorAction Stop
+        foreach ($upn in $BreakGlassUpn)
+        {
+            try
+            {
+                $resp = Invoke-MgGraphRequest -Method GET -Uri "v1.0/users/$upn?`$select=id,userPrincipalName" -ErrorAction Stop
                 $bgAccounts += [PSCustomObject]@{
-                    Id = $user.Id
-                    Upn = $user.UserPrincipalName
+                    Id  = $resp.id
+                    Upn = $resp.userPrincipalName
                 }
-                Write-PSFMessage -Level Verbose -Message "Resolved $upn to $($user.Id)"
+                Write-PSFMessage -Level Verbose -Message "Resolved $upn to $($resp.id)"
             }
-            catch {
+            catch
+            {
                 Write-Error "Could not find Break Glass user: $upn. Skipping."
             }
         }
 
-        if ($bgAccounts.Count -eq 0) {
+        if ($bgAccounts.Count -eq 0)
+        {
             Write-Error "No valid Break Glass accounts resolved. Aborting."
             return
         }
@@ -93,14 +97,14 @@ function Get-GTBreakGlassPolicyReport
             $props = @('id', 'displayName', 'state', 'conditions', 'grantControls')
 
             Write-PSFMessage -Level Verbose -Message "Fetching CA policies with state: $($State -join ', ')"
-            $policies = Get-MgIdentityConditionalAccessPolicy -Filter $filter -Property $props -ErrorAction Stop
+            $policies = Invoke-GTGraphPagedRequest -Uri "v1.0/identity/conditionalAccess/policies?`$filter=$([Uri]::EscapeDataString($filter))&`$select=$($props -join ',')"
 
             Write-PSFMessage -Level Verbose -Message "Auditing $($policies.Count) policies against $($bgAccounts.Count) break glass accounts..."
 
             foreach ($policy in $policies)
             {
-                $users = $policy.Conditions.Users
-                $controls = $policy.GrantControls.BuiltInControls
+                $users = $policy.conditions.users
+                $controls = $policy.grantControls.builtInControls
                 
                 # Determine if this is a BLOCK policy (Higher Risk)
                 $isBlockPolicy = ($controls -contains 'block')
@@ -114,32 +118,36 @@ function Get-GTBreakGlassPolicyReport
                     # --- Analysis Logic ---
 
                     # Check Exclusions (The most important check)
-                    $isExcluded = ($users.ExcludeUsers -contains $bgUser.Id)
+                    $isExcluded = ($users.excludeUsers -contains $bgUser.Id)
 
                     # Check Inclusions
                     $isTargeted = $false
                     
                     # A. Targeted via "All Users"
-                    if ($users.IncludeUsers -contains 'All') {
+                    if ($users.includeUsers -contains 'All')
+                    {
                         $isTargeted = $true
                     }
                     # B. Targeted via Specific User ID
-                    elseif ($users.IncludeUsers -contains $bgUser.Id) {
+                    elseif ($users.includeUsers -contains $bgUser.Id)
+                    {
                         $isTargeted = $true
                     }
-                    # C. Targeted via Roles (New Feature)
-                    elseif ($users.IncludeRoles.Count -gt 0) {
-                        # We flag this as a potential risk because BG accounts usually hold roles.
-                        # If they aren't excluded, they are likely hit.
-                        if (-not $isExcluded) {
+                    # C. Targeted via Roles
+                    elseif ($users.includeRoles.Count -gt 0)
+                    {
+                        if (-not $isExcluded)
+                        {
                             $status = "Potential Risk"
                             $reason = "Policy targets Roles. Ensure BG account does not hold included roles."
                             $severity = "Warning"
                         }
                     }
                     # D. Targeted via Group
-                    elseif ($users.IncludeGroups.Count -gt 0) {
-                        if (-not $isExcluded) {
+                    elseif ($users.includeGroups.Count -gt 0)
+                    {
+                        if (-not $isExcluded)
+                        {
                             $status = "Potential Risk"
                             $reason = "Policy targets Groups. Ensure BG account is not in included groups."
                             $severity = "Warning"
@@ -158,11 +166,13 @@ function Get-GTBreakGlassPolicyReport
                         else
                         {
                             $status = "RISK"
-                            if ($isBlockPolicy) {
+                            if ($isBlockPolicy)
+                            {
                                 $reason = "User is INCLUDED in a BLOCK policy and NOT excluded."
                                 $severity = "Critical"
                             }
-                            else {
+                            else
+                            {
                                 $reason = "User is INCLUDED and NOT excluded. Controls applied: $($controls -join ', ')"
                                 $severity = "High"
                             }
@@ -173,24 +183,27 @@ function Get-GTBreakGlassPolicyReport
                     if ($status -ne "Not Targeted" -or $PSCmdlet.MyInvocation.BoundParameters["Verbose"])
                     {
                         $report.Add([PSCustomObject]@{
-                            PolicyName      = $policy.DisplayName
-                            PolicyId        = $policy.Id
-                            State           = $policy.State
-                            BreakGlassUser  = $bgUser.Upn
-                            Status          = $status
-                            Severity        = $severity
-                            Reason          = $reason
-                            GrantControls   = $controls -join ', '
-                        })
+                                PolicyName     = $policy.displayName
+                                PolicyId       = $policy.id
+                                State          = $policy.state
+                                BreakGlassUser = $bgUser.Upn
+                                Status         = $status
+                                Severity       = $severity
+                                Reason         = $reason
+                                GrantControls  = $controls -join ', '
+                            })
                     }
                 }
             }
 
             # Output Summary
             $risks = $report | Where-Object { $_.Status -eq 'RISK' }
-            if ($risks) {
+            if ($risks)
+            {
                 Write-PSFMessage -Level Warning -Message "Found $($risks.Count) policies putting Break Glass accounts at RISK."
-            } else {
+            }
+            else
+            {
                 Write-PSFMessage -Level Verbose -Message "No direct risks found."
             }
 

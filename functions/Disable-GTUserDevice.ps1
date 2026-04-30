@@ -90,7 +90,7 @@ Function Disable-GTUserDevice
         $results = New-Object System.Collections.ArrayList
 
         # Module Management
-        $modules = ('Microsoft.Graph.Authentication', 'Microsoft.Graph.Users', 'Microsoft.Graph.Identity.DirectoryManagement')
+        $modules = ('Microsoft.Graph.Authentication')
         Install-GTRequiredModule -ModuleNames $modules -Verbose
 
         # Graph Connection Handling
@@ -112,14 +112,13 @@ Function Disable-GTUserDevice
             {
                 # Performance Optimization: Get user ID first, then query devices directly with filter
                 # This reduces API calls from 1+N to just 2 per user (1 for user ID, 1 for all enabled devices)
-                $userObject = Get-MgUser -UserId $User -Property Id -ErrorAction Stop
-                $userId = $userObject.Id
+                $userResp = Invoke-MgGraphRequest -Method GET -Uri "v1.0/users/$User?`$select=id" -ErrorAction Stop
+                $userId = $userResp.id
 
                 # Validate that userId is a GUID to prevent OData injection
                 Test-GTGuid -InputObject $userId | Out-Null
                 # Get all enabled devices registered to this user in a single API call
-                # This replaces Get-MgUserRegisteredDevice + Get-MgUserRegisteredDeviceAsDevice loop
-                $devicesToDisable = Get-MgDevice -All -Filter "accountEnabled eq true and registeredUsers/any(u:u/id eq '$userId')" -ErrorAction Stop
+                $devicesToDisable = Invoke-GTGraphPagedRequest -Uri "v1.0/devices?`$filter=accountEnabled eq true and registeredUsers/any(u:u/id eq '$userId')"
 
                 if ($null -eq $devicesToDisable -or $devicesToDisable.Count -eq 0)
                 {
@@ -145,18 +144,18 @@ Function Disable-GTUserDevice
                     try
                     {
                         # Describe the target and action for ShouldProcess
-                        $target = "$User - Device: $($device.DisplayName) (ID: $($device.Id))"
+                        $target = "$User - Device: $($device.displayName) (ID: $($device.id))"
                         $action = "Disable device (set AccountEnabled to False)"
 
                         if ($PSCmdlet.ShouldProcess($target, $action))
                         {
-                            Update-MgDevice -DeviceId $device.Id -AccountEnabled:$false -ErrorAction Stop
-                            Write-PSFMessage -Level Verbose -Message "$User - Disable Device Action - Device disabled: $($device.DisplayName) (ID: $($device.Id))"
+                            Invoke-MgGraphRequest -Method PATCH -Uri "v1.0/devices/$($device.id)" -Body @{ accountEnabled = $false } -ContentType 'application/json' -ErrorAction Stop
+                            Write-PSFMessage -Level Verbose -Message "$User - Disable Device Action - Device disabled: $($device.displayName) (ID: $($device.id))"
 
                             $result = [PSCustomObject]@{
                                 User             = $User
-                                DeviceId         = $device.Id
-                                DeviceName       = $device.DisplayName
+                                DeviceId         = $device.id
+                                DeviceName       = $device.displayName
                                 Status           = 'Disabled'
                                 TimeUtc          = $deviceTimeUtc
                                 HttpStatus       = $null
@@ -167,13 +166,12 @@ Function Disable-GTUserDevice
                         }
                         else
                         {
-                            # When -WhatIf or user declines via -Confirm, operation is not performed.
-                            Write-PSFMessage -Level Verbose -Message "$User - Disable Device Action - Skipped (WhatIf/Confirmed=false): $($device.DisplayName) (ID: $($device.Id))"
+                            Write-PSFMessage -Level Verbose -Message "$User - Disable Device Action - Skipped (WhatIf/Confirmed=false): $($device.displayName) (ID: $($device.id))"
 
                             $result = [PSCustomObject]@{
                                 User             = $User
-                                DeviceId         = $device.Id
-                                DeviceName       = $device.DisplayName
+                                DeviceId         = $device.id
+                                DeviceName       = $device.displayName
                                 Status           = 'Skipped'
                                 TimeUtc          = $deviceTimeUtc
                                 HttpStatus       = $null
@@ -206,8 +204,8 @@ Function Disable-GTUserDevice
 
                         $result = [PSCustomObject]@{
                             User             = $User
-                            DeviceId         = $device.Id
-                            DeviceName       = $device.DisplayName
+                            DeviceId         = $device.id
+                            DeviceName       = $device.displayName
                             Status           = 'Failed'
                             TimeUtc          = $deviceTimeUtc
                             HttpStatus       = $errorDetails.HttpStatus

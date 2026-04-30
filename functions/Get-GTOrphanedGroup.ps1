@@ -49,7 +49,7 @@ function Get-GTOrphanedGroup
 
     begin
     {
-        $modules = @('Microsoft.Graph.Beta.Groups')
+        $modules = @('Microsoft.Graph.Authentication')
         Install-GTRequiredModule -ModuleNames $modules -Verbose:$VerbosePreference
 
         # 1. Scopes Check (Gold Standard)
@@ -87,14 +87,15 @@ function Get-GTOrphanedGroup
             
             Write-PSFMessage -Level Verbose -Message "Expanding properties: $($expandProps -join ', ')"
             
-            # Fetch Groups and process via Pipeline (Streaming)
-            # This is memory efficient for large tenants
-            Get-MgBetaGroup -All -Property $selectProps -ExpandProperty $expandProps -ErrorAction Stop | ForEach-Object {
-                $group = $_
+            # Fetch Groups and process via foreach (collect first for memory efficiency)
+            $groups = Invoke-GTGraphPagedRequest -Uri ("v1.0/groups?`$select={0}&`$expand={1}" -f ($selectProps -join ','), ($expandProps -join ','))
+            foreach ($group in $groups)
+            {
+                $group = $group
         
                 # Skip soft-deleted groups
                 # In ForEach-Object, 'return' acts like 'continue' (skips current item)
-                if ($group.DeletedDateTime)
+                if ($group.deletedDateTime)
                 { 
                     Write-PSFMessage -Level Verbose -Message "Skipping soft-deleted group: $($group.DisplayName)"
                     return 
@@ -103,7 +104,7 @@ function Get-GTOrphanedGroup
                 $orphanReasons = [System.Collections.Generic.List[string]]::new()
 
                 # --- Check 1: No Owners ---
-                if (-not $group.Owners -or $group.Owners.Count -eq 0)
+                if (-not $group.owners -or $group.owners.Count -eq 0)
                 {
                     $orphanReasons.Add("NoOwners")
                 }
@@ -113,19 +114,14 @@ function Get-GTOrphanedGroup
                     $activeOwners = 0
                     $statusUnknown = 0
 
-                    foreach ($owner in $group.Owners)
+                    foreach ($owner in $group.owners)
                     {
                         $isEnabled = $null
                 
-                        # Try standard property access
-                        if ($null -ne $owner.AccountEnabled)
+                        # Invoke-MgGraphRequest returns hashtables; access accountEnabled directly
+                        if ($null -ne $owner.accountEnabled)
                         {
-                            $isEnabled = $owner.AccountEnabled
-                        }
-                        # Try dictionary access
-                        elseif ($owner.AdditionalProperties -and $owner.AdditionalProperties.ContainsKey('accountEnabled'))
-                        {
-                            $isEnabled = $owner.AdditionalProperties['accountEnabled']
+                            $isEnabled = $owner.accountEnabled
                         }
 
                         if ($null -ne $isEnabled)
@@ -147,7 +143,7 @@ function Get-GTOrphanedGroup
                 # --- Check 3: Empty Group (Optional) ---
                 if ($CheckEmpty)
                 {
-                    if (-not $group.Members -or $group.Members.Count -eq 0)
+                    if (-not $group.members -or $group.members.Count -eq 0)
                     {
                         $orphanReasons.Add("EmptyGroup")
                     }
@@ -157,13 +153,13 @@ function Get-GTOrphanedGroup
                 if ($orphanReasons.Count -gt 0)
                 {
                     [PSCustomObject]@{
-                        DisplayName     = $group.DisplayName
-                        Id              = $group.Id
-                        MailEnabled     = $group.MailEnabled
-                        SecurityEnabled = $group.SecurityEnabled
-                        GroupTypes      = if ($group.GroupTypes) { $group.GroupTypes -join ', ' } else { $null }
-                        Visibility      = $group.Visibility
-                        CreatedDateTime = $group.CreatedDateTime
+                        DisplayName     = $group.displayName
+                        Id              = $group.id
+                        MailEnabled     = $group.mailEnabled
+                        SecurityEnabled = $group.securityEnabled
+                        GroupTypes      = if ($group.groupTypes) { $group.groupTypes -join ', ' } else { $null }
+                        Visibility      = $group.visibility
+                        CreatedDateTime = $group.createdDateTime
                         OrphanReason    = $orphanReasons -join ', '
                     }
                 }
