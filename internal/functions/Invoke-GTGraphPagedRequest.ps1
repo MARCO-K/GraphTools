@@ -1,4 +1,5 @@
-function Invoke-GTGraphPagedRequest {
+function Invoke-GTGraphPagedRequest
+{
     <#
     .SYNOPSIS
     Executes a paged Microsoft Graph request and aggregates all items.
@@ -29,37 +30,46 @@ function Invoke-GTGraphPagedRequest {
     $results = [System.Collections.Generic.List[object]]::new()
     $nextUri = $Uri
 
-    while (-not [string]::IsNullOrWhiteSpace($nextUri)) {
+    while (-not [string]::IsNullOrWhiteSpace($nextUri))
+    {
         $requestParams = @{
             Method      = 'GET'
             Uri         = $nextUri
             ErrorAction = 'Stop'
         }
-        if ($Headers) {
+        if ($Headers)
+        {
             $requestParams.Headers = $Headers
         }
 
         $response = Invoke-MgGraphRequest @requestParams
 
-        if ($response -and ($response.PSObject.Properties.Name -contains 'value')) {
-            if ($null -ne $response.value) {
-                foreach ($item in $response.value) {
+        if ($response -and ($response.PSObject.Properties.Name -contains 'value'))
+        {
+            if ($null -ne $response.value)
+            {
+                foreach ($item in $response.value)
+                {
                     [void]$results.Add($item)
                 }
             }
         }
-        elseif ($response -is [System.Collections.IEnumerable] -and -not ($response -is [string])) {
-            foreach ($item in $response) {
+        elseif ($response -is [System.Collections.IEnumerable] -and -not ($response -is [string]))
+        {
+            foreach ($item in $response)
+            {
                 [void]$results.Add($item)
             }
         }
 
         $nextUri = $null
-        if ($response -and ($response.PSObject.Properties.Name -contains '@odata.nextLink')) {
+        if ($response -and ($response.PSObject.Properties.Name -contains '@odata.nextLink'))
+        {
             $nextUri = [string]$response.'@odata.nextLink'
         }
 
-        if (-not [string]::IsNullOrWhiteSpace($nextUri) -and $nextUri.StartsWith('https://graph.microsoft.com', [System.StringComparison]::OrdinalIgnoreCase)) {
+        if (-not [string]::IsNullOrWhiteSpace($nextUri) -and $nextUri.StartsWith('https://graph.microsoft.com', [System.StringComparison]::OrdinalIgnoreCase))
+        {
             $nextUri = $nextUri.Substring('https://graph.microsoft.com'.Length)
         }
     }
