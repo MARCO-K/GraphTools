@@ -9,7 +9,7 @@ if (-not (Get-Command Write-PSFMessage -ErrorAction SilentlyContinue)) { functio
 
 Describe "Get-GTGraphErrorDetails" -Tag 'Unit' {
     BeforeAll {
-        $functionFile = Join-Path $PSScriptRoot '..' 'internal' 'functions' 'Get-GTGraphErrorDetails.ps1'
+        $functionFile = Join-Path -Path $PSScriptRoot -ChildPath '..\internal\functions\Get-GTGraphErrorDetails.ps1'
         if (-not (Test-Path $functionFile))
         {
             Throw "Function file not found: $functionFile"
