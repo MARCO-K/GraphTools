@@ -82,7 +82,7 @@ function Get-GTInactiveUser
             $requiredScopes += 'Directory.Read.All'
         }
 
-        if (-not (Initialize-GTBeginBlock -ModuleNames $modules -RequiredScopes $requiredScopes -InitializeConnection -NewSession:$NewSession -ConnectionErrorMessage "Failed to acquire required permissions ($($requiredScopes -join ', ')). Aborting."))
+        if (-not (Initialize-GTBeginBlock -ModuleNames $modules -RequiredScopes $requiredScopes -InitializeConnection -ValidateScopes -NewSession:$NewSession -ScopeValidationErrorMessage "Failed to acquire required permissions ($($requiredScopes -join ', ')). Aborting."))
         {
             return
         }
