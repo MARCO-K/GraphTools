@@ -9,14 +9,7 @@ if (-not (Get-Command Write-PSFMessage -ErrorAction SilentlyContinue)) { functio
 
 Describe "Get-GTGraphErrorDetails" -Tag 'Unit' {
     BeforeAll {
-        
-        if (-not (Get-Command Install-GTRequiredModule -ErrorAction SilentlyContinue)) { function Install-GTRequiredModule { param([string[]]$ModuleNames, [string]$Scope, [switch]$AllowPrerelease) } }
-        if (-not (Get-Command Initialize-GTGraphConnection -ErrorAction SilentlyContinue)) { function Initialize-GTGraphConnection { param([string[]]$Scopes, [switch]$NewSession, [switch]$SkipConnect) return $true } }
-        if (-not (Get-Command Test-GTGraphScopes -ErrorAction SilentlyContinue)) { function Test-GTGraphScopes { param([string[]]$RequiredScopes, [switch]$Reconnect, [switch]$Quiet) return $true } }
-        if (-not (Get-Command Write-PSFMessage -ErrorAction SilentlyContinue)) { function Write-PSFMessage { param($Level, $Message, $ErrorRecord) } }
-
-        
-        $functionFile = Join-Path $PSScriptRoot '..' 'internal' 'functions' 'Get-GTGraphErrorDetails.ps1'
+        $functionFile = Join-Path $PSScriptRoot (Join-Path '..' (Join-Path 'internal' (Join-Path 'functions' 'Get-GTGraphErrorDetails.ps1')))
         if (-not (Test-Path $functionFile))
         {
             Throw "Function file not found: $functionFile"
@@ -88,6 +81,16 @@ Describe "Get-GTGraphErrorDetails" -Tag 'Unit' {
 
             $result.HttpStatus | Should -Be 400
             $result.Reason | Should -Match 'Bad request'
+        }
+
+        It "extracts 401 status from 'Unauthorized' message" {
+            $exception = [System.Exception]::new('401 Unauthorized - Token expired')
+
+            $result = Get-GTGraphErrorDetails -Exception $exception
+
+            $result.HttpStatus | Should -Be 401
+            $result.Reason | Should -Match 'Unauthorized'
+            $result.LogLevel | Should -Be 'Error'
         }
     }
 
