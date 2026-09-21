@@ -6,12 +6,15 @@ function Get-GTRiskyAppPermissionReport
 
     .DESCRIPTION
     Retrieves Service Principals and analyzes their permissions (App Roles & OAuth Grants).
-    It adds forensic context (Who, When, Usage) and supports targeted analysis by App, Type, and Risk.
+    Evaluates permissions using official Microsoft Graph DevX metadata (privilegeLevel 1-5)
+    and curated high-impact security profiles. Adds forensic context (Who, When, Usage)
+    and supports targeted analysis by App, Type, and Risk.
 
     RISK SCORING:
-    - 10 (Critical): Full Tenant Takeover.
-    - 7-9 (High): Data Exfiltration/Destruction.
-    - 6 (Medium): Impersonation.
+    - 9-10 (Critical): Full Tenant Takeover / Destruction.
+    - 7-8 (High): Broad Data Access / Exfiltration / Privilege Escalation.
+    - 5-6 (Medium): Standard Write Access / Impersonation.
+    - 1-4 (Low): Least Privilege / Basic Read Access.
 
     .PARAMETER AppId
     Optional. Filter by specific Application (Client) IDs.
@@ -22,6 +25,12 @@ function Get-GTRiskyAppPermissionReport
 
     .PARAMETER RiskLevel
     Filter output by specific risk levels (e.g., 'Critical', 'High'). Default returns all identified risks.
+
+    .PARAMETER MinPrivilegeLevel
+    Optional. Filter permissions by minimum Microsoft DevX privilege level (1-5).
+
+    .PARAMETER PermissionsFile
+    Optional. Custom file path to a graph-permissions.json metadata fixture. Defaults to data/graph-permissions.json.
 
     .PARAMETER HighRiskScopes
     Optional. Additional scopes to flag.
@@ -40,6 +49,11 @@ function Get-GTRiskyAppPermissionReport
 
         [ValidateSet('Critical', 'High', 'Medium', 'Low')]
         [string[]]$RiskLevel,
+
+        [ValidateRange(1, 5)]
+        [int]$MinPrivilegeLevel,
+
+        [string]$PermissionsFile,
 
         [string[]]$HighRiskScopes,
         [switch]$NewSession
@@ -66,8 +80,11 @@ function Get-GTRiskyAppPermissionReport
             return
         }
 
-        # 3. Define Risk Engine
-        $RiskEngine = @{
+        # 3. Load DevX Permissions Catalog
+        $permissionCatalog = Get-GTPermissionDefinition -PermissionsFile $PermissionsFile
+
+        # 4. Curated High-Impact Overrides
+        $CuratedOverrides = @{
             'RoleManagement.ReadWrite.Directory' = @{ Score = 10; Level = 'Critical'; Impact = 'Privilege Escalation'; Desc = 'Can promote self to Global Admin' }
             'AppRoleAssignment.ReadWrite.All'    = @{ Score = 10; Level = 'Critical'; Impact = 'Privilege Escalation'; Desc = 'Can grant self any permission' }
             'Directory.ReadWrite.All'            = @{ Score = 9;  Level = 'Critical'; Impact = 'Tenant Destruction';   Desc = 'Can delete users, groups, and apps' }
@@ -79,11 +96,6 @@ function Get-GTRiskyAppPermissionReport
             'User.ReadWrite.All'                 = @{ Score = 6;  Level = 'Medium';   Impact = 'User Modification';    Desc = 'Can modify user profiles' }
         }
 
-        $TargetScopes = [System.Collections.Generic.List[string]]::new($RiskEngine.Keys)
-        if ($HighRiskScopes) {
-            foreach ($s in $HighRiskScopes) { if (-not $TargetScopes.Contains($s)) { $TargetScopes.Add($s) } }
-        }
-        
         $UserCache = @{}
         $targetAppIds = [System.Collections.Generic.List[string]]::new()
     }
@@ -96,9 +108,99 @@ function Get-GTRiskyAppPermissionReport
     end
     {
         $CalculateRisk = {
-            param($PermissionName)
-            if ($RiskEngine.ContainsKey($PermissionName)) { return $RiskEngine[$PermissionName] }
-            else { return @{ Score = 5; Level = 'Medium'; Impact = 'Custom Definition'; Desc = 'Flagged by user parameter' } }
+            param(
+                [string]$PermissionName,
+                [ValidateSet('Application', 'Delegated')][string]$Scheme = 'Application'
+            )
+
+            # Check curated attack profiles first
+            if ($CuratedOverrides.ContainsKey($PermissionName))
+            {
+                $curated = $CuratedOverrides[$PermissionName]
+                $devxMeta = if ($permissionCatalog -and $permissionCatalog.ContainsKey($PermissionName)) { $permissionCatalog[$PermissionName] } else { $null }
+                $devxPriv = if ($devxMeta) {
+                    if ($Scheme -eq 'Application') { $devxMeta['appPrivilegeLevel'] } else { $devxMeta['delegatedPrivilegeLevel'] }
+                } else { $null }
+                $adminConsent = if ($devxMeta) { $devxMeta['requiresAdminConsent'] } else { $true }
+
+                return [PSCustomObject]@{
+                    Score                = $curated.Score
+                    Level                = $curated.Level
+                    Impact               = $curated.Impact
+                    Desc                 = $curated.Desc
+                    PrivilegeLevel       = if ($null -ne $devxPriv) { [int]$devxPriv } else { 4 }
+                    AdminConsentRequired = [bool]$adminConsent
+                }
+            }
+
+            # Evaluate DevX catalog metadata
+            if ($permissionCatalog -and $permissionCatalog.ContainsKey($PermissionName))
+            {
+                $meta = $permissionCatalog[$PermissionName]
+                $privLevel = if ($Scheme -eq 'Application') { $meta['appPrivilegeLevel'] } else { $meta['delegatedPrivilegeLevel'] }
+
+                if ($null -eq $privLevel)
+                {
+                    $privLevel = if ($Scheme -eq 'Application') { $meta['delegatedPrivilegeLevel'] } else { $meta['appPrivilegeLevel'] }
+                }
+
+                $adminConsent = [bool]$meta['requiresAdminConsent']
+                $desc = if ($meta['description']) { $meta['description'] } else { "Microsoft Graph permission: $PermissionName" }
+
+                switch ($privLevel)
+                {
+                    { $_ -ge 4 } {
+                        return [PSCustomObject]@{
+                            Score                = 8
+                            Level                = 'High'
+                            Impact               = 'High Privilege'
+                            Desc                 = $desc
+                            PrivilegeLevel       = [int]$privLevel
+                            AdminConsentRequired = $adminConsent
+                        }
+                    }
+                    3 {
+                        return [PSCustomObject]@{
+                            Score                = 6
+                            Level                = 'Medium'
+                            Impact               = 'Medium Privilege'
+                            Desc                 = $desc
+                            PrivilegeLevel       = 3
+                            AdminConsentRequired = $adminConsent
+                        }
+                    }
+                    2 {
+                        return [PSCustomObject]@{
+                            Score                = 4
+                            Level                = 'Low'
+                            Impact               = 'Low Privilege'
+                            Desc                 = $desc
+                            PrivilegeLevel       = 2
+                            AdminConsentRequired = $adminConsent
+                        }
+                    }
+                    default {
+                        return [PSCustomObject]@{
+                            Score                = 2
+                            Level                = 'Low'
+                            Impact               = 'Least Privilege'
+                            Desc                 = $desc
+                            PrivilegeLevel       = if ($null -ne $privLevel) { [int]$privLevel } else { 1 }
+                            AdminConsentRequired = $adminConsent
+                        }
+                    }
+                }
+            }
+
+            # Unknown or custom scope
+            return [PSCustomObject]@{
+                Score                = 5
+                Level                = 'Medium'
+                Impact               = 'Custom Definition'
+                Desc                 = 'Flagged by user parameter'
+                PrivilegeLevel       = $null
+                AdminConsentRequired = $null
+            }
         }
 
         $report = [System.Collections.Generic.List[PSCustomObject]]::new()
@@ -106,14 +208,14 @@ function Get-GTRiskyAppPermissionReport
 
         try
         {
-            # --- Pre-Req: Cache Microsoft Graph App Roles ---
+            # Cache Microsoft Graph App Roles for app-only ID-to-Name resolution
             Write-PSFMessage -Level Verbose -Message "Caching Microsoft Graph App Roles..."
             $graphSpResp = Invoke-MgGraphRequest -Method GET -Uri "v1.0/servicePrincipals?`$filter=appId eq '00000003-0000-0000-c000-000000000000'&`$select=id,appRoles" -ErrorAction Stop
             $graphSp = $graphSpResp.value[0]
             $roleMap = @{}
             foreach ($role in $graphSp.appRoles) { $roleMap[$role.id] = $role.value }
 
-            # --- Fetch Service Principals (Targeted or All) ---
+            # Fetch Service Principals
             # beta required: signInActivity is not available on servicePrincipals in v1.0
             if ($targetAppIds.Count -gt 0) {
                 $safeIds = $targetAppIds | ForEach-Object { ($_ -replace "'", "''") }
@@ -126,18 +228,16 @@ function Get-GTRiskyAppPermissionReport
                 $sps = Invoke-GTGraphPagedRequest -Uri "beta/servicePrincipals?`$select=id,appId,displayName,signInActivity&`$expand=appRoleAssignments"
             }
             
-            # Create lookup for later OAuth matching
             $spLookup = @{}
             foreach ($sp in $sps) { $spLookup[$sp.id] = $sp }
 
-            # --- Phase 1: App-Only Permissions ---
+            # Phase 1: App-Only Permissions
             if ($PermissionType -in 'Both', 'AppOnly')
             {
                 Write-PSFMessage -Level Verbose -Message "Analyzing App-Only Assignments..."
                 
                 foreach ($sp in $sps)
                 {
-                    # Check Usage
                     $lastSignIn = $sp.signInActivity.lastSignInDateTime
                     $isActive = $false
                     if ($lastSignIn) {
@@ -153,24 +253,50 @@ function Get-GTRiskyAppPermissionReport
                             {
                                 $permName = $roleMap[$assign.appRoleId]
                                 
-                                if ($permName -and ($TargetScopes -contains $permName))
+                                if ($permName)
                                 {
-                                    $riskInfo = & $CalculateRisk -PermissionName $permName
-                                    
-                                    $report.Add([PSCustomObject]@{
-                                        AppName        = $sp.displayName
-                                        AppId          = $sp.appId
-                                        Type           = "Application (App-Only)"
-                                        Permission     = $permName
-                                        RiskLevel      = $riskInfo.Level
-                                        RiskScore      = $riskInfo.Score
-                                        Impact         = $riskInfo.Impact
-                                        GrantedDate    = $assign.creationTimestamp
-                                        GrantedBy      = "Administrator"
-                                        LastSignIn     = $lastSignIn
-                                        IsActive       = $isActive
-                                        Description    = $riskInfo.Desc
-                                    })
+                                    $riskInfo = & $CalculateRisk -PermissionName $permName -Scheme 'Application'
+
+                                    # Inclusion decision
+                                    $isCandidate = $false
+                                    if ($HighRiskScopes -and ($HighRiskScopes -contains $permName)) {
+                                        $isCandidate = $true
+                                    }
+                                    elseif ($MinPrivilegeLevel) {
+                                        if ($riskInfo.PrivilegeLevel -and ($riskInfo.PrivilegeLevel -ge $MinPrivilegeLevel)) {
+                                            $isCandidate = $true
+                                        }
+                                    }
+                                    elseif ($RiskLevel) {
+                                        if ($riskInfo.Level -in $RiskLevel) {
+                                            $isCandidate = $true
+                                        }
+                                    }
+                                    else {
+                                        if ($riskInfo.Level -in @('Critical', 'High') -or $CuratedOverrides.ContainsKey($permName)) {
+                                            $isCandidate = $true
+                                        }
+                                    }
+
+                                    if ($isCandidate)
+                                    {
+                                        $report.Add([PSCustomObject]@{
+                                            AppName              = $sp.displayName
+                                            AppId                = $sp.appId
+                                            Type                 = "Application (App-Only)"
+                                            Permission           = $permName
+                                            RiskLevel            = $riskInfo.Level
+                                            RiskScore            = $riskInfo.Score
+                                            PrivilegeLevel       = $riskInfo.PrivilegeLevel
+                                            AdminConsentRequired = $riskInfo.AdminConsentRequired
+                                            Impact               = $riskInfo.Impact
+                                            GrantedDate          = $assign.creationTimestamp
+                                            GrantedBy            = "Administrator"
+                                            LastSignIn           = $lastSignIn
+                                            IsActive             = $isActive
+                                            Description          = $riskInfo.Desc
+                                        })
+                                    }
                                 }
                             }
                         }
@@ -178,7 +304,7 @@ function Get-GTRiskyAppPermissionReport
                 }
             }
 
-            # --- Phase 2: Delegated Permissions ---
+            # Phase 2: Delegated Permissions
             if ($PermissionType -in 'Both', 'Delegated')
             {
                 Write-PSFMessage -Level Verbose -Message "Fetching Delegated Grants..."
@@ -202,64 +328,85 @@ function Get-GTRiskyAppPermissionReport
                     
                     foreach ($scope in $grantedScopes)
                     {
-                        if ($TargetScopes -contains $scope)
+                        if (-not [string]::IsNullOrWhiteSpace($scope))
                         {
-                            # Resolve Client App Details
-                            $clientSp = $spLookup[$grant.clientId]
-                            
-                            $appName = if ($clientSp) { $clientSp.displayName } else { $grant.clientId }
-                            $appId = if ($clientSp) { $clientSp.appId } else { "Unknown" }
-                            
-                            # Usage Check
-                            $lastSignIn = if ($clientSp) { $clientSp.signInActivity.lastSignInDateTime } else { $null }
-                            $isActive = $false
-                            if ($lastSignIn) {
-                                $daysSince = (New-TimeSpan -Start $lastSignIn -End $utcNow).Days
-                                if ($daysSince -le 90) { $isActive = $true }
-                            }
+                            $riskInfo = & $CalculateRisk -PermissionName $scope -Scheme 'Delegated'
 
-                            # Resolve "Who"
-                            $grantedBy = "Unknown"
-                            $target = "Specific User"
-
-                            if ($grant.consentType -eq 'AllPrincipals') {
-                                $target = "Entire Tenant"
-                                $grantedBy = "Administrator"
+                            # Inclusion decision
+                            $isCandidate = $false
+                            if ($HighRiskScopes -and ($HighRiskScopes -contains $scope)) {
+                                $isCandidate = $true
                             }
-                            elseif ($grant.principalId) {
-                                if (-not $UserCache.ContainsKey($grant.principalId)) {
-                                    try {
-                                        $uResp = Invoke-MgGraphRequest -Method GET -Uri "v1.0/users/$($grant.principalId)?`$select=userPrincipalName" -ErrorAction SilentlyContinue
-                                        $UserCache[$grant.principalId] = if ($uResp) { $uResp.userPrincipalName } else { "Deleted User ($($grant.principalId))" }
-                                    } catch {
-                                        $UserCache[$grant.principalId] = "Unknown"
-                                    }
+                            elseif ($MinPrivilegeLevel) {
+                                if ($riskInfo.PrivilegeLevel -and ($riskInfo.PrivilegeLevel -ge $MinPrivilegeLevel)) {
+                                    $isCandidate = $true
                                 }
-                                $grantedBy = $UserCache[$grant.principalId]
+                            }
+                            elseif ($RiskLevel) {
+                                if ($riskInfo.Level -in $RiskLevel) {
+                                    $isCandidate = $true
+                                }
+                            }
+                            else {
+                                if ($riskInfo.Level -in @('Critical', 'High') -or $CuratedOverrides.ContainsKey($scope)) {
+                                    $isCandidate = $true
+                                }
                             }
 
-                            $riskInfo = & $CalculateRisk -PermissionName $scope
+                            if ($isCandidate)
+                            {
+                                $clientSp = $spLookup[$grant.clientId]
+                                $appName = if ($clientSp) { $clientSp.displayName } else { $grant.clientId }
+                                $appId = if ($clientSp) { $clientSp.appId } else { "Unknown" }
+                                
+                                $lastSignIn = if ($clientSp) { $clientSp.signInActivity.lastSignInDateTime } else { $null }
+                                $isActive = $false
+                                if ($lastSignIn) {
+                                    $daysSince = (New-TimeSpan -Start $lastSignIn -End $utcNow).Days
+                                    if ($daysSince -le 90) { $isActive = $true }
+                                }
 
-                            $report.Add([PSCustomObject]@{
-                                AppName        = $appName
-                                AppId          = $appId
-                                Type           = "Delegated ($target)"
-                                Permission     = $scope
-                                RiskLevel      = $riskInfo.Level
-                                RiskScore      = $riskInfo.Score
-                                Impact         = $riskInfo.Impact
-                                GrantedDate    = $grant.startTime
-                                GrantedBy      = $grantedBy
-                                LastSignIn     = $lastSignIn
-                                IsActive       = $isActive
-                                Description    = $riskInfo.Desc
-                            })
+                                $grantedBy = "Unknown"
+                                $target = "Specific User"
+
+                                if ($grant.consentType -eq 'AllPrincipals') {
+                                    $target = "Entire Tenant"
+                                    $grantedBy = "Administrator"
+                                }
+                                elseif ($grant.principalId) {
+                                    if (-not $UserCache.ContainsKey($grant.principalId)) {
+                                        try {
+                                            $uResp = Invoke-MgGraphRequest -Method GET -Uri "v1.0/users/$($grant.principalId)?`$select=userPrincipalName" -ErrorAction SilentlyContinue
+                                            $UserCache[$grant.principalId] = if ($uResp) { $uResp.userPrincipalName } else { "Deleted User ($($grant.principalId))" }
+                                        } catch {
+                                            $UserCache[$grant.principalId] = "Unknown"
+                                        }
+                                    }
+                                    $grantedBy = $UserCache[$grant.principalId]
+                                }
+
+                                $report.Add([PSCustomObject]@{
+                                    AppName              = $appName
+                                    AppId                = $appId
+                                    Type                 = "Delegated ($target)"
+                                    Permission           = $scope
+                                    RiskLevel            = $riskInfo.Level
+                                    RiskScore            = $riskInfo.Score
+                                    PrivilegeLevel       = $riskInfo.PrivilegeLevel
+                                    AdminConsentRequired = $riskInfo.AdminConsentRequired
+                                    Impact               = $riskInfo.Impact
+                                    GrantedDate          = $grant.startTime
+                                    GrantedBy            = $grantedBy
+                                    LastSignIn           = $lastSignIn
+                                    IsActive             = $isActive
+                                    Description          = $riskInfo.Desc
+                                })
+                            }
                         }
                     }
                 }
             }
 
-            # --- Filter & Sort ---
             if ($RiskLevel) {
                 $report = $report | Where-Object { $_.RiskLevel -in $RiskLevel }
             }

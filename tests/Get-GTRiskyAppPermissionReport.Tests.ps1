@@ -4,22 +4,35 @@ if (-not (Get-Command Initialize-GTGraphConnection -ErrorAction SilentlyContinue
 if (-not (Get-Command Test-GTGraphScopes -ErrorAction SilentlyContinue)) { function Test-GTGraphScopes { param([string[]]$RequiredScopes, [switch]$Reconnect, [switch]$Quiet) return $true } }
 if (-not (Get-Command Write-PSFMessage -ErrorAction SilentlyContinue)) { function Write-PSFMessage { param($Level, $Message, $ErrorRecord) } }
 if (-not (Get-Command Get-UTCTime -ErrorAction SilentlyContinue)) { function Get-UTCTime { return [DateTime]::UtcNow } }
-
-## (Function will be dot-sourced in BeforeAll to allow Pester mocks to register first)
+if (-not (Get-Command Invoke-GTGraphPagedRequest -ErrorAction SilentlyContinue)) { function Invoke-GTGraphPagedRequest { param($Uri, $Headers) return @() } }
+if (-not (Get-Command Invoke-MgGraphRequest -ErrorAction SilentlyContinue)) { function Invoke-MgGraphRequest { param($Method, $Uri, $ErrorAction) return $null } }
+if (-not (Get-Command Get-GTGraphErrorDetails -ErrorAction SilentlyContinue)) { function Get-GTGraphErrorDetails { param($Exception, $ResourceType) return [PSCustomObject]@{ LogLevel = 'Error'; Reason = 'Error'; ErrorMessage = 'Error' } } }
 
 Describe "Get-GTRiskyAppPermissionReport" {
     BeforeAll {
-        # Mock Get-MgContext to simulate being connected
-        Mock -CommandName "Get-MgContext" -MockWith {
-            return @{ Scopes = @('AppRoleAssignment.Read.All', 'DelegatedPermissionGrant.Read.All', 'Application.Read.All', 'AuditLog.Read.All', 'User.Read.All') }
-        }
+        function Install-GTRequiredModule { param([string[]]$ModuleNames, [string]$Scope, [switch]$AllowPrerelease) }
+        function Initialize-GTGraphConnection { param([string[]]$Scopes, [switch]$NewSession, [switch]$SkipConnect) return $true }
+        function Test-GTGraphScopes { param([string[]]$RequiredScopes, [switch]$Reconnect, [switch]$Quiet) return $true }
+        function Write-PSFMessage { param($Level, $Message, $ErrorRecord) }
+        function Get-UTCTime { return [DateTime]::UtcNow }
+        function Invoke-GTGraphPagedRequest { param($Uri, $Headers) return @() }
+        function Invoke-MgGraphRequest { param($Method, $Uri, $ErrorAction) return $null }
+        function Get-GTGraphErrorDetails { param($Exception, $ResourceType) return [PSCustomObject]@{ LogLevel = 'Error'; Reason = 'Error'; ErrorMessage = 'Error' } }
+
+        $helperPath = "$PSScriptRoot/../internal/functions/Get-GTPermissionDefinition.ps1"
+        if (Test-Path $helperPath) { . $helperPath } else { Throw "Helper not found: $helperPath" }
+
         $functionPath = "$PSScriptRoot/../functions/Get-GTRiskyAppPermissionReport.ps1"
-        if (Test-Path $functionPath) { . $functionPath } else { Throw "Function file not found: $functionPath" }
+        if (Test-Path $functionPath) { . $functionPath } else { Throw "Function not found: $functionPath" }
     }
 
     Context "Parameter Validation" {
         It "should accept pipeline input for AppId" {
-            Mock -CommandName "Get-MgBetaServicePrincipal" -MockWith { return @() }
+            Mock -CommandName "Invoke-MgGraphRequest" -MockWith {
+                return [PSCustomObject]@{ value = @([PSCustomObject]@{ id = "graph-sp-id"; appRoles = @() }) }
+            }
+            Mock -CommandName "Invoke-GTGraphPagedRequest" -MockWith { return @() }
+
             { "test-app-id" | Get-GTRiskyAppPermissionReport } | Should -Not -Throw
         }
 
@@ -30,59 +43,79 @@ Describe "Get-GTRiskyAppPermissionReport" {
         It "should validate RiskLevel parameter" {
             { Get-GTRiskyAppPermissionReport -RiskLevel "Invalid" } | Should -Throw
         }
+
+        It "should validate MinPrivilegeLevel range" {
+            { Get-GTRiskyAppPermissionReport -MinPrivilegeLevel 6 } | Should -Throw
+        }
     }
 
     Context "Microsoft Graph Resolution" {
         It "should cache Microsoft Graph app roles" {
-            Mock -CommandName "Get-MgBetaServicePrincipal" -MockWith {
-                param($Filter)
-                if ($Filter -like "*00000003-0000-0000-c000-000000000000*") {
+            Mock -CommandName "Invoke-MgGraphRequest" -MockWith {
+                param($Uri)
+                if ($Uri -like "*00000003-0000-0000-c000-000000000000*") {
                     return [PSCustomObject]@{
-                        Id = "graph-sp-id"
-                        AppRoles = @(
-                            [PSCustomObject]@{ Id = "role-guid-1"; Value = "Directory.ReadWrite.All" }
-                            [PSCustomObject]@{ Id = "role-guid-2"; Value = "Mail.ReadWrite" }
+                        value = @(
+                            [PSCustomObject]@{
+                                id = "graph-sp-id"
+                                appRoles = @(
+                                    [PSCustomObject]@{ id = "role-guid-1"; value = "Directory.ReadWrite.All" }
+                                    [PSCustomObject]@{ id = "role-guid-2"; value = "Mail.ReadWrite" }
+                                )
+                            }
                         )
                     }
                 }
-                return @()
+                return $null
             }
+            Mock -CommandName "Invoke-GTGraphPagedRequest" -MockWith { return @() }
 
             $result = Get-GTRiskyAppPermissionReport
-            # Should not throw and complete execution
-            $true | Should -BeTrue  # Just ensuring no exceptions
+            $true | Should -BeTrue
         }
     }
 
     Context "App-Only Permissions Analysis" {
         BeforeEach {
-            Mock -CommandName "Get-MgBetaServicePrincipal" -MockWith {
-                param($Filter)
-                if ($Filter -like "*00000003-0000-0000-c000-000000000000*") {
+            Mock -CommandName "Invoke-MgGraphRequest" -MockWith {
+                param($Uri)
+                if ($Uri -like "*00000003-0000-0000-c000-000000000000*") {
                     return [PSCustomObject]@{
-                        Id = "graph-sp-id"
-                        AppRoles = @(
-                            [PSCustomObject]@{ Id = "role-guid-1"; Value = "Directory.ReadWrite.All" }
-                        )
-                    }
-                }
-                return @(
-                    [PSCustomObject]@{
-                        Id = "sp-1"
-                        AppId = "app-1"
-                        DisplayName = "Test App"
-                        SignInActivity = [PSCustomObject]@{ LastSignInDateTime = (Get-Date).AddDays(-30) }
-                        AppRoleAssignments = @(
+                        value = @(
                             [PSCustomObject]@{
-                                ResourceId = "graph-sp-id"
-                                AppRoleId = "role-guid-1"
-                                CreationTimestamp = (Get-Date).AddDays(-60)
+                                id = "graph-sp-id"
+                                appRoles = @(
+                                    [PSCustomObject]@{ id = "role-guid-1"; value = "Directory.ReadWrite.All" }
+                                    [PSCustomObject]@{ id = "role-guid-2"; value = "Application.ReadWrite.All" }
+                                )
                             }
                         )
                     }
-                )
+                }
+                return $null
             }
-            Mock -CommandName "Get-MgBetaOauth2PermissionGrant" -MockWith { return @() }
+
+            Mock -CommandName "Invoke-GTGraphPagedRequest" -MockWith {
+                param($Uri)
+                if ($Uri -like "*servicePrincipals*") {
+                    return @(
+                        [PSCustomObject]@{
+                            id = "sp-1"
+                            appId = "app-1"
+                            displayName = "Test App"
+                            signInActivity = [PSCustomObject]@{ lastSignInDateTime = (Get-Date).AddDays(-30) }
+                            appRoleAssignments = @(
+                                [PSCustomObject]@{
+                                    resourceId = "graph-sp-id"
+                                    appRoleId = "role-guid-1"
+                                    creationTimestamp = (Get-Date).AddDays(-60)
+                                }
+                            )
+                        }
+                    )
+                }
+                return @()
+            }
         }
 
         It "should detect high-risk app-only permissions" {
@@ -91,6 +124,7 @@ Describe "Get-GTRiskyAppPermissionReport" {
             $result.Permission | Should -Contain "Directory.ReadWrite.All"
             $result.RiskLevel | Should -Contain "Critical"
             $result.Type | Should -Contain "Application (App-Only)"
+            $result.PrivilegeLevel | Should -Be 4
         }
 
         It "should include usage information" {
@@ -108,33 +142,43 @@ Describe "Get-GTRiskyAppPermissionReport" {
 
     Context "Delegated Permissions Analysis" {
         BeforeEach {
-            Mock -CommandName "Get-MgBetaServicePrincipal" -MockWith {
-                param($Filter)
-                if ($Filter -like "*00000003-0000-0000-c000-000000000000*") {
+            Mock -CommandName "Invoke-MgGraphRequest" -MockWith {
+                param($Uri)
+                if ($Uri -like "*00000003-0000-0000-c000-000000000000*") {
                     return [PSCustomObject]@{
-                        Id = "graph-sp-id"
-                        AppRoles = @()
+                        value = @([PSCustomObject]@{ id = "graph-sp-id"; appRoles = @() })
                     }
                 }
-                return @(
-                    [PSCustomObject]@{
-                        Id = "sp-1"
-                        AppId = "app-1"
-                        DisplayName = "Test App"
-                        SignInActivity = [PSCustomObject]@{ LastSignInDateTime = (Get-Date).AddDays(-10) }
-                    }
-                )
+                if ($Uri -like "*v1.0/users/*") {
+                    return [PSCustomObject]@{ userPrincipalName = "user@contoso.com" }
+                }
+                return $null
             }
-            Mock -CommandName "Get-MgBetaOauth2PermissionGrant" -MockWith {
-                return @(
-                    [PSCustomObject]@{
-                        ClientId = "sp-1"
-                        Scope = "Mail.ReadWrite Directory.ReadWrite.All"
-                        ConsentType = "AllPrincipals"
-                        StartTime = (Get-Date).AddDays(-30)
-                        PrincipalId = $null
-                    }
-                )
+
+            Mock -CommandName "Invoke-GTGraphPagedRequest" -MockWith {
+                param($Uri)
+                if ($Uri -like "*servicePrincipals*") {
+                    return @(
+                        [PSCustomObject]@{
+                            id = "sp-1"
+                            appId = "app-1"
+                            displayName = "Test App"
+                            signInActivity = [PSCustomObject]@{ lastSignInDateTime = (Get-Date).AddDays(-10) }
+                        }
+                    )
+                }
+                if ($Uri -like "*oauth2PermissionGrants*") {
+                    return @(
+                        [PSCustomObject]@{
+                            clientId = "sp-1"
+                            scope = "Mail.ReadWrite Directory.ReadWrite.All"
+                            consentType = "AllPrincipals"
+                            startTime = (Get-Date).AddDays(-30)
+                            principalId = $null
+                        }
+                    )
+                }
+                return @()
             }
         }
 
@@ -147,19 +191,30 @@ Describe "Get-GTRiskyAppPermissionReport" {
         }
 
         It "should resolve user-specific grants" {
-            Mock -CommandName "Get-MgUser" -MockWith {
-                return [PSCustomObject]@{ UserPrincipalName = "user@contoso.com" }
-            }
-            Mock -CommandName "Get-MgBetaOauth2PermissionGrant" -MockWith {
-                return @(
-                    [PSCustomObject]@{
-                        ClientId = "sp-1"
-                        Scope = "Mail.Read"
-                        ConsentType = "Principal"
-                        StartTime = (Get-Date).AddDays(-15)
-                        PrincipalId = "user-guid"
-                    }
-                )
+            Mock -CommandName "Invoke-GTGraphPagedRequest" -MockWith {
+                param($Uri)
+                if ($Uri -like "*servicePrincipals*") {
+                    return @(
+                        [PSCustomObject]@{
+                            id = "sp-1"
+                            appId = "app-1"
+                            displayName = "Test App"
+                            signInActivity = [PSCustomObject]@{ lastSignInDateTime = (Get-Date).AddDays(-10) }
+                        }
+                    )
+                }
+                if ($Uri -like "*oauth2PermissionGrants*") {
+                    return @(
+                        [PSCustomObject]@{
+                            clientId = "sp-1"
+                            scope = "Mail.Read"
+                            consentType = "Principal"
+                            startTime = (Get-Date).AddDays(-15)
+                            principalId = "user-guid"
+                        }
+                    )
+                }
+                return @()
             }
 
             $result = Get-GTRiskyAppPermissionReport -PermissionType Delegated
@@ -169,123 +224,167 @@ Describe "Get-GTRiskyAppPermissionReport" {
 
         It "should filter by risk level" {
             $result = Get-GTRiskyAppPermissionReport -PermissionType Delegated -RiskLevel Critical
-            # Directory.ReadWrite.All should be filtered as Critical
             $result | Where-Object { $_.Permission -eq "Directory.ReadWrite.All" } | Should -Not -BeNullOrEmpty
-            $result | Where-Object { $_.Permission -eq "Mail.ReadWrite" } | Should -BeNullOrEmpty  # High, not Critical
+            $result | Where-Object { $_.Permission -eq "Mail.ReadWrite" } | Should -BeNullOrEmpty
         }
     }
 
-    Context "Risk Scoring" {
-        It "should assign correct risk scores" {
-            Mock -CommandName "Get-MgBetaServicePrincipal" -MockWith {
-                param($Filter)
-                if ($Filter -like "*00000003-0000-0000-c000-000000000000*") {
+    Context "DevX Metadata Integration" {
+        It "should resolve privilege level and admin consent from catalog" {
+            Mock -CommandName "Invoke-MgGraphRequest" -MockWith {
+                param($Uri)
+                if ($Uri -like "*00000003-0000-0000-c000-000000000000*") {
                     return [PSCustomObject]@{
-                        Id = "graph-sp-id"
-                        AppRoles = @(
-                            [PSCustomObject]@{ Id = "role-guid-1"; Value = "RoleManagement.ReadWrite.Directory" }
-                        )
-                    }
-                }
-                return @(
-                    [PSCustomObject]@{
-                        Id = "sp-1"
-                        AppId = "app-1"
-                        DisplayName = "Test App"
-                        SignInActivity = $null
-                        AppRoleAssignments = @(
+                        value = @(
                             [PSCustomObject]@{
-                                ResourceId = "graph-sp-id"
-                                AppRoleId = "role-guid-1"
-                                CreationTimestamp = (Get-Date).AddDays(-1)
+                                id = "graph-sp-id"
+                                appRoles = @(
+                                    [PSCustomObject]@{ id = "role-guid-app"; value = "Application.ReadWrite.All" }
+                                )
                             }
                         )
                     }
-                )
-            }
-            Mock -CommandName "Get-MgBetaOauth2PermissionGrant" -MockWith { return @() }
-
-            $result = Get-GTRiskyAppPermissionReport -PermissionType AppOnly
-            $result.RiskScore | Should -Contain 10
-            $result.RiskLevel | Should -Contain "Critical"
-            $result.Impact | Should -Contain "Privilege Escalation"
-        }
-    }
-
-    Context "Custom Risk Definitions" {
-        It "should accept custom high-risk scopes" {
-            Mock -CommandName "Get-MgBetaServicePrincipal" -MockWith {
-                param($Filter)
-                if ($Filter -like "*00000003-0000-0000-c000-000000000000*") {
-                    return [PSCustomObject]@{
-                        Id = "graph-sp-id"
-                        AppRoles = @(
-                            [PSCustomObject]@{ Id = "custom-role"; Value = "Custom.Permission" }
-                        )
-                    }
                 }
-                return @(
-                    [PSCustomObject]@{
-                        Id = "sp-1"
-                        AppId = "app-1"
-                        DisplayName = "Test App"
-                        SignInActivity = $null
-                        AppRoleAssignments = @(
-                            [PSCustomObject]@{
-                                ResourceId = "graph-sp-id"
-                                AppRoleId = "custom-role"
-                                CreationTimestamp = (Get-Date)
-                            }
-                        )
-                    }
-                )
+                return $null
             }
-            Mock -CommandName "Get-MgBetaOauth2PermissionGrant" -MockWith { return @() }
-
-            $result = Get-GTRiskyAppPermissionReport -PermissionType AppOnly -HighRiskScopes "Custom.Permission"
-            $result.Permission | Should -Contain "Custom.Permission"
-            $result.RiskLevel | Should -Contain "Medium"  # Custom definition
-        }
-    }
-
-    Context "Error Handling" {
-        It "should handle Graph API errors gracefully" {
-            Mock -CommandName "Get-MgBetaServicePrincipal" -MockWith { throw "Graph API Error" }
-
-            { Get-GTRiskyAppPermissionReport } | Should -Throw
-        }
-
-        It "should handle invalid app IDs gracefully" {
-            Mock -CommandName "Get-MgBetaServicePrincipal" -MockWith { return @() }
-            Mock -CommandName "Get-MgBetaOauth2PermissionGrant" -MockWith { return @() }
-
-            $result = Get-GTRiskyAppPermissionReport -AppId "nonexistent-app"
-            $result | Should -BeNullOrEmpty
-        }
-    }
-
-    Context "Performance Optimization" {
-        It "should filter Service Principals when AppId specified" {
-            Mock -CommandName "Get-MgBetaServicePrincipal" -MockWith {
-                param($Filter, $All)
-                if ($Filter -and $Filter -like "*app-1*") {
-                    # Verify filtering is applied
+            Mock -CommandName "Invoke-GTGraphPagedRequest" -MockWith {
+                param($Uri)
+                if ($Uri -like "*servicePrincipals*") {
                     return @(
                         [PSCustomObject]@{
-                            Id = "sp-1"
-                            AppId = "app-1"
-                            DisplayName = "Filtered App"
-                            AppRoleAssignments = @()
+                            id = "sp-1"
+                            appId = "app-1"
+                            displayName = "App Management App"
+                            signInActivity = $null
+                            appRoleAssignments = @(
+                                [PSCustomObject]@{
+                                    resourceId = "graph-sp-id"
+                                    appRoleId = "role-guid-app"
+                                    creationTimestamp = (Get-Date)
+                                }
+                            )
                         }
                     )
                 }
                 return @()
             }
-            Mock -CommandName "Get-MgBetaOauth2PermissionGrant" -MockWith { return @() }
 
-            $result = Get-GTRiskyAppPermissionReport -AppId "app-1"
-            # Should not throw and complete execution
-            $true | Should -BeTrue
+            $result = Get-GTRiskyAppPermissionReport -PermissionType AppOnly
+            $result | Should -Not -BeNullOrEmpty
+            $result.Permission | Should -Be "Application.ReadWrite.All"
+            $result.PrivilegeLevel | Should -Be 4
+            $result.AdminConsentRequired | Should -Be $true
+            $result.RiskLevel | Should -Be "High"
+        }
+
+        It "should support filtering by MinPrivilegeLevel" {
+            Mock -CommandName "Invoke-MgGraphRequest" -MockWith {
+                param($Uri)
+                if ($Uri -like "*00000003-0000-0000-c000-000000000000*") {
+                    return [PSCustomObject]@{
+                        value = @(
+                            [PSCustomObject]@{
+                                id = "graph-sp-id"
+                                appRoles = @(
+                                    [PSCustomObject]@{ id = "role-guid-app"; value = "Application.ReadWrite.All" }
+                                )
+                            }
+                        )
+                    }
+                }
+                return $null
+            }
+            Mock -CommandName "Invoke-GTGraphPagedRequest" -MockWith {
+                param($Uri)
+                if ($Uri -like "*servicePrincipals*") {
+                    return @(
+                        [PSCustomObject]@{
+                            id = "sp-1"
+                            appId = "app-1"
+                            displayName = "Test App"
+                            signInActivity = $null
+                            appRoleAssignments = @(
+                                [PSCustomObject]@{
+                                    resourceId = "graph-sp-id"
+                                    appRoleId = "role-guid-app"
+                                    creationTimestamp = (Get-Date)
+                                }
+                            )
+                        }
+                    )
+                }
+                return @()
+            }
+
+            $result = Get-GTRiskyAppPermissionReport -PermissionType AppOnly -MinPrivilegeLevel 4
+            $result.Count | Should -Be 1
+
+            $resultBelow = Get-GTRiskyAppPermissionReport -PermissionType AppOnly -MinPrivilegeLevel 5
+            $resultBelow | Should -BeNullOrEmpty
+        }
+    }
+
+    Context "Custom Risk Definitions" {
+        It "should accept custom high-risk scopes" {
+            Mock -CommandName "Invoke-MgGraphRequest" -MockWith {
+                param($Uri)
+                if ($Uri -like "*00000003-0000-0000-c000-000000000000*") {
+                    return [PSCustomObject]@{
+                        value = @(
+                            [PSCustomObject]@{
+                                id = "graph-sp-id"
+                                appRoles = @(
+                                    [PSCustomObject]@{ id = "custom-role"; value = "Custom.Permission" }
+                                )
+                            }
+                        )
+                    }
+                }
+                return $null
+            }
+            Mock -CommandName "Invoke-GTGraphPagedRequest" -MockWith {
+                param($Uri)
+                if ($Uri -like "*servicePrincipals*") {
+                    return @(
+                        [PSCustomObject]@{
+                            id = "sp-1"
+                            appId = "app-1"
+                            displayName = "Test App"
+                            signInActivity = $null
+                            appRoleAssignments = @(
+                                [PSCustomObject]@{
+                                    resourceId = "graph-sp-id"
+                                    appRoleId = "custom-role"
+                                    creationTimestamp = (Get-Date)
+                                }
+                            )
+                        }
+                    )
+                }
+                return @()
+            }
+
+            $result = Get-GTRiskyAppPermissionReport -PermissionType AppOnly -HighRiskScopes "Custom.Permission"
+            $result.Permission | Should -Contain "Custom.Permission"
+            $result.RiskLevel | Should -Contain "Medium"
+        }
+    }
+
+    Context "Error Handling" {
+        It "should handle Graph API errors gracefully" {
+            Mock -CommandName "Invoke-MgGraphRequest" -MockWith { throw "Graph API Error" }
+
+            { Get-GTRiskyAppPermissionReport } | Should -Throw
+        }
+
+        It "should handle empty results gracefully" {
+            Mock -CommandName "Invoke-MgGraphRequest" -MockWith {
+                return [PSCustomObject]@{ value = @([PSCustomObject]@{ id = "graph-sp-id"; appRoles = @() }) }
+            }
+            Mock -CommandName "Invoke-GTGraphPagedRequest" -MockWith { return @() }
+
+            $result = Get-GTRiskyAppPermissionReport -AppId "nonexistent-app"
+            $result | Should -BeNullOrEmpty
         }
     }
 }
