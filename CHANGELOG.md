@@ -19,7 +19,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
     - `Disconnect-GTGraph`: Flushes session context and in-memory token cache.
     - `Get-GTConnection`: Inspects active connection status and token expiration.
   - Comprehensive documentation added in `docs/Connect-GTGraph.md`.
-  - Pester 5.7+ test suites added in `tests/Get-GTCachedGraphToken.Tests.ps1`, `tests/Invoke-GTGraphRequest.Tests.ps1`, `tests/Connect-GTGraph.Tests.ps1`, and `tests/Invoke-GTGraphPagedRequest.Tests.ps1`.
+  - Implemented `Invoke-GTGraphBatch` internal helper supporting Microsoft Graph JSON batching (combining up to 20 subrequests into a single HTTP POST to `/$batch` with automatic chunking for arbitrary request counts).
+  - Pester 5.7+ test suites added in `tests/Get-GTCachedGraphToken.Tests.ps1`, `tests/Invoke-GTGraphRequest.Tests.ps1`, `tests/Connect-GTGraph.Tests.ps1`, `tests/Invoke-GTGraphPagedRequest.Tests.ps1`, and `tests/Invoke-GTGraphBatch.Tests.ps1`.
 
 ### Changed
 
