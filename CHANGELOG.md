@@ -7,6 +7,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- **DevX Permissions Metadata Integration (`Get-GTRiskyAppPermissionReport`)** - Resolves [#80](https://github.com/MARCO-K/GraphTools/issues/80).
+  - Integrates official Microsoft Graph DevX permissions metadata with `privilegeLevel` (1–5) for both `Application` and `DelegatedWork` schemes.
+  - Added compiled offline metadata fixture `data/graph-permissions.json` (926 permissions) for fast, zero-latency runtime evaluation without external HTTP dependencies.
+  - Added internal helper `Get-GTPermissionDefinition` with in-memory caching and custom `-PermissionsFile` support.
+  - Added new public utility `Update-GTRiskyPermissionData` to fetch, compile, and update local metadata from upstream DevX on demand.
+  - Added `-MinPrivilegeLevel` and `-PermissionsFile` parameters to `Get-GTRiskyAppPermissionReport`.
+  - Enriched output `[PSCustomObject]` with `PrivilegeLevel` and `AdminConsentRequired` properties while maintaining complete backward compatibility with existing properties and curated attack vector profiles (*Privilege Escalation*, *Tenant Destruction*).
+  - Added dedicated documentation in `docs/Get-GTRiskyAppPermissionReport.md`.
+
 ### Changed
 
 - **SDK dependency elimination** - Migrated all public functions and internal helpers to use only `Microsoft.Graph.Authentication` as the required SDK module. All Graph API calls now use `Invoke-MgGraphRequest` (single resource) or `Invoke-GTGraphPagedRequest` (paged collections) instead of individual `Microsoft.Graph.*` SDK cmdlets.
