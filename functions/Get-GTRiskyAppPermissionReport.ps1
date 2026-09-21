@@ -149,7 +149,17 @@ function Get-GTRiskyAppPermissionReport
 
                 switch ($privLevel)
                 {
-                    { $_ -ge 4 } {
+                    { $_ -ge 5 } {
+                        return [PSCustomObject]@{
+                            Score                = 10
+                            Level                = 'Critical'
+                            Impact               = 'Critical Privilege'
+                            Desc                 = $desc
+                            PrivilegeLevel       = [int]$privLevel
+                            AdminConsentRequired = $adminConsent
+                        }
+                    }
+                    4 {
                         return [PSCustomObject]@{
                             Score                = 8
                             Level                = 'High'
@@ -408,12 +418,12 @@ function Get-GTRiskyAppPermissionReport
             }
 
             if ($RiskLevel) {
-                $report = $report | Where-Object { $_.RiskLevel -in $RiskLevel }
+                $report = @($report | Where-Object { $_.RiskLevel -in $RiskLevel })
             }
 
-            if ($report.Count -gt 0) {
-                Write-PSFMessage -Level Warning -Message "Found $($report.Count) risky assignments."
-                return $report | Sort-Object RiskScore -Descending
+            if (@($report).Count -gt 0) {
+                Write-PSFMessage -Level Warning -Message "Found $(@($report).Count) risky assignments."
+                return @($report | Sort-Object RiskScore -Descending)
             } else {
                 Write-PSFMessage -Level Verbose -Message "No high-risk permissions found matching criteria."
                 return @()

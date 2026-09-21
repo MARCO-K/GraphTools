@@ -44,9 +44,16 @@ Describe "Update-GTRiskyPermissionData" {
             $result.Status | Should -Be "Success"
 
             Test-Path $testOutFile | Should -BeTrue
-            $content = Get-Content -Path $testOutFile -Raw | ConvertFrom-Json -AsHashtable
-            $content.ContainsKey("Directory.ReadWrite.All") | Should -BeTrue
-            $content["Directory.ReadWrite.All"]["appPrivilegeLevel"] | Should -Be 4
+            $content = Get-Content -Path $testOutFile -Raw | ConvertFrom-Json
+            $content.PSObject.Properties['Directory.ReadWrite.All'] | Should -Not -BeNullOrEmpty
+            $content.'Directory.ReadWrite.All'.appPrivilegeLevel | Should -Be 4
+        }
+
+        It "should respect WhatIf and not write to target path" {
+            Mock -CommandName "Invoke-RestMethod" -MockWith { return $mockPayload }
+
+            Update-GTRiskyPermissionData -OutputPath $testOutFile -Force -WhatIf
+            Test-Path $testOutFile | Should -BeFalse
         }
 
         It "should throw if source payload contains no permissions" {

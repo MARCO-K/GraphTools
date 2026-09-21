@@ -7,7 +7,8 @@ function Update-GTRiskyPermissionData
     .DESCRIPTION
     Fetches the latest permissions schema from the official microsoft-graph-devx-content repository,
     extracts privilege levels for Application and DelegatedWork schemes, and compiles an optimized
-    offline fixture into data/graph-permissions.json.
+    offline fixture into data/graph-permissions.json. Compatible with Windows PowerShell 5.1 and
+    PowerShell 7+.
 
     .PARAMETER OutputPath
     Custom path to write the compiled JSON metadata. Defaults to data/graph-permissions.json in the module.
@@ -41,16 +42,40 @@ function Update-GTRiskyPermissionData
             Join-Path $moduleBase 'data\graph-permissions.json'
         }
 
-        if (-not $Force -and -not $PSCmdlet.ShouldProcess($targetPath, "Update Graph Permissions Metadata from $SourceUri"))
+        if (-not $PSCmdlet.ShouldProcess($targetPath, "Update Graph Permissions Metadata from $SourceUri"))
         {
             return
+        }
+
+        if (-not $Force -and (Test-Path -Path $targetPath))
+        {
+            if (-not $PSCmdlet.ShouldProcess($targetPath, "Overwrite existing permissions fixture"))
+            {
+                return
+            }
         }
 
         try
         {
             Write-PSFMessage -Level Verbose -Message "Fetching DevX permissions from $SourceUri..."
             $rawPayload = Invoke-RestMethod -Uri $SourceUri -ErrorAction Stop
-            $parsedJson = if ($rawPayload -is [string]) { $rawPayload | ConvertFrom-Json -AsHashtable -ErrorAction Stop } else { $rawPayload }
+
+            $parsedJson = if ($rawPayload -is [System.Collections.IDictionary])
+            {
+                $rawPayload
+            }
+            elseif ((Get-Command ConvertFrom-Json).Parameters.ContainsKey('AsHashtable'))
+            {
+                $rawPayload | ConvertFrom-Json -AsHashtable -ErrorAction Stop
+            }
+            else
+            {
+                # Fallback for Windows PowerShell 5.1 to handle case-collision keys safely
+                Add-Type -AssemblyName System.Web.Extensions
+                $jsSerializer = New-Object System.Web.Script.Serialization.JavaScriptSerializer
+                $jsSerializer.MaxJsonLength = [int]::MaxValue
+                $jsSerializer.DeserializeObject($rawPayload)
+            }
 
             $rawPermissions = $parsedJson['permissions']
             if (-not $rawPermissions -or $rawPermissions.Count -eq 0)

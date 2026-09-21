@@ -29,9 +29,10 @@ Describe "Get-GTRiskyAppPermissionReport" {
     Context "Parameter Validation" {
         It "should accept pipeline input for AppId" {
             Mock -CommandName "Invoke-MgGraphRequest" -MockWith {
+                param($Method, $Uri, $ErrorAction)
                 return [PSCustomObject]@{ value = @([PSCustomObject]@{ id = "graph-sp-id"; appRoles = @() }) }
             }
-            Mock -CommandName "Invoke-GTGraphPagedRequest" -MockWith { return @() }
+            Mock -CommandName "Invoke-GTGraphPagedRequest" -MockWith { param($Uri, $Headers) return @() }
 
             { "test-app-id" | Get-GTRiskyAppPermissionReport } | Should -Not -Throw
         }
@@ -52,7 +53,7 @@ Describe "Get-GTRiskyAppPermissionReport" {
     Context "Microsoft Graph Resolution" {
         It "should cache Microsoft Graph app roles" {
             Mock -CommandName "Invoke-MgGraphRequest" -MockWith {
-                param($Uri)
+                param($Method, $Uri, $ErrorAction)
                 if ($Uri -like "*00000003-0000-0000-c000-000000000000*") {
                     return [PSCustomObject]@{
                         value = @(
@@ -68,7 +69,7 @@ Describe "Get-GTRiskyAppPermissionReport" {
                 }
                 return $null
             }
-            Mock -CommandName "Invoke-GTGraphPagedRequest" -MockWith { return @() }
+            Mock -CommandName "Invoke-GTGraphPagedRequest" -MockWith { param($Uri, $Headers) return @() }
 
             $result = Get-GTRiskyAppPermissionReport
             $true | Should -BeTrue
@@ -78,7 +79,7 @@ Describe "Get-GTRiskyAppPermissionReport" {
     Context "App-Only Permissions Analysis" {
         BeforeEach {
             Mock -CommandName "Invoke-MgGraphRequest" -MockWith {
-                param($Uri)
+                param($Method, $Uri, $ErrorAction)
                 if ($Uri -like "*00000003-0000-0000-c000-000000000000*") {
                     return [PSCustomObject]@{
                         value = @(
@@ -96,7 +97,7 @@ Describe "Get-GTRiskyAppPermissionReport" {
             }
 
             Mock -CommandName "Invoke-GTGraphPagedRequest" -MockWith {
-                param($Uri)
+                param($Uri, $Headers)
                 if ($Uri -like "*servicePrincipals*") {
                     return @(
                         [PSCustomObject]@{
@@ -143,7 +144,7 @@ Describe "Get-GTRiskyAppPermissionReport" {
     Context "Delegated Permissions Analysis" {
         BeforeEach {
             Mock -CommandName "Invoke-MgGraphRequest" -MockWith {
-                param($Uri)
+                param($Method, $Uri, $ErrorAction)
                 if ($Uri -like "*00000003-0000-0000-c000-000000000000*") {
                     return [PSCustomObject]@{
                         value = @([PSCustomObject]@{ id = "graph-sp-id"; appRoles = @() })
@@ -156,7 +157,7 @@ Describe "Get-GTRiskyAppPermissionReport" {
             }
 
             Mock -CommandName "Invoke-GTGraphPagedRequest" -MockWith {
-                param($Uri)
+                param($Uri, $Headers)
                 if ($Uri -like "*servicePrincipals*") {
                     return @(
                         [PSCustomObject]@{
@@ -192,7 +193,7 @@ Describe "Get-GTRiskyAppPermissionReport" {
 
         It "should resolve user-specific grants" {
             Mock -CommandName "Invoke-GTGraphPagedRequest" -MockWith {
-                param($Uri)
+                param($Uri, $Headers)
                 if ($Uri -like "*servicePrincipals*") {
                     return @(
                         [PSCustomObject]@{
@@ -232,7 +233,7 @@ Describe "Get-GTRiskyAppPermissionReport" {
     Context "DevX Metadata Integration" {
         It "should resolve privilege level and admin consent from catalog" {
             Mock -CommandName "Invoke-MgGraphRequest" -MockWith {
-                param($Uri)
+                param($Method, $Uri, $ErrorAction)
                 if ($Uri -like "*00000003-0000-0000-c000-000000000000*") {
                     return [PSCustomObject]@{
                         value = @(
@@ -248,7 +249,7 @@ Describe "Get-GTRiskyAppPermissionReport" {
                 return $null
             }
             Mock -CommandName "Invoke-GTGraphPagedRequest" -MockWith {
-                param($Uri)
+                param($Uri, $Headers)
                 if ($Uri -like "*servicePrincipals*") {
                     return @(
                         [PSCustomObject]@{
@@ -277,9 +278,70 @@ Describe "Get-GTRiskyAppPermissionReport" {
             $result.RiskLevel | Should -Be "High"
         }
 
+        It "should map privilege level 5 to Critical with score 10" {
+            $tempFixture = Join-Path ([System.IO.Path]::GetTempPath()) "test-priv5-$(Get-Random).json"
+            @{
+                "Ultra.HighPriv.Role" = @{
+                    appPrivilegeLevel       = 5
+                    delegatedPrivilegeLevel = 5
+                    requiresAdminConsent    = $true
+                    description             = "Ultra high privilege"
+                }
+            } | ConvertTo-Json -Depth 5 | Set-Content -Path $tempFixture -Encoding UTF8
+
+            try {
+                Mock -CommandName "Invoke-MgGraphRequest" -MockWith {
+                    param($Method, $Uri, $ErrorAction)
+                    if ($Uri -like "*00000003-0000-0000-c000-000000000000*") {
+                        return [PSCustomObject]@{
+                            value = @(
+                                [PSCustomObject]@{
+                                    id = "graph-sp-id"
+                                    appRoles = @(
+                                        [PSCustomObject]@{ id = "role-guid-p5"; value = "Ultra.HighPriv.Role" }
+                                    )
+                                }
+                            )
+                        }
+                    }
+                    return $null
+                }
+                Mock -CommandName "Invoke-GTGraphPagedRequest" -MockWith {
+                    param($Uri, $Headers)
+                    if ($Uri -like "*servicePrincipals*") {
+                        return @(
+                            [PSCustomObject]@{
+                                id = "sp-p5"
+                                appId = "app-p5"
+                                displayName = "P5 App"
+                                signInActivity = $null
+                                appRoleAssignments = @(
+                                    [PSCustomObject]@{
+                                        resourceId = "graph-sp-id"
+                                        appRoleId = "role-guid-p5"
+                                        creationTimestamp = (Get-Date)
+                                    }
+                                )
+                            }
+                        )
+                    }
+                    return @()
+                }
+
+                $result = Get-GTRiskyAppPermissionReport -PermissionType AppOnly -PermissionsFile $tempFixture
+                $result | Should -Not -BeNullOrEmpty
+                $result.RiskLevel | Should -Be "Critical"
+                $result.RiskScore | Should -Be 10
+                $result.PrivilegeLevel | Should -Be 5
+            }
+            finally {
+                if (Test-Path $tempFixture) { Remove-Item -Path $tempFixture -Force }
+            }
+        }
+
         It "should support filtering by MinPrivilegeLevel" {
             Mock -CommandName "Invoke-MgGraphRequest" -MockWith {
-                param($Uri)
+                param($Method, $Uri, $ErrorAction)
                 if ($Uri -like "*00000003-0000-0000-c000-000000000000*") {
                     return [PSCustomObject]@{
                         value = @(
@@ -295,7 +357,7 @@ Describe "Get-GTRiskyAppPermissionReport" {
                 return $null
             }
             Mock -CommandName "Invoke-GTGraphPagedRequest" -MockWith {
-                param($Uri)
+                param($Uri, $Headers)
                 if ($Uri -like "*servicePrincipals*") {
                     return @(
                         [PSCustomObject]@{
@@ -317,7 +379,7 @@ Describe "Get-GTRiskyAppPermissionReport" {
             }
 
             $result = Get-GTRiskyAppPermissionReport -PermissionType AppOnly -MinPrivilegeLevel 4
-            $result.Count | Should -Be 1
+            @($result).Count | Should -Be 1
 
             $resultBelow = Get-GTRiskyAppPermissionReport -PermissionType AppOnly -MinPrivilegeLevel 5
             $resultBelow | Should -BeNullOrEmpty
@@ -327,7 +389,7 @@ Describe "Get-GTRiskyAppPermissionReport" {
     Context "Custom Risk Definitions" {
         It "should accept custom high-risk scopes" {
             Mock -CommandName "Invoke-MgGraphRequest" -MockWith {
-                param($Uri)
+                param($Method, $Uri, $ErrorAction)
                 if ($Uri -like "*00000003-0000-0000-c000-000000000000*") {
                     return [PSCustomObject]@{
                         value = @(
@@ -343,7 +405,7 @@ Describe "Get-GTRiskyAppPermissionReport" {
                 return $null
             }
             Mock -CommandName "Invoke-GTGraphPagedRequest" -MockWith {
-                param($Uri)
+                param($Uri, $Headers)
                 if ($Uri -like "*servicePrincipals*") {
                     return @(
                         [PSCustomObject]@{
@@ -379,9 +441,10 @@ Describe "Get-GTRiskyAppPermissionReport" {
 
         It "should handle empty results gracefully" {
             Mock -CommandName "Invoke-MgGraphRequest" -MockWith {
+                param($Method, $Uri, $ErrorAction)
                 return [PSCustomObject]@{ value = @([PSCustomObject]@{ id = "graph-sp-id"; appRoles = @() }) }
             }
-            Mock -CommandName "Invoke-GTGraphPagedRequest" -MockWith { return @() }
+            Mock -CommandName "Invoke-GTGraphPagedRequest" -MockWith { param($Uri, $Headers) return @() }
 
             $result = Get-GTRiskyAppPermissionReport -AppId "nonexistent-app"
             $result | Should -BeNullOrEmpty

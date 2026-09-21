@@ -7,7 +7,8 @@ function Get-GTPermissionDefinition
     .DESCRIPTION
     Retrieves permission metadata derived from Microsoft DevX content, providing
     privilege levels (1-5) for Application and DelegatedWork schemes, admin consent
-    requirements, and permission descriptions.
+    requirements, and permission descriptions. Compatible with Windows PowerShell 5.1
+    and PowerShell 7+.
     #>
     [CmdletBinding()]
     param (
@@ -37,13 +38,41 @@ function Get-GTPermissionDefinition
     try
     {
         $rawJson = Get-Content -Path $targetFile -Raw -ErrorAction Stop
-        $parsed = $rawJson | ConvertFrom-Json -AsHashtable -ErrorAction Stop
+        # Use standard ConvertFrom-Json for PS 5.1 / PS 7+ compatibility (avoid -AsHashtable)
+        $parsed = $rawJson | ConvertFrom-Json -ErrorAction Stop
 
-        # Store in case-insensitive hashtable for resilient lookups
+        # Normalize into case-insensitive hashtable for resilient lookups
         $ciCatalog = [System.Collections.Hashtable]::new([System.StringComparer]::OrdinalIgnoreCase)
-        foreach ($key in $parsed.Keys)
+
+        if ($parsed -is [System.Collections.IDictionary])
         {
-            $ciCatalog[$key] = $parsed[$key]
+            foreach ($key in $parsed.Keys)
+            {
+                $val = $parsed[$key]
+                $ciCatalog[$key] = if ($val -is [System.Collections.IDictionary]) { $val } else {
+                    @{
+                        appPrivilegeLevel       = $val.appPrivilegeLevel
+                        delegatedPrivilegeLevel = $val.delegatedPrivilegeLevel
+                        requiresAdminConsent    = $val.requiresAdminConsent
+                        description             = $val.description
+                    }
+                }
+            }
+        }
+        elseif ($parsed.PSObject -and $parsed.PSObject.Properties)
+        {
+            foreach ($prop in $parsed.PSObject.Properties)
+            {
+                $val = $prop.Value
+                $ciCatalog[$prop.Name] = if ($val -is [System.Collections.IDictionary]) { $val } else {
+                    @{
+                        appPrivilegeLevel       = $val.appPrivilegeLevel
+                        delegatedPrivilegeLevel = $val.delegatedPrivilegeLevel
+                        requiresAdminConsent    = $val.requiresAdminConsent
+                        description             = $val.description
+                    }
+                }
+            }
         }
 
         if (-not $PermissionsFile)
