@@ -42,7 +42,6 @@
     # Die Module, die vor dem Importieren dieses Moduls in die globale Umgebung geladen werden müssen
     RequiredModules   = @(
         @{ ModuleName = 'PSFramework'; ModuleVersion = '1.9.270' }
-        @{ ModuleName = 'Microsoft.Graph.Beta.Reports'; ModuleVersion = '2.25.0' }
     )
 
     # Die Assemblys, die vor dem Importieren dieses Moduls geladen werden müssen

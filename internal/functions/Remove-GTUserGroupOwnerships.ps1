@@ -43,34 +43,33 @@ function Remove-GTUserGroupOwnerships
         [System.Collections.Generic.List[PSObject]]$Results
     )
 
-    $OwnedGroups = Get-MgBetaUserOwnedObject -UserId $User.Id -All |
-    Where-Object { $_.AdditionalProperties.'@odata.type' -eq '#microsoft.graph.group' }
+    $OwnedGroups = Invoke-GTGraphPagedRequest -Uri "v1.0/users/$($User.Id)/ownedObjects/microsoft.graph.group?`$select=id,displayName"
 
     foreach ($Group in $OwnedGroups)
     {
         $action = 'RemoveGroupOwnership'
         $output = $OutputBase + @{
-            ResourceName = $Group.AdditionalProperties.displayName
+            ResourceName = $Group.displayName
             ResourceType = 'Group'
-            ResourceId   = $Group.Id
+            ResourceId   = $Group.id
             Action       = $action
         }
 
         try
         {
-            $owners = Get-MgBetaGroupOwner -GroupId $Group.Id -All -ErrorAction Stop
+            $owners = Invoke-GTGraphPagedRequest -Uri "v1.0/groups/$($Group.id)/owners?`$select=id"
             if ($owners.Count -eq 1)
             {
-                Write-PSFMessage -Level Verbose -Message "Skipping last owner ($($User.Id)) of group $($Group.Id)"
+                Write-PSFMessage -Level Verbose -Message "Skipping last owner ($($User.Id)) of group $($Group.id)"
                 $output['Status'] = 'Skipped: Last owner'
                 $Results.Add([PSCustomObject]$output)
                 continue
             }
 
-            if ($PSCmdlet.ShouldProcess($Group.AdditionalProperties.displayName, $action))
+            if ($PSCmdlet.ShouldProcess($Group.displayName, $action))
             {
-                Write-PSFMessage -Level Verbose -Message "Removing user $($User.UserPrincipalName) from groupowner $($Group.DisplayName)"
-                Remove-MgBetaGroupOwnerByRef -GroupId $Group.Id -DirectoryObjectId $User.Id -ErrorAction Stop
+                Write-PSFMessage -Level Verbose -Message "Removing user $($User.UserPrincipalName) from groupowner $($Group.displayName)"
+                Invoke-MgGraphRequest -Method DELETE -Uri "v1.0/groups/$($Group.id)/owners/$($User.Id)/`$ref" -ErrorAction Stop
                 $output['Status'] = 'Success'
             }
         }

@@ -27,7 +27,7 @@ function Remove-GTPIMRoleEligibility {
     )
 
     begin {
-        $modules = @('Microsoft.Graph.Identity.Governance')
+        $modules = @('Microsoft.Graph.Authentication')
         Install-GTRequiredModule -ModuleNames $modules -Verbose:$VerbosePreference
 
         # 1. Scopes Check (CRITICAL FIX)
@@ -57,8 +57,8 @@ function Remove-GTPIMRoleEligibility {
         try {
             $context = Get-MgContext
             if ($context.AuthType -eq 'Delegated') {
-                $me = Get-MgUser -UserId 'me' -Property Id -ErrorAction Stop
-                if ($me.Id -eq $UserId) {
+                $meResp = Invoke-MgGraphRequest -Method GET -Uri "v1.0/me?`$select=id" -ErrorAction Stop
+                if ($meResp.id -eq $UserId) {
                     Write-Warning "You are attempting to remove PIM roles from YOURSELF. Proceed with caution."
                     if (-not $PSCmdlet.ShouldProcess("YOURSELF ($UserId)", "Remove PIM Roles")) {
                         # If user says "No", we return a special empty object or just exit
@@ -79,18 +79,18 @@ function Remove-GTPIMRoleEligibility {
         $ProcessRemoval = {
             param($Assignment, $Type)
             
-            $roleName = $Assignment.RoleDefinition.DisplayName
+            $roleName = $Assignment.roleDefinition.displayName
             $targetDesc = "$Type Assignment: $roleName (User: $UserId)"
             
             if ($PSCmdlet.ShouldProcess($targetDesc, "Remove")) {
                 try {
                     if ($Type -eq 'Active') {
                         # Revoke Active Assignment
-                        Remove-MgBetaRoleManagementDirectoryRoleAssignmentSchedule -UnifiedRoleAssignmentScheduleId $Assignment.RoleAssignmentScheduleId -ErrorAction Stop
+                        Invoke-MgGraphRequest -Method DELETE -Uri "beta/roleManagement/directory/roleAssignmentSchedules/$($Assignment.roleAssignmentScheduleId)" -ErrorAction Stop
                     }
                     else {
                         # Revoke Eligible Assignment
-                        Remove-MgBetaRoleManagementDirectoryRoleEligibilitySchedule -UnifiedRoleEligibilityScheduleId $Assignment.RoleEligibilityScheduleId -ErrorAction Stop
+                        Invoke-MgGraphRequest -Method DELETE -Uri "beta/roleManagement/directory/roleEligibilitySchedules/$($Assignment.roleEligibilityScheduleId)" -ErrorAction Stop
                     }
 
                     $results.Add([PSCustomObject]@{
@@ -122,15 +122,16 @@ function Remove-GTPIMRoleEligibility {
             if ($RoleDefinitionId) { $activeFilter += " and roleDefinitionId eq '$RoleDefinitionId'" }
             
             # Note: We must expand roleDefinition to get the friendly name for logging
-            $activeAssignments = Get-MgBetaRoleManagementDirectoryRoleAssignmentScheduleInstance -Filter $activeFilter -ExpandProperty roleDefinition -All -ErrorAction Stop
+            # beta required: PIM roleManagement endpoints are only available in the beta API
+            $activeAssignments = Invoke-GTGraphPagedRequest -Uri "beta/roleManagement/directory/roleAssignmentScheduleInstances?`$filter=$([Uri]::EscapeDataString($activeFilter))&`$expand=roleDefinition"
             
             foreach ($assignment in $activeAssignments) {
                 # Only attempt to remove if there is a ScheduleId (Permanent/Direct assignments might differ)
-                if ($assignment.RoleAssignmentScheduleId) {
+                if ($assignment.roleAssignmentScheduleId) {
                     & $ProcessRemoval -Assignment $assignment -Type 'Active'
                 }
                 else {
-                    Write-PSFMessage -Level Warning -Message "Skipping Active role '$($assignment.RoleDefinition.DisplayName)' - No ScheduleID found. This might be a direct directory role, not PIM."
+                    Write-PSFMessage -Level Warning -Message "Skipping Active role '$($assignment.roleDefinition.displayName)' - No ScheduleID found. This might be a direct directory role, not PIM."
                 }
             }
 
@@ -139,10 +140,10 @@ function Remove-GTPIMRoleEligibility {
             $eligibleFilter = "principalId eq '$UserId'"
             if ($RoleDefinitionId) { $eligibleFilter += " and roleDefinitionId eq '$RoleDefinitionId'" }
 
-            $eligibleAssignments = Get-MgBetaRoleManagementDirectoryRoleEligibilityScheduleInstance -Filter $eligibleFilter -ExpandProperty roleDefinition -All -ErrorAction Stop
+            $eligibleAssignments = Invoke-GTGraphPagedRequest -Uri "beta/roleManagement/directory/roleEligibilityScheduleInstances?`$filter=$([Uri]::EscapeDataString($eligibleFilter))&`$expand=roleDefinition"
 
             foreach ($assignment in $eligibleAssignments) {
-                if ($assignment.RoleEligibilityScheduleId) {
+                if ($assignment.roleEligibilityScheduleId) {
                     & $ProcessRemoval -Assignment $assignment -Type 'Eligible'
                 }
             }

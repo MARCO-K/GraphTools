@@ -19,6 +19,7 @@ Describe "Disable-GTUser" {
         if (-not (Get-Command Initialize-GTGraphConnection -ErrorAction SilentlyContinue)) { function Initialize-GTGraphConnection { param([string[]]$Scopes, [switch]$NewSession, [switch]$SkipConnect) return $true } }
         if (-not (Get-Command Test-GTGraphScopes -ErrorAction SilentlyContinue)) { function Test-GTGraphScopes { param([string[]]$RequiredScopes, [switch]$Reconnect, [switch]$Quiet) return $true } }
         if (-not (Get-Command Write-PSFMessage -ErrorAction SilentlyContinue)) { function Write-PSFMessage { param($Level, $Message, $ErrorRecord) } }
+        if (-not (Get-Command Get-UTCTime -ErrorAction SilentlyContinue)) { function Get-UTCTime { return [DateTime]::UtcNow } }
 
         # Mock Logging to prevent pollution of the output stream
         function Write-PSFMessage { param([string]$Level, [string]$Message) }
@@ -53,7 +54,7 @@ Describe "Disable-GTUser" {
         }
 
         It "accepts a valid UPN via parameter" {
-            Mock -CommandName Update-MgBetaUser -MockWith { }
+            Mock -CommandName Invoke-MgGraphRequest -MockWith { }
             
             $results = Disable-GTUser -UPN "test@contoso.com" -Force
             
@@ -63,18 +64,21 @@ Describe "Disable-GTUser" {
     }
 
     Context "Execution Logic" {
-        It "calls Update-MgBetaUser with correct arguments" {
-            Mock -CommandName Update-MgBetaUser -MockWith { } -Verifiable -ParameterFilter { 
-                $UserId -eq 'user@contoso.com' -and $AccountEnabled -eq $false 
+        It "calls Invoke-MgGraphRequest with correct arguments" {
+            Mock -CommandName Invoke-MgGraphRequest -MockWith { } -Verifiable -ParameterFilter {
+                $Method -eq 'PATCH' -and
+                $Uri -eq 'v1.0/users/user@contoso.com' -and
+                $Body.accountEnabled -eq $false -and
+                $ContentType -eq 'application/json'
             }
 
             $null = Disable-GTUser -UPN 'user@contoso.com' -Force
 
-            Should -Invoke -CommandName Update-MgBetaUser -Times 1
+            Should -Invoke -CommandName Invoke-MgGraphRequest -Times 1
         }
 
         It "outputs a 'Disabled' status object on success" {
-            Mock -CommandName Update-MgBetaUser -MockWith { }
+            Mock -CommandName Invoke-MgGraphRequest -MockWith { }
 
             $results = Disable-GTUser -UPN 'user@contoso.com' -Force
 

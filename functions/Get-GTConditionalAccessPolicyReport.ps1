@@ -37,27 +37,20 @@ function Get-GTConditionalAccessPolicyReport
 
     Write-Verbose "Starting Conditional Access policy report generation."
 
-    # Ensure required module is available
-    if (-not (Get-Module -ListAvailable -Name Microsoft.Graph.Identity.SignIns))
-    {
-        Write-Error "Required module 'Microsoft.Graph.Identity.SignIns' not found. Please install it first."
-        return
-    }
+    # Module Management
+    Install-GTRequiredModule -ModuleNames @('Microsoft.Graph.Authentication') -Verbose
 
-    # Check Graph connection status
-    if (-not (Get-MgContext))
+    # Graph Connection
+    if (-not (Initialize-GTGraphConnection -Scopes @('Policy.Read.All')))
     {
-        Write-Warning "Not connected to Microsoft Graph. Attempting to connect."
-        # Add connection logic here if desired, or rely on user being pre-connected.
-        # For now, we'll assume the user connects beforehand or handle connection outside.
-        Write-Error "Please connect to Microsoft Graph first using Connect-MgGraph with appropriate scopes (e.g., Policy.Read.All)."
+        Write-Error "Failed to connect to Microsoft Graph."
         return
     }
 
     Write-Verbose "Retrieving Conditional Access policies..."
     try
     {
-        $policies = Get-MgIdentityConditionalAccessPolicy -ErrorAction Stop
+        $policies = Invoke-GTGraphPagedRequest -Uri "v1.0/identity/conditionalAccess/policies"
         Write-Verbose "Successfully retrieved $($policies.Count) policies."
     }
     catch
@@ -70,56 +63,56 @@ function Get-GTConditionalAccessPolicyReport
     {
         Write-Verbose "Processing policy: $($policy.DisplayName) ($($policy.Id))"
         [PSCustomObject]@{
-            PolicyName       = $policy.DisplayName
-            PolicyId         = $policy.Id
-            State            = $policy.State
+            PolicyName       = $policy.displayName
+            PolicyId         = $policy.id
+            State            = $policy.state
             Assignments      = @{
-                IncludeUsers        = $policy.Conditions.Users.IncludeUsers
-                ExcludeUsers        = $policy.Conditions.Users.ExcludeUsers
-                IncludeGroups       = $policy.Conditions.Users.IncludeGroups
-                ExcludeGroups       = $policy.Conditions.Users.ExcludeGroups
-                IncludeRoles        = $policy.Conditions.Users.IncludeRoles
-                ExcludeRoles        = $policy.Conditions.Users.ExcludeRoles
-                IncludeApplications = $policy.Conditions.Applications.IncludeApplications
-                ExcludeApplications = $policy.Conditions.Applications.ExcludeApplications
-                IncludeUserActions  = $policy.Conditions.Applications.IncludeUserActions
-                IncludeAuthContexts = $policy.Conditions.Applications.IncludeAuthenticationContextClassReferences # Renamed for clarity
-                IncludePlatforms    = $policy.Conditions.Platforms.IncludePlatforms
-                ExcludePlatforms    = $policy.Conditions.Platforms.ExcludePlatforms
-                IncludeLocations    = $policy.Conditions.Locations.IncludeLocations
-                ExcludeLocations    = $policy.Conditions.Locations.ExcludeLocations
-                IncludeDeviceStates = $policy.Conditions.Devices.IncludeDeviceStates # Deprecated, use DeviceFilter
-                ExcludeDeviceStates = $policy.Conditions.Devices.ExcludeDeviceStates # Deprecated, use DeviceFilter
+                IncludeUsers        = $policy.conditions.users.includeUsers
+                ExcludeUsers        = $policy.conditions.users.excludeUsers
+                IncludeGroups       = $policy.conditions.users.includeGroups
+                ExcludeGroups       = $policy.conditions.users.excludeGroups
+                IncludeRoles        = $policy.conditions.users.includeRoles
+                ExcludeRoles        = $policy.conditions.users.excludeRoles
+                IncludeApplications = $policy.conditions.applications.includeApplications
+                ExcludeApplications = $policy.conditions.applications.excludeApplications
+                IncludeUserActions  = $policy.conditions.applications.includeUserActions
+                IncludeAuthContexts = $policy.conditions.applications.includeAuthenticationContextClassReferences # Renamed for clarity
+                IncludePlatforms    = $policy.conditions.platforms.includePlatforms
+                ExcludePlatforms    = $policy.conditions.platforms.excludePlatforms
+                IncludeLocations    = $policy.conditions.locations.includeLocations
+                ExcludeLocations    = $policy.conditions.locations.excludeLocations
+                IncludeDeviceStates = $policy.conditions.devices.includeDeviceStates # Deprecated, use DeviceFilter
+                ExcludeDeviceStates = $policy.conditions.devices.excludeDeviceStates # Deprecated, use DeviceFilter
             }
             Conditions       = @{
-                SignInRiskLevels           = $policy.Conditions.SignInRiskLevels
-                UserRiskLevels             = $policy.Conditions.UserRiskLevels
-                ClientAppTypes             = $policy.Conditions.ClientAppTypes
-                DeviceFilterMode           = $policy.Conditions.Devices.DeviceFilter.Mode
-                DeviceFilterRule           = $policy.Conditions.Devices.DeviceFilter.Rule
-                ClientApplications         = $policy.Conditions.ClientApplications # Added based on potential structure
-                ServicePrincipalRiskLevels = $policy.Conditions.ServicePrincipalRiskLevels # Added based on potential structure
+                SignInRiskLevels           = $policy.conditions.signInRiskLevels
+                UserRiskLevels             = $policy.conditions.userRiskLevels
+                ClientAppTypes             = $policy.conditions.clientAppTypes
+                DeviceFilterMode           = $policy.conditions.devices.deviceFilter.mode
+                DeviceFilterRule           = $policy.conditions.devices.deviceFilter.rule
+                ClientApplications         = $policy.conditions.clientApplications # Added based on potential structure
+                ServicePrincipalRiskLevels = $policy.conditions.servicePrincipalRiskLevels # Added based on potential structure
             }
             GrantControls    = @{
-                Operator        = $policy.GrantControls.Operator
-                BuiltInControls = $policy.GrantControls.BuiltInControls
-                CustomControls  = $policy.GrantControls.CustomAuthenticationFactors # Correct property name
-                TermsOfUse      = $policy.GrantControls.TermsOfUse
+                Operator        = $policy.grantControls.operator
+                BuiltInControls = $policy.grantControls.builtInControls
+                CustomControls  = $policy.grantControls.customAuthenticationFactors # Correct property name
+                TermsOfUse      = $policy.grantControls.termsOfUse
             }
             SessionControls  = @{
-                ApplicationEnforcedRestrictions = $policy.SessionControls.ApplicationEnforcedRestrictions.IsEnabled
-                CloudAppSecurity                = $policy.SessionControls.CloudAppSecurity.IsEnabled
-                CloudAppSecurityType            = $policy.SessionControls.CloudAppSecurity.CloudAppSecurityType
-                SignInFrequencyInterval         = $policy.SessionControls.SignInFrequency.Value
-                SignInFrequencyUnit             = $policy.SessionControls.SignInFrequency.Type
-                SignInFrequencyAuthType         = $policy.SessionControls.SignInFrequency.AuthenticationType # Added based on potential structure
-                PersistentBrowserSessionMode    = $policy.SessionControls.PersistentBrowserSession.Mode
-                DisableResilienceDefaults       = $policy.SessionControls.DisableResilienceDefaults # Added based on potential structure
-                SecureSignInSession             = $policy.SessionControls.SecureSignInSession.IsEnabled # Added based on potential structure
+                ApplicationEnforcedRestrictions = $policy.sessionControls.applicationEnforcedRestrictions.isEnabled
+                CloudAppSecurity                = $policy.sessionControls.cloudAppSecurity.isEnabled
+                CloudAppSecurityType            = $policy.sessionControls.cloudAppSecurity.cloudAppSecurityType
+                SignInFrequencyInterval         = $policy.sessionControls.signInFrequency.value
+                SignInFrequencyUnit             = $policy.sessionControls.signInFrequency.type
+                SignInFrequencyAuthType         = $policy.sessionControls.signInFrequency.authenticationType # Added based on potential structure
+                PersistentBrowserSessionMode    = $policy.sessionControls.persistentBrowserSession.mode
+                DisableResilienceDefaults       = $policy.sessionControls.disableResilienceDefaults # Added based on potential structure
+                SecureSignInSession             = $policy.sessionControls.secureSignInSession.isEnabled # Added based on potential structure
             }
-            ModifiedDateTime = $policy.ModifiedDateTime
-            CreatedDateTime  = $policy.CreatedDateTime
-            TemplateId       = $policy.TemplateId # Added based on potential structure
+            ModifiedDateTime = $policy.modifiedDateTime
+            CreatedDateTime  = $policy.createdDateTime
+            TemplateId       = $policy.templateId # Added based on potential structure
         }
     }
 

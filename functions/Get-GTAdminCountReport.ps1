@@ -44,7 +44,7 @@ function Get-GTAdminCountReport
 
     begin
     {
-        $modules = @('Microsoft.Graph.Identity.DirectoryManagement')
+        $modules = @('Microsoft.Graph.Authentication')
         Install-GTRequiredModule -ModuleNames $modules -Verbose:$VerbosePreference
 
         # 1. Scopes Check
@@ -80,21 +80,21 @@ function Get-GTAdminCountReport
             # 4. Fetch Roles
             # We only fetch activated roles (those that have members) to save time.
             # Get-MgDirectoryRole returns only roles that have been activated/used in the tenant.
-            $roles = Get-MgDirectoryRole -All -ExpandProperty members -ErrorAction Stop
+            $roles = Invoke-GTGraphPagedRequest -Uri "v1.0/directoryRoles?`$expand=members"
 
             foreach ($role in $roles)
             {
                 # Filter by Name if requested
-                if ($RoleName -and $role.DisplayName -notin $RoleName) { continue }
+                if ($RoleName -and $role.displayName -notin $RoleName) { continue }
 
                 # Determine Tier
                 $tier = "Tier 2 (Standard)"
-                if ($Tier0 -contains $role.DisplayName) { $tier = "Tier 0 (Critical)" }
-                elseif ($Tier1 -contains $role.DisplayName) { $tier = "Tier 1 (High)" }
+                if ($Tier0 -contains $role.displayName) { $tier = "Tier 0 (Critical)" }
+                elseif ($Tier1 -contains $role.displayName) { $tier = "Tier 1 (High)" }
 
                 # Count Members
                 # Members can be Users, Service Principals, or Groups.
-                $memberCount = if ($role.Members) { $role.Members.Count } else { 0 }
+                $memberCount = if ($role.members) { $role.members.Count } else { 0 }
                 
                 # Identify Member Types
                 $userCount = 0
@@ -102,34 +102,33 @@ function Get-GTAdminCountReport
                 $groupCount = 0
                 $memberNames = [System.Collections.Generic.List[string]]::new()
 
-                if ($role.Members)
+                if ($role.members)
                 {
-                    foreach ($member in $role.Members)
+                    foreach ($member in $role.members)
                     {
-                        $type = $member.AdditionalProperties['@odata.type']
+                        $type = $member.'@odata.type'
                         
                         if ($type -match 'user') { 
                             $userCount++
                             if ($ShowMembers) { 
-                                # Try to get UPN, fallback to DisplayName
-                                $name = if ($member.AdditionalProperties.ContainsKey('userPrincipalName')) { $member.AdditionalProperties['userPrincipalName'] } else { $member.DisplayName }
+                                $name = if ($member.userPrincipalName) { $member.userPrincipalName } else { $member.displayName }
                                 $memberNames.Add("$name (User)")
                             }
                         }
                         elseif ($type -match 'servicePrincipal') { 
                             $spCount++ 
-                            if ($ShowMembers) { $memberNames.Add("$($member.DisplayName) (SP)") }
+                            if ($ShowMembers) { $memberNames.Add("$($member.displayName) (SP)") }
                         }
                         elseif ($type -match 'group') { 
                             $groupCount++ 
-                            if ($ShowMembers) { $memberNames.Add("$($member.DisplayName) (Group)") }
+                            if ($ShowMembers) { $memberNames.Add("$($member.displayName) (Group)") }
                         }
                     }
                 }
 
                 # 5. Risk Analysis (Heuristics)
                 $riskNote = $null
-                if ($role.DisplayName -eq "Global Administrator" -and $userCount -gt 5) {
+                if ($role.displayName -eq "Global Administrator" -and $userCount -gt 5) {
                     $riskNote = "High: >5 Global Admins detected."
                 }
                 elseif ($groupCount -gt 0) {
@@ -137,7 +136,7 @@ function Get-GTAdminCountReport
                 }
 
                 $reportObject = [ordered]@{
-                    RoleName      = $role.DisplayName
+                    RoleName      = $role.displayName
                     Tier          = $tier
                     TotalMembers  = $memberCount
                     UserCount     = $userCount

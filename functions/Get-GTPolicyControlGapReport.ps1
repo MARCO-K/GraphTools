@@ -31,7 +31,7 @@ function Get-GTPolicyControlGapReport
 
     begin
     {
-        $modules = @('Microsoft.Graph.Identity.SignIns')
+        $modules = @('Microsoft.Graph.Authentication')
         Install-GTRequiredModule -ModuleNames $modules -Verbose:$VerbosePreference
 
         # 1. Scopes Check
@@ -53,9 +53,9 @@ function Get-GTPolicyControlGapReport
         Write-PSFMessage -Level Verbose -Message "Caching Authentication Strength policies..."
         $authStrengthCache = @{}
         try {
-            $strengths = Get-MgIdentityConditionalAccessAuthenticationStrengthPolicy -All -ErrorAction SilentlyContinue
+            $strengths = Invoke-GTGraphPagedRequest -Uri 'v1.0/identity/conditionalAccess/authenticationStrengthPolicies' -ErrorAction SilentlyContinue
             foreach ($s in $strengths) {
-                $authStrengthCache[$s.Id] = $s.DisplayName
+                $authStrengthCache[$s.id] = $s.displayName
             }
             Write-PSFMessage -Level Verbose -Message "Cached $($authStrengthCache.Count) Auth Strength definitions."
         }
@@ -79,7 +79,7 @@ function Get-GTPolicyControlGapReport
             # 5. Optimize Property Selection
             $props = @('id', 'displayName', 'state', 'grantControls', 'conditions')
 
-            $policies = Get-MgIdentityConditionalAccessPolicy -Filter $filter -Property $props -ErrorAction Stop
+            $policies = Invoke-GTGraphPagedRequest -Uri "v1.0/identity/conditionalAccess/policies?`$filter=$([Uri]::EscapeDataString($filter))&`$select=$($props -join ',')"
 
             Write-PSFMessage -Level Verbose -Message "Analyzing $($policies.Count) policies..."
 
@@ -88,14 +88,14 @@ function Get-GTPolicyControlGapReport
                 # --- Analysis Logic ---
                 
                 # Check for BLOCK (Ultimate Security)
-                if ($policy.GrantControls.BuiltInControls -contains 'block') {
+                if ($policy.grantControls.builtInControls -contains 'block') {
                     continue 
                 }
 
-                $controls = $policy.GrantControls.BuiltInControls
-                $operator = $policy.GrantControls.Operator
-                $authStrength = $policy.GrantControls.AuthenticationStrength
-                $customControls = $policy.GrantControls.CustomAuthenticationFactors
+                $controls = $policy.grantControls.builtInControls
+                $operator = $policy.grantControls.operator
+                $authStrength = $policy.grantControls.authenticationStrength
+                $customControls = $policy.grantControls.customAuthenticationFactors
 
                 # Identify Strong Controls
                 $hasMfa = ($controls -contains 'mfa')
@@ -119,7 +119,7 @@ function Get-GTPolicyControlGapReport
                 $missing = [System.Collections.Generic.List[string]]::new()
 
                 # --- Scenario A: No Controls (Implicit Allow) ---
-                if (-not $policy.GrantControls -or (-not $controls -and -not $authStrength -and -not $customControls))
+                if (-not $policy.grantControls -or (-not $controls -and -not $authStrength -and -not $customControls))
                 {
                     $gapType = "Critical: Implicit Allow"
                     $reason = "Policy has no Grant controls configured."
@@ -149,42 +149,42 @@ function Get-GTPolicyControlGapReport
                     if ($controls) { $displayControls.AddRange($controls) }
                     
                     if ($authStrength) { 
-                        $name = if ($authStrengthCache.ContainsKey($authStrength.Id)) { $authStrengthCache[$authStrength.Id] } else { $authStrength.Id }
+                        $name = if ($authStrengthCache.ContainsKey($authStrength.id)) { $authStrengthCache[$authStrength.id] } else { $authStrength.id }
                         $displayControls.Add("AuthStrength: $name") 
                     }
                     if ($customControls) { $displayControls.Add("CustomControl: $($customControls -join ', ')") }
                     
                     # --- Enhanced Context Parsing ---
-                    $users = $policy.Conditions.Users
-                    $apps = $policy.Conditions.Applications
+                    $users = $policy.conditions.users
+                    $apps = $policy.conditions.applications
 
                     # Determine User Scope
-                    $hasExclusions = ($users.ExcludeUsers.Count -gt 0) -or ($users.ExcludeGroups.Count -gt 0) -or ($users.ExcludeRoles.Count -gt 0)
+                    $hasExclusions = ($users.excludeUsers.Count -gt 0) -or ($users.excludeGroups.Count -gt 0) -or ($users.excludeRoles.Count -gt 0)
 
                     $userScope = switch ($users) {
-                        { $_.IncludeUsers -contains 'All' -and -not $hasExclusions } { "All Users (No Exclusions)"; break }
-                        { $_.IncludeUsers -contains 'All' } { "All Users (With Exclusions)"; break }
-                        { $_.IncludeUsers -contains 'GuestsOrExternalUsers' } { "Guests"; break }
-                        { $_.IncludeRoles.Count -gt 0 } { "Role Holders ($($_.IncludeRoles.Count))"; break }
-                        { $_.IncludeGroups.Count -gt 0 } { "Group Members ($($_.IncludeGroups.Count))"; break }
+                        { $_.includeUsers -contains 'All' -and -not $hasExclusions } { "All Users (No Exclusions)"; break }
+                        { $_.includeUsers -contains 'All' } { "All Users (With Exclusions)"; break }
+                        { $_.includeUsers -contains 'GuestsOrExternalUsers' } { "Guests"; break }
+                        { $_.includeRoles.Count -gt 0 } { "Role Holders ($($_.includeRoles.Count))"; break }
+                        { $_.includeGroups.Count -gt 0 } { "Group Members ($($_.includeGroups.Count))"; break }
                         default { "Specific Users" }
                     }
 
-                    # Determine App Scope (Updated with Generic Action Catch-all)
+                    # Determine App Scope
                     $appScope = switch ($apps) {
-                        { $_.IncludeApplications -contains 'All' } { "All Cloud Apps"; break }
-                        { $_.IncludeUserActions -contains 'RegisterSecurityInformation' } { "Security Info Reg"; break }
-                        { $_.IncludeUserActions -contains 'RegisterDevice' } { "Device Reg"; break }
-                        { $_.IncludeUserActions.Count -gt 0 } { "$($_.IncludeUserActions.Count) User Actions"; break }
+                        { $_.includeApplications -contains 'All' } { "All Cloud Apps"; break }
+                        { $_.includeUserActions -contains 'RegisterSecurityInformation' } { "Security Info Reg"; break }
+                        { $_.includeUserActions -contains 'RegisterDevice' } { "Device Reg"; break }
+                        { $_.includeUserActions.Count -gt 0 } { "$($_.includeUserActions.Count) User Actions"; break }
                         default { "Specific Apps" }
                     }
                     
                     $context = "$userScope -> $appScope"
 
                     $gapReport.Add([PSCustomObject]@{
-                        PolicyName      = $policy.DisplayName
-                        PolicyId        = $policy.Id
-                        State           = $policy.State
+                        PolicyName      = $policy.displayName
+                        PolicyId        = $policy.id
+                        State           = $policy.state
                         GapSeverity     = $gapType
                         PolicyContext   = $context
                         GrantOperator   = $operator

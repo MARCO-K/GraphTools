@@ -40,16 +40,16 @@ function Remove-GTUserAppRoleAssignments
 
     try
     {
-        $AppRoleAssignments = Get-MgBetaUserAppRoleAssignment -UserId $user.Id -All -ErrorAction Stop
+        $AppRoleAssignments = Invoke-GTGraphPagedRequest -Uri "v1.0/users/$($User.Id)/appRoleAssignments"
 
         if ($null -ne $AppRoleAssignments)
         {
             $AppRoleAssignments | ForEach-Object {
                 $action = 'RemoveUserAppRoleAssignments'
                 $output = $OutputBase + @{
-                    ResourceName = $_.ResourceDisplayName
+                    ResourceName = $_.resourceDisplayName
                     ResourceType = 'UserAppRoleAssignment'
-                    ResourceId   = $_.Id
+                    ResourceId   = $_.id
                     Action       = $action
                 }
 
@@ -57,8 +57,8 @@ function Remove-GTUserAppRoleAssignments
                 {
                     if ($PSCmdlet.ShouldProcess($_.ResourceDisplayName, $action))
                     {
-                        Write-PSFMessage -Level Verbose -Message "Removing user $($User.UserPrincipalName) from AppRoleAssignments $($_.ResourceDisplayName)"
-                        Remove-MgBetaUserAppRoleAssignment -AppRoleAssignmentID $_.Id -UserId $user.Id -ErrorAction Stop
+                        Write-PSFMessage -Level Verbose -Message "Removing user $($User.UserPrincipalName) from AppRoleAssignments $($_.resourceDisplayName)"
+                        Invoke-MgGraphRequest -Method DELETE -Uri "v1.0/users/$($User.Id)/appRoleAssignments/$($_.id)" -ErrorAction Stop
                         $output['Status'] = 'Success'
                     }
                 }

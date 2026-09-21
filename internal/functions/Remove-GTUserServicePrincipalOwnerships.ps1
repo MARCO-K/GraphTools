@@ -43,26 +43,26 @@ function Remove-GTUserServicePrincipalOwnerships
         [System.Collections.Generic.List[PSObject]]$Results
     )
 
-    $servicePrincipals = Get-MgBetaServicePrincipal -Filter "owners/`$count eq 1" -CountVariable CountVar -Property 'id,displayName,owners' -ConsistencyLevel 'eventual'
+    $servicePrincipals = Invoke-GTGraphPagedRequest -Uri "v1.0/servicePrincipals?`$filter=$([Uri]::EscapeDataString('owners/$count eq 1'))&`$select=id,displayName" -Headers @{ ConsistencyLevel = 'eventual' }
 
-    if ($global:CountVar -gt 0)
+    if ($servicePrincipals.Count -gt 0)
     {
         foreach ($sp in $servicePrincipals)
         {
             $action = 'RemoveServicePrincipalOwnership'
             $output = $OutputBase + @{
-                ResourceName = $sp.DisplayName
+                ResourceName = $sp.displayName
                 ResourceType = 'ServicePrincipal'
-                ResourceId   = $sp.Id
+                ResourceId   = $sp.id
                 Action       = $action
             }
 
             try
             {
-                if ($PSCmdlet.ShouldProcess($sp.DisplayName, $action))
+                if ($PSCmdlet.ShouldProcess($sp.displayName, $action))
                 {
-                    Write-PSFMessage -Level Verbose -Message "Removing user $($User.UserPrincipalName) from service principal $($sp.DisplayName)"
-                    Remove-MgBetaServicePrincipalOwnerByRef -ServicePrincipalId $sp.Id -DirectoryObjectId $User.Id -ErrorAction Stop
+                    Write-PSFMessage -Level Verbose -Message "Removing user $($User.UserPrincipalName) from service principal $($sp.displayName)"
+                    Invoke-MgGraphRequest -Method DELETE -Uri "v1.0/servicePrincipals/$($sp.id)/owners/$($User.Id)/`$ref" -ErrorAction Stop
                     $output['Status'] = 'Success'
                 }
             }

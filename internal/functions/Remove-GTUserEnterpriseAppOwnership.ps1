@@ -44,11 +44,11 @@ function Remove-GTUserEnterpriseAppOwnership
     # Get all owned objects with a single API call
     try
     {
-        $allOwnedObjects = Get-MgBetaUserOwnedObject -UserId $User.Id -All -ErrorAction Stop
+        $allOwnedObjects = Invoke-GTGraphPagedRequest -Uri "v1.0/users/$($User.Id)/ownedObjects?`$select=id,displayName"
 
         # Filter the results in memory
-        $ownedApplications = $allOwnedObjects | Where-Object { $_.AdditionalProperties.'@odata.type' -eq '#microsoft.graph.application' }
-        $ownedServicePrincipals = $allOwnedObjects | Where-Object { $_.AdditionalProperties.'@odata.type' -eq '#microsoft.graph.servicePrincipal' }
+        $ownedApplications = $allOwnedObjects | Where-Object { $_.'@odata.type' -eq '#microsoft.graph.application' }
+        $ownedServicePrincipals = $allOwnedObjects | Where-Object { $_.'@odata.type' -eq '#microsoft.graph.servicePrincipal' }
     }
     catch
     {
@@ -85,28 +85,28 @@ function Remove-GTUserEnterpriseAppOwnership
         {
             $action = 'RemoveAppRegistrationOwnership'
             $output = $OutputBase + @{
-                ResourceName = $app.AdditionalProperties.displayName
+                ResourceName = $app.displayName
                 ResourceType = 'AppRegistration'
-                ResourceId   = $app.Id
+                ResourceId   = $app.id
                 Action       = $action
             }
 
             try
             {
                 # Check if user is the last owner
-                $owners = Get-MgBetaApplicationOwner -ApplicationId $app.Id -All -ErrorAction Stop
+                $owners = Invoke-GTGraphPagedRequest -Uri "v1.0/applications/$($app.id)/owners?`$select=id"
                 if ($owners.Count -eq 1)
                 {
-                    Write-PSFMessage -Level Warning -Message "Skipping last owner ($($User.UserPrincipalName)) of App Registration: $($app.AdditionalProperties.displayName). Transfer ownership first."
+                    Write-PSFMessage -Level Warning -Message "Skipping last owner ($($User.UserPrincipalName)) of App Registration: $($app.displayName). Transfer ownership first."
                     $output['Status'] = 'Skipped: Last owner - transfer ownership first'
                     $Results.Add([PSCustomObject]$output)
                     continue
                 }
 
-                if ($PSCmdlet.ShouldProcess($app.AdditionalProperties.displayName, $action))
+                if ($PSCmdlet.ShouldProcess($app.displayName, $action))
                 {
-                    Write-PSFMessage -Level Verbose -Message "Removing user $($User.UserPrincipalName) from App Registration ownership: $($app.AdditionalProperties.displayName)"
-                    Remove-MgBetaApplicationOwnerByRef -ApplicationId $app.Id -DirectoryObjectId $User.Id -ErrorAction Stop
+                    Write-PSFMessage -Level Verbose -Message "Removing user $($User.UserPrincipalName) from App Registration ownership: $($app.displayName)"
+                    Invoke-MgGraphRequest -Method DELETE -Uri "v1.0/applications/$($app.id)/owners/$($User.Id)/`$ref" -ErrorAction Stop
                     $output['Status'] = 'Success'
                 }
             }
@@ -117,14 +117,14 @@ function Remove-GTUserEnterpriseAppOwnership
                 
                 # Log appropriate message based on error details
                 if ($errorDetails.HttpStatus -in 404, 403) {
-                    Write-PSFMessage -Level $errorDetails.LogLevel -Message "Failed to remove user $($User.UserPrincipalName) from App Registration: $($app.AdditionalProperties.displayName) - $($errorDetails.Reason)"
+                    Write-PSFMessage -Level $errorDetails.LogLevel -Message "Failed to remove user $($User.UserPrincipalName) from App Registration: $($app.displayName) - $($errorDetails.Reason)"
                     Write-PSFMessage -Level Debug -Message "Detailed error ($($errorDetails.HttpStatus)): $($errorDetails.ErrorMessage)"
                 }
                 elseif ($errorDetails.HttpStatus) {
-                    Write-PSFMessage -Level $errorDetails.LogLevel -Message "Failed to remove user $($User.UserPrincipalName) from App Registration: $($app.AdditionalProperties.displayName) - $($errorDetails.Reason)"
+                    Write-PSFMessage -Level $errorDetails.LogLevel -Message "Failed to remove user $($User.UserPrincipalName) from App Registration: $($app.displayName) - $($errorDetails.Reason)"
                 }
                 else {
-                    Write-PSFMessage -Level Error -Message "Failed to remove user $($User.UserPrincipalName) from App Registration: $($app.AdditionalProperties.displayName). $($errorDetails.ErrorMessage)"
+                    Write-PSFMessage -Level Error -Message "Failed to remove user $($User.UserPrincipalName) from App Registration: $($app.displayName). $($errorDetails.ErrorMessage)"
                 }
                 $output['Status'] = "Failed: $($errorDetails.Reason)"
             }
@@ -143,28 +143,28 @@ function Remove-GTUserEnterpriseAppOwnership
         {
             $action = 'RemoveEnterpriseAppOwnership'
             $output = $OutputBase + @{
-                ResourceName = $sp.AdditionalProperties.displayName
+                ResourceName = $sp.displayName
                 ResourceType = 'EnterpriseApplication'
-                ResourceId   = $sp.Id
+                ResourceId   = $sp.id
                 Action       = $action
             }
 
             try
             {
                 # Check if user is the last owner
-                $owners = Get-MgBetaServicePrincipalOwner -ServicePrincipalId $sp.Id -All -ErrorAction Stop
+                $owners = Invoke-GTGraphPagedRequest -Uri "v1.0/servicePrincipals/$($sp.id)/owners?`$select=id"
                 if ($owners.Count -eq 1)
                 {
-                    Write-PSFMessage -Level Warning -Message "Skipping last owner ($($User.UserPrincipalName)) of Enterprise Application: $($sp.AdditionalProperties.displayName). Transfer ownership first."
+                    Write-PSFMessage -Level Warning -Message "Skipping last owner ($($User.UserPrincipalName)) of Enterprise Application: $($sp.displayName). Transfer ownership first."
                     $output['Status'] = 'Skipped: Last owner - transfer ownership first'
                     $Results.Add([PSCustomObject]$output)
                     continue
                 }
 
-                if ($PSCmdlet.ShouldProcess($sp.AdditionalProperties.displayName, $action))
+                if ($PSCmdlet.ShouldProcess($sp.displayName, $action))
                 {
-                    Write-PSFMessage -Level Verbose -Message "Removing user $($User.UserPrincipalName) from Enterprise Application ownership: $($sp.AdditionalProperties.displayName)"
-                    Remove-MgBetaServicePrincipalOwnerByRef -ServicePrincipalId $sp.Id -DirectoryObjectId $User.Id -ErrorAction Stop
+                    Write-PSFMessage -Level Verbose -Message "Removing user $($User.UserPrincipalName) from Enterprise Application ownership: $($sp.displayName)"
+                    Invoke-MgGraphRequest -Method DELETE -Uri "v1.0/servicePrincipals/$($sp.id)/owners/$($User.Id)/`$ref" -ErrorAction Stop
                     $output['Status'] = 'Success'
                 }
             }
@@ -175,14 +175,14 @@ function Remove-GTUserEnterpriseAppOwnership
                 
                 # Log appropriate message based on error details
                 if ($errorDetails.HttpStatus -in 404, 403) {
-                    Write-PSFMessage -Level $errorDetails.LogLevel -Message "Failed to remove user $($User.UserPrincipalName) from Enterprise Application: $($sp.AdditionalProperties.displayName) - $($errorDetails.Reason)"
+                    Write-PSFMessage -Level $errorDetails.LogLevel -Message "Failed to remove user $($User.UserPrincipalName) from Enterprise Application: $($sp.displayName) - $($errorDetails.Reason)"
                     Write-PSFMessage -Level Debug -Message "Detailed error ($($errorDetails.HttpStatus)): $($errorDetails.ErrorMessage)"
                 }
                 elseif ($errorDetails.HttpStatus) {
-                    Write-PSFMessage -Level $errorDetails.LogLevel -Message "Failed to remove user $($User.UserPrincipalName) from Enterprise Application: $($sp.AdditionalProperties.displayName) - $($errorDetails.Reason)"
+                    Write-PSFMessage -Level $errorDetails.LogLevel -Message "Failed to remove user $($User.UserPrincipalName) from Enterprise Application: $($sp.displayName) - $($errorDetails.Reason)"
                 }
                 else {
-                    Write-PSFMessage -Level Error -Message "Failed to remove user $($User.UserPrincipalName) from Enterprise Application: $($sp.AdditionalProperties.displayName). $($errorDetails.ErrorMessage)"
+                    Write-PSFMessage -Level Error -Message "Failed to remove user $($User.UserPrincipalName) from Enterprise Application: $($sp.displayName). $($errorDetails.ErrorMessage)"
                 }
                 $output['Status'] = "Failed: $($errorDetails.Reason)"
             }

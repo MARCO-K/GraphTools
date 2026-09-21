@@ -83,7 +83,7 @@ function Get-GTLegacyAuthReport
         $targetApps  = [System.Collections.Generic.List[string]]::new()
         $targetIPs   = [System.Collections.Generic.List[string]]::new()
 
-        $modules = @('Microsoft.Graph.Identity.SignIns')
+        $modules = @('Microsoft.Graph.Authentication')
         Install-GTRequiredModule -ModuleNames $modules -Verbose:$VerbosePreference
 
         # 2. Scopes Check
@@ -147,42 +147,35 @@ function Get-GTLegacyAuthReport
                 'status', 'ipAddress', 'location', 'appDisplayName'
             )
 
-            $params = @{
-                Filter      = $filter
-                All         = $true
-                ErrorAction = 'Stop'
-                Property    = $props
-            }
-
-            # 7. Stream and Process (The Heavy Lifting)
-            Get-MgAuditLogSignIn @params | ForEach-Object {
-                $log = $_
-                $appUsed = $log.ClientAppUsed
+            # 7. Collect and Process
+            $logs = Invoke-GTGraphPagedRequest -Uri "v1.0/auditLogs/signIns?`$filter=$([Uri]::EscapeDataString($filter))&`$select=$($props -join ',')"
+            foreach ($log in $logs) {
+                $appUsed = $log.clientAppUsed
 
                 # --- FILTERING LOGIC ---
 
                 # A. Protocol Detection (The User's Request)
                 # Must be in Legacy list AND NOT in Modern list (Defensive check)
-                if (-not ($LegacyProtocols -contains $appUsed -and $ModernProtocols -notcontains $appUsed)) { return }
+                if (-not ($LegacyProtocols -contains $appUsed -and $ModernProtocols -notcontains $appUsed)) { continue }
 
                 # B. Filter by Client App (if specified)
-                if ($targetApps.Count -gt 0 -and $appUsed -notin $targetApps) { return }
+                if ($targetApps.Count -gt 0 -and $appUsed -notin $targetApps) { continue }
 
                 # C. Filter by User (if specified)
-                if ($targetUsers.Count -gt 0 -and $log.UserPrincipalName -notin $targetUsers) { return }
+                if ($targetUsers.Count -gt 0 -and $log.userPrincipalName -notin $targetUsers) { continue }
 
                 # D. Filter by IP (if specified)
-                if ($targetIPs.Count -gt 0 -and $log.IpAddress -notin $targetIPs) { return }
+                if ($targetIPs.Count -gt 0 -and $log.ipAddress -notin $targetIPs) { continue }
 
                 # --- PROCESSING ---
 
-                $isSuccess = ($log.Status.ErrorCode -eq 0)
+                $isSuccess = ($log.status.errorCode -eq 0)
                 
                 $resultType = if ($isSuccess) { "Security Gap (Success)" } else { "Attack Attempt (Failed)" }
                 
                 $failureReason = $null
                 if (-not $isSuccess) {
-                    $failureReason = switch ($log.Status.ErrorCode) {
+                    $failureReason = switch ($log.status.errorCode) {
                         50034 { "User not found" }
                         50053 { "Account locked" }
                         50055 { "Password expired" }
@@ -192,22 +185,22 @@ function Get-GTLegacyAuthReport
                         50079 { "MFA enrollment required" }
                         50126 { "Invalid username/password" }
                         53003 { "Blocked by CA" }
-                        default { $log.Status.FailureReason }
+                        default { $log.status.failureReason }
                     }
                 }
 
                 [PSCustomObject]@{
-                    CreatedDateTime   = $log.CreatedDateTime
-                    UserPrincipalName = $log.UserPrincipalName
+                    CreatedDateTime   = $log.createdDateTime
+                    UserPrincipalName = $log.userPrincipalName
                     ClientAppUsed     = $appUsed
                     Result            = $resultType
                     Status            = if ($isSuccess) { "Success" } else { "Failure" }
-                    ErrorCode         = $log.Status.ErrorCode
+                    ErrorCode         = $log.status.errorCode
                     FailureReason     = $failureReason
-                    IPAddress         = $log.IpAddress
-                    Location          = "$($log.Location.City), $($log.Location.CountryOrRegion)"
-                    AppDisplayName    = $log.AppDisplayName
-                    RequestId         = $log.Id
+                    IPAddress         = $log.ipAddress
+                    Location          = "$($log.location.city), $($log.location.countryOrRegion)"
+                    AppDisplayName    = $log.appDisplayName
+                    RequestId         = $log.id
                 }
             }
         }

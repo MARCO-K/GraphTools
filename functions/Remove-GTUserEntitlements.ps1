@@ -88,7 +88,7 @@ function Remove-GTUserEntitlements {
         else { Write-PSFMessage -Level Verbose -Message "All required scopes are present" }
 
         # install required modules
-        $requiremodules = @('Microsoft.Graph.Authentication', 'Microsoft.Graph.Beta.Groups', 'Microsoft.Graph.Beta.Users', 'Microsoft.Graph.Beta.Applications', 'Microsoft.Graph.Beta.Users.Actions', 'Microsoft.Graph.Beta.Identity.Governance', 'Microsoft.Graph.Beta.Identity.DirectoryManagement')
+        $requiremodules = @('Microsoft.Graph.Authentication')
         Install-GTRequiredModule -ModuleNames $requiremodules
 
     }
@@ -96,7 +96,8 @@ function Remove-GTUserEntitlements {
     process {
         foreach ($UPN in $UserUPNs) {
             try {
-                $User = Get-MgBetaUser -UserId $UPN -ErrorAction Stop
+                $userResp = Invoke-MgGraphRequest -Method GET -Uri "v1.0/users/$UPN?`$select=id,userPrincipalName" -ErrorAction Stop
+                $User = [PSCustomObject]@{ Id = $userResp.id; UserPrincipalName = $userResp.userPrincipalName }
                 $outputBase = @{
                     UPN       = $UPN
                     UserId    = $User.Id

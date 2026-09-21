@@ -43,14 +43,14 @@ function Remove-GTUserLicenses
         [System.Collections.Generic.List[PSObject]]$Results
     )
 
-    $licenses = Get-MgBetaUserLicenseDetail -UserId $User.Id -ErrorAction Stop
+    $licenses = Invoke-GTGraphPagedRequest -Uri "v1.0/users/$($User.Id)/licenseDetails?`$select=id,skuId,skuPartNumber"
     if ($licenses)
     {
         $action = 'RemoveLicenses'
         $output = $OutputBase + @{
             ResourceName = 'Licenses'
             ResourceType = 'License'
-            ResourceId   = ($licenses.SkuPartNumber -join ', ')
+            ResourceId   = ($licenses.skuPartNumber -join ', ')
             Action       = $action
         }
 
@@ -59,7 +59,7 @@ function Remove-GTUserLicenses
             if ($PSCmdlet.ShouldProcess($User.UserPrincipalName, $action))
             {
                 Write-PSFMessage -Level Verbose -Message "Removing licenses from user $($User.UserPrincipalName)"
-                Set-MgBetaUserLicense -UserId $User.Id -AddLicenses @() -RemoveLicenses @($licenses.SkuId) -ErrorAction Stop
+                Invoke-MgGraphRequest -Method POST -Uri "v1.0/users/$($User.Id)/assignLicense" -Body @{ addLicenses = @(); removeLicenses = @($licenses.skuId) } -ContentType 'application/json' -ErrorAction Stop
                 $output['Status'] = 'Success'
             }
         }

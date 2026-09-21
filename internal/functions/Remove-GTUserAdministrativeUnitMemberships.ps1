@@ -42,8 +42,7 @@ function Remove-GTUserAdministrativeUnitMemberships
     try
     {
         # Get all administrative units where the user is a member
-        $adminUnits = Get-MgBetaUserMemberOf -UserId $User.Id -All -ErrorAction Stop |
-            Where-Object { $_.AdditionalProperties.'@odata.type' -eq '#microsoft.graph.administrativeUnit' }
+        $adminUnits = Invoke-GTGraphPagedRequest -Uri "v1.0/users/$($User.Id)/memberOf/microsoft.graph.administrativeUnit?`$select=id,displayName"
 
         if ($adminUnits)
         {
@@ -51,18 +50,18 @@ function Remove-GTUserAdministrativeUnitMemberships
             {
                 $action = 'RemoveAdministrativeUnitMembership'
                 $output = $OutputBase + @{
-                    ResourceName = $adminUnit.AdditionalProperties.displayName
+                    ResourceName = $adminUnit.displayName
                     ResourceType = 'AdministrativeUnit'
-                    ResourceId   = $adminUnit.Id
+                    ResourceId   = $adminUnit.id
                     Action       = $action
                 }
 
                 try
                 {
-                    if ($PSCmdlet.ShouldProcess($adminUnit.AdditionalProperties.displayName, $action))
+                    if ($PSCmdlet.ShouldProcess($adminUnit.displayName, $action))
                     {
-                        Write-PSFMessage -Level Verbose -Message "Removing user $($User.UserPrincipalName) from administrative unit $($adminUnit.AdditionalProperties.displayName)"
-                        Remove-MgBetaDirectoryAdministrativeUnitMemberByRef -AdministrativeUnitId $adminUnit.Id -DirectoryObjectId $User.Id -ErrorAction Stop
+                        Write-PSFMessage -Level Verbose -Message "Removing user $($User.UserPrincipalName) from administrative unit $($adminUnit.displayName)"
+                        Invoke-MgGraphRequest -Method DELETE -Uri "v1.0/directory/administrativeUnits/$($adminUnit.id)/members/$($User.Id)/`$ref" -ErrorAction Stop
                         $output['Status'] = 'Success'
                     }
                 }
@@ -73,14 +72,14 @@ function Remove-GTUserAdministrativeUnitMemberships
                     
                     # Log appropriate message based on error details
                     if ($errorDetails.HttpStatus -in 404, 403) {
-                        Write-PSFMessage -Level $errorDetails.LogLevel -Message "Failed to remove user $($User.UserPrincipalName) from administrative unit $($adminUnit.AdditionalProperties.displayName) - $($errorDetails.Reason)"
+                        Write-PSFMessage -Level $errorDetails.LogLevel -Message "Failed to remove user $($User.UserPrincipalName) from administrative unit $($adminUnit.displayName) - $($errorDetails.Reason)"
                         Write-PSFMessage -Level Debug -Message "Detailed error ($($errorDetails.HttpStatus)): $($errorDetails.ErrorMessage)"
                     }
                     elseif ($errorDetails.HttpStatus) {
-                        Write-PSFMessage -Level $errorDetails.LogLevel -Message "Failed to remove user $($User.UserPrincipalName) from administrative unit $($adminUnit.AdditionalProperties.displayName) - $($errorDetails.Reason)"
+                        Write-PSFMessage -Level $errorDetails.LogLevel -Message "Failed to remove user $($User.UserPrincipalName) from administrative unit $($adminUnit.displayName) - $($errorDetails.Reason)"
                     }
                     else {
-                        Write-PSFMessage -Level Error -Message "Failed to remove user $($User.UserPrincipalName) from administrative unit $($adminUnit.AdditionalProperties.displayName). $($errorDetails.ErrorMessage)"
+                        Write-PSFMessage -Level Error -Message "Failed to remove user $($User.UserPrincipalName) from administrative unit $($adminUnit.displayName). $($errorDetails.ErrorMessage)"
                     }
                     $output['Status'] = "Failed: $($errorDetails.Reason)"
                 }

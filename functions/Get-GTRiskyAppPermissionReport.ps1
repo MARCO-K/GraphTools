@@ -47,7 +47,7 @@ function Get-GTRiskyAppPermissionReport
 
     begin
     {
-        $modules = @('Microsoft.Graph.Beta.Applications', 'Microsoft.Graph.Beta.Identity.SignIns', 'Microsoft.Graph.Users')
+        $modules = @('Microsoft.Graph.Authentication')
         Install-GTRequiredModule -ModuleNames $modules -Verbose:$VerbosePreference
 
         # 1. Scopes Check
@@ -108,34 +108,27 @@ function Get-GTRiskyAppPermissionReport
         {
             # --- Pre-Req: Cache Microsoft Graph App Roles ---
             Write-PSFMessage -Level Verbose -Message "Caching Microsoft Graph App Roles..."
-            $graphSp = Get-MgBetaServicePrincipal -Filter "appId eq '00000003-0000-0000-c000-000000000000'" -Property Id, AppRoles -ErrorAction Stop
+            $graphSpResp = Invoke-MgGraphRequest -Method GET -Uri "v1.0/servicePrincipals?`$filter=appId eq '00000003-0000-0000-c000-000000000000'&`$select=id,appRoles" -ErrorAction Stop
+            $graphSp = $graphSpResp.value[0]
             $roleMap = @{}
-            foreach ($role in $graphSp.AppRoles) { $roleMap[$role.Id] = $role.Value }
+            foreach ($role in $graphSp.appRoles) { $roleMap[$role.id] = $role.value }
 
             # --- Fetch Service Principals (Targeted or All) ---
-            $spParams = @{
-                All = $true
-                Property = @('id', 'appId', 'displayName', 'signInActivity')
-                ExpandProperty = @('appRoleAssignments')
-                ErrorAction = 'Stop'
-            }
-
+            # beta required: signInActivity is not available on servicePrincipals in v1.0
             if ($targetAppIds.Count -gt 0) {
-                # Build safe filter for specific App IDs
                 $safeIds = $targetAppIds | ForEach-Object { ($_ -replace "'", "''") }
-                $spParams['Filter'] = "appId in ('" + ($safeIds -join "','") + "')"
-                $spParams.Remove('All') # Filter implies not all
+                $spFilter = "appId in ('" + ($safeIds -join "','") + "')"
                 Write-PSFMessage -Level Verbose -Message "Fetching specific Service Principals ($($targetAppIds.Count))..."
+                $sps = Invoke-GTGraphPagedRequest -Uri "beta/servicePrincipals?`$filter=$([Uri]::EscapeDataString($spFilter))&`$select=id,appId,displayName,signInActivity&`$expand=appRoleAssignments" -Headers @{ ConsistencyLevel = 'eventual' }
             }
             else {
                 Write-PSFMessage -Level Verbose -Message "Fetching ALL Service Principals..."
+                $sps = Invoke-GTGraphPagedRequest -Uri "beta/servicePrincipals?`$select=id,appId,displayName,signInActivity&`$expand=appRoleAssignments"
             }
-
-            $sps = Get-MgBetaServicePrincipal @spParams
             
             # Create lookup for later OAuth matching
             $spLookup = @{}
-            foreach ($sp in $sps) { $spLookup[$sp.Id] = $sp }
+            foreach ($sp in $sps) { $spLookup[$sp.id] = $sp }
 
             # --- Phase 1: App-Only Permissions ---
             if ($PermissionType -in 'Both', 'AppOnly')
@@ -145,34 +138,34 @@ function Get-GTRiskyAppPermissionReport
                 foreach ($sp in $sps)
                 {
                     # Check Usage
-                    $lastSignIn = $sp.SignInActivity.LastSignInDateTime
+                    $lastSignIn = $sp.signInActivity.lastSignInDateTime
                     $isActive = $false
                     if ($lastSignIn) {
                         $daysSince = (New-TimeSpan -Start $lastSignIn -End $utcNow).Days
                         if ($daysSince -le 90) { $isActive = $true }
                     }
 
-                    if ($sp.AppRoleAssignments)
+                    if ($sp.appRoleAssignments)
                     {
-                        foreach ($assign in $sp.AppRoleAssignments)
+                        foreach ($assign in $sp.appRoleAssignments)
                         {
-                            if ($assign.ResourceId -eq $graphSp.Id)
+                            if ($assign.resourceId -eq $graphSp.id)
                             {
-                                $permName = $roleMap[$assign.AppRoleId]
+                                $permName = $roleMap[$assign.appRoleId]
                                 
                                 if ($permName -and ($TargetScopes -contains $permName))
                                 {
                                     $riskInfo = & $CalculateRisk -PermissionName $permName
                                     
                                     $report.Add([PSCustomObject]@{
-                                        AppName        = $sp.DisplayName
-                                        AppId          = $sp.AppId
+                                        AppName        = $sp.displayName
+                                        AppId          = $sp.appId
                                         Type           = "Application (App-Only)"
                                         Permission     = $permName
                                         RiskLevel      = $riskInfo.Level
                                         RiskScore      = $riskInfo.Score
                                         Impact         = $riskInfo.Impact
-                                        GrantedDate    = $assign.CreationTimestamp
+                                        GrantedDate    = $assign.creationTimestamp
                                         GrantedBy      = "Administrator"
                                         LastSignIn     = $lastSignIn
                                         IsActive       = $isActive
@@ -190,36 +183,35 @@ function Get-GTRiskyAppPermissionReport
             {
                 Write-PSFMessage -Level Verbose -Message "Fetching Delegated Grants..."
                 
-                $oauthParams = @{ All = $true; ErrorAction = 'Stop' }
-                
-                # Optimization: If targeting specific Apps, filter OAuth grants by ClientId (which is the SP Object ID)
                 if ($targetAppIds.Count -gt 0) {
-                    $spObjectIds = $sps.Id
+                    $spObjectIds = $sps | ForEach-Object { $_.id }
                     if ($spObjectIds) {
-                        # OData 'IN' filter for clientIds
-                        $oauthParams['Filter'] = "clientId in ('" + ($spObjectIds -join "','") + "')"
-                        $oauthParams.Remove('All')
+                        $grantFilter = "clientId in ('" + ($spObjectIds -join "','") + "')"
+                        $grants = Invoke-GTGraphPagedRequest -Uri "v1.0/oauth2PermissionGrants?`$filter=$([Uri]::EscapeDataString($grantFilter))" -Headers @{ ConsistencyLevel = 'eventual' }
+                    } else {
+                        $grants = @()
                     }
                 }
-
-                $grants = Get-MgBetaOauth2PermissionGrant @oauthParams
+                else {
+                    $grants = Invoke-GTGraphPagedRequest -Uri "v1.0/oauth2PermissionGrants"
+                }
 
                 foreach ($grant in $grants)
                 {
-                    $grantedScopes = $grant.Scope -split ' '
+                    $grantedScopes = $grant.scope -split ' '
                     
                     foreach ($scope in $grantedScopes)
                     {
                         if ($TargetScopes -contains $scope)
                         {
                             # Resolve Client App Details
-                            $clientSp = $spLookup[$grant.ClientId]
+                            $clientSp = $spLookup[$grant.clientId]
                             
-                            $appName = if ($clientSp) { $clientSp.DisplayName } else { $grant.ClientId }
-                            $appId = if ($clientSp) { $clientSp.AppId } else { "Unknown" }
+                            $appName = if ($clientSp) { $clientSp.displayName } else { $grant.clientId }
+                            $appId = if ($clientSp) { $clientSp.appId } else { "Unknown" }
                             
                             # Usage Check
-                            $lastSignIn = if ($clientSp) { $clientSp.SignInActivity.LastSignInDateTime } else { $null }
+                            $lastSignIn = if ($clientSp) { $clientSp.signInActivity.lastSignInDateTime } else { $null }
                             $isActive = $false
                             if ($lastSignIn) {
                                 $daysSince = (New-TimeSpan -Start $lastSignIn -End $utcNow).Days
@@ -230,20 +222,20 @@ function Get-GTRiskyAppPermissionReport
                             $grantedBy = "Unknown"
                             $target = "Specific User"
 
-                            if ($grant.ConsentType -eq 'AllPrincipals') {
+                            if ($grant.consentType -eq 'AllPrincipals') {
                                 $target = "Entire Tenant"
                                 $grantedBy = "Administrator"
                             }
-                            elseif ($grant.PrincipalId) {
-                                if (-not $UserCache.ContainsKey($grant.PrincipalId)) {
+                            elseif ($grant.principalId) {
+                                if (-not $UserCache.ContainsKey($grant.principalId)) {
                                     try {
-                                        $u = Get-MgUser -UserId $grant.PrincipalId -Property UserPrincipalName -ErrorAction SilentlyContinue
-                                        $UserCache[$grant.PrincipalId] = if ($u) { $u.UserPrincipalName } else { "Deleted User ($($grant.PrincipalId))" }
+                                        $uResp = Invoke-MgGraphRequest -Method GET -Uri "v1.0/users/$($grant.principalId)?`$select=userPrincipalName" -ErrorAction SilentlyContinue
+                                        $UserCache[$grant.principalId] = if ($uResp) { $uResp.userPrincipalName } else { "Deleted User ($($grant.principalId))" }
                                     } catch {
-                                        $UserCache[$grant.PrincipalId] = "Unknown"
+                                        $UserCache[$grant.principalId] = "Unknown"
                                     }
                                 }
-                                $grantedBy = $UserCache[$grant.PrincipalId]
+                                $grantedBy = $UserCache[$grant.principalId]
                             }
 
                             $riskInfo = & $CalculateRisk -PermissionName $scope
@@ -256,7 +248,7 @@ function Get-GTRiskyAppPermissionReport
                                 RiskLevel      = $riskInfo.Level
                                 RiskScore      = $riskInfo.Score
                                 Impact         = $riskInfo.Impact
-                                GrantedDate    = $grant.StartTime
+                                GrantedDate    = $grant.startTime
                                 GrantedBy      = $grantedBy
                                 LastSignIn     = $lastSignIn
                                 IsActive       = $isActive

@@ -4,7 +4,7 @@
 
 .DESCRIPTION
     Disables one or more user accounts by setting the AccountEnabled property to false.
-    This function requires Microsoft.Graph.Authentication and Microsoft.Graph.Beta.Users modules.
+    This function requires the Microsoft.Graph.Authentication module.
     It validates UPN format and manages Microsoft Graph connection automatically.
 
     This cmdlet supports -WhatIf and -Confirm via ShouldProcess.
@@ -49,7 +49,7 @@ Function Disable-GTUser
         $results = New-Object System.Collections.ArrayList
 
         # Module Management
-        $modules = ('Microsoft.Graph.Authentication', 'Microsoft.Graph.Beta.Users')
+        $modules = ('Microsoft.Graph.Authentication')
         # Capture output to prevent pipeline pollution
         $null = Install-GTRequiredModule -ModuleNames $modules -Verbose
 
@@ -78,7 +78,7 @@ Function Disable-GTUser
             {
                 if ($Force -or $PSCmdlet.ShouldProcess($target, $action))
                 {
-                    Update-MgBetaUser -UserId $User -AccountEnabled:$false -ErrorAction Stop
+                    Invoke-MgGraphRequest -Method PATCH -Uri ("v1.0/users/{0}" -f $User) -Body @{ accountEnabled = $false } -ContentType 'application/json' -ErrorAction Stop
                     Write-PSFMessage -Level Verbose -Message "$User - Disable User Action - User Disabled"
 
                     $result = [PSCustomObject]@{
