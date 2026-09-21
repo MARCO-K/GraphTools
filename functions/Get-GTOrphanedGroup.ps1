@@ -87,18 +87,15 @@ function Get-GTOrphanedGroup
             
             Write-PSFMessage -Level Verbose -Message "Expanding properties: $($expandProps -join ', ')"
             
-            # Fetch Groups and process via foreach (collect first for memory efficiency)
+            # Fetch Groups and process results
             $groups = Invoke-GTGraphPagedRequest -Uri ("v1.0/groups?`$select={0}&`$expand={1}" -f ($selectProps -join ','), ($expandProps -join ','))
             foreach ($group in $groups)
             {
-                $group = $group
-        
                 # Skip soft-deleted groups
-                # In ForEach-Object, 'return' acts like 'continue' (skips current item)
                 if ($group.deletedDateTime)
                 { 
-                    Write-PSFMessage -Level Verbose -Message "Skipping soft-deleted group: $($group.DisplayName)"
-                    return 
+                    Write-PSFMessage -Level Verbose -Message "Skipping soft-deleted group: $($group.displayName)"
+                    continue
                 }
 
                 $orphanReasons = [System.Collections.Generic.List[string]]::new()

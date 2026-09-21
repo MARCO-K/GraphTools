@@ -35,7 +35,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - PIM `roleManagement/directory/*` endpoints: `Get-GTPIMRoleReport`, `Remove-GTPIMRoleEligibility`, `internal/Remove-GTUserRoleAssignments`, `internal/Remove-GTPIMRoleEligibilityInternal`
 - **Property casing** — all REST response property accesses updated from PascalCase (SDK) to camelCase (REST); output `PSCustomObject` property names preserved in PascalCase for backward compatibility
 - **AdditionalProperties eliminated** — all `$obj.AdditionalProperties['key']` patterns replaced with direct property access `$obj.key`
-- **`return` → `continue`** in `Get-GTLegacyAuthReport` filter loop (was inside `ForEach-Object`, now inside `foreach`)
+- **`return` → `continue`** in `Get-GTLegacyAuthReport` and `Get-GTOrphanedGroup` filter loops (was inside `ForEach-Object`, now inside `foreach`)
 
 - **License Cost Reporting** - New function `Get-GTLicenseCostReport`
   - Generates license utilization and cost optimization reports across the tenant

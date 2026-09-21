@@ -80,11 +80,11 @@ function Get-GTOrphanedServicePrincipal
             # 3. UTC Date for Comparisons
             $utcNow = Get-UTCTime
 
-            # 4. Collect SPs (with streaming-like processing via foreach)
+            # 4. Collect SPs
             $selectStr = $properties -join ','
             $sps = Invoke-GTGraphPagedRequest -Uri "v1.0/servicePrincipals?`$select=$selectStr&`$expand=owners"
-            foreach ($sp in $sps) {
-                $sp = $sp
+            foreach ($sp in $sps)
+            {
                 $issues = [System.Collections.Generic.List[string]]::new()
 
                 # --- Check 1: No Owners ---

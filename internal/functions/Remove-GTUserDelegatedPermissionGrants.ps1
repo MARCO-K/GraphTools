@@ -47,7 +47,8 @@ function Remove-GTUserDelegatedPermissionGrants
         
         # Get all OAuth2 permission grants for the user
         # These are delegated permissions granted to apps on behalf of the user
-        $permissionGrants = Invoke-GTGraphPagedRequest -Uri "v1.0/oauth2PermissionGrants?`$filter=$([Uri]::EscapeDataString(\"principalId eq '$($User.Id)'\"))"
+        $filter = "principalId eq '$($User.Id)'"
+        $permissionGrants = Invoke-GTGraphPagedRequest -Uri "v1.0/oauth2PermissionGrants?`$filter=$([Uri]::EscapeDataString($filter))"
 
         if ($permissionGrants)
         {

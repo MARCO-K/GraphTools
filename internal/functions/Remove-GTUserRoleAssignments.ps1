@@ -44,7 +44,8 @@ function Remove-GTUserRoleAssignments
         Test-GTGuid -InputObject $User.Id | Out-Null
         
         # beta required: PIM roleManagement endpoints are only available in the beta API
-        $roleAssignments = Invoke-GTGraphPagedRequest -Uri "beta/roleManagement/directory/roleAssignments?`$filter=$([Uri]::EscapeDataString(\"principalId eq '$($User.Id)'\"))&`$expand=roleDefinition&`$select=id,roleDefinitionId"
+        $filter = "principalId eq '$($User.Id)'"
+        $roleAssignments = Invoke-GTGraphPagedRequest -Uri "beta/roleManagement/directory/roleAssignments?`$filter=$([Uri]::EscapeDataString($filter))&`$expand=roleDefinition&`$select=id,roleDefinitionId"
 
         if ($roleAssignments)
         {

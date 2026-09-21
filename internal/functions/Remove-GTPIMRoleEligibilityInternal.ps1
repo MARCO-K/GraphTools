@@ -51,7 +51,8 @@ function Remove-GTPIMRoleEligibility
         Test-GTGuid -InputObject $User.Id | Out-Null
         
         # beta required: PIM roleManagement endpoints are only available in the beta API
-        $roleEligibilitySchedules = Invoke-GTGraphPagedRequest -Uri "beta/roleManagement/directory/roleEligibilitySchedules?`$filter=$([Uri]::EscapeDataString(\"principalId eq '$($User.Id)'\"))&`$expand=roleDefinition"
+        $filter = "principalId eq '$($User.Id)'"
+        $roleEligibilitySchedules = Invoke-GTGraphPagedRequest -Uri "beta/roleManagement/directory/roleEligibilitySchedules?`$filter=$([Uri]::EscapeDataString($filter))&`$expand=roleDefinition"
 
         if ($roleEligibilitySchedules)
         {
