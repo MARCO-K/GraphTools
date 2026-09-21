@@ -79,7 +79,7 @@ function Get-GTRecentUser
                 Write-PSFMessage -Level Verbose -Message "Querying Microsoft Graph for user: $UserPrincipalName"
                 
                 # Fetch single user
-                $resp = Invoke-MgGraphRequest -Method GET -Uri "v1.0/users/$UserPrincipalName?`$select=id,displayName,userPrincipalName,createdDateTime,accountEnabled,userType" -ErrorAction Stop
+                $resp = Invoke-GTGraphRequest -Method GET -Uri "v1.0/users/$($UserPrincipalName)?`$select=id,displayName,userPrincipalName,createdDateTime,accountEnabled,userType" -ErrorAction Stop
                 $users = @([PSCustomObject]@{ id = $resp.id; displayName = $resp.displayName; userPrincipalName = $resp.userPrincipalName; createdDateTime = $resp.createdDateTime; accountEnabled = $resp.accountEnabled; userType = $resp.userType })
             }
             else

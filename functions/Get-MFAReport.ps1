@@ -101,7 +101,7 @@ function Get-MFAReport
             $baseUri = 'beta/reports/authenticationMethodsUserRegistrationDetails'
             if ($UPNList.Count -gt 0) {
                 $filterString = "userPrincipalName in ('" + ($UPNList -join "','") + "')"
-                $report = Invoke-GTGraphPagedRequest -Uri "$baseUri?`$filter=$([Uri]::EscapeDataString($filterString))"
+                $report = Invoke-GTGraphPagedRequest -Uri "$($baseUri)?`$filter=$([Uri]::EscapeDataString($filterString))"
             } else {
                 $report = Invoke-GTGraphPagedRequest -Uri $baseUri
             }

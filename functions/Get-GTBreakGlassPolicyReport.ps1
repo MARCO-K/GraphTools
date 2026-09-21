@@ -64,7 +64,7 @@ function Get-GTBreakGlassPolicyReport
         {
             try
             {
-                $resp = Invoke-MgGraphRequest -Method GET -Uri "v1.0/users/$upn?`$select=id,userPrincipalName" -ErrorAction Stop
+                $resp = Invoke-GTGraphRequest -Method GET -Uri "v1.0/users/$($upn)?`$select=id,userPrincipalName" -ErrorAction Stop
                 $bgAccounts += [PSCustomObject]@{
                     Id  = $resp.id
                     Upn = $resp.userPrincipalName
@@ -111,7 +111,7 @@ function Get-GTBreakGlassPolicyReport
 
                 foreach ($bgUser in $bgAccounts)
                 {
-                    $status = "Safe"
+                    $status = "Not Targeted"
                     $reason = "Not Targeted"
                     $severity = "Info"
 

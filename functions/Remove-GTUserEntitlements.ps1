@@ -96,7 +96,7 @@ function Remove-GTUserEntitlements {
     process {
         foreach ($UPN in $UserUPNs) {
             try {
-                $userResp = Invoke-MgGraphRequest -Method GET -Uri "v1.0/users/$UPN?`$select=id,userPrincipalName" -ErrorAction Stop
+                $userResp = Invoke-GTGraphRequest -Method GET -Uri "v1.0/users/$($UPN)?`$select=id,userPrincipalName" -ErrorAction Stop
                 $User = [PSCustomObject]@{ Id = $userResp.id; UserPrincipalName = $userResp.userPrincipalName }
                 $outputBase = @{
                     UPN       = $UPN

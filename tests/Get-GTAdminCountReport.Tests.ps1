@@ -7,6 +7,12 @@ if (-not (Get-Command Get-GTGraphErrorDetails -ErrorAction SilentlyContinue)) { 
 
 Describe "Get-GTAdminCountReport" {
     BeforeAll {
+        function Install-GTRequiredModule { param([string[]]$ModuleNames, [string]$Scope, [switch]$AllowPrerelease) }
+        function Initialize-GTGraphConnection { param([string[]]$Scopes, [switch]$NewSession, [switch]$SkipConnect) return $true }
+        function Test-GTGraphScopes { param([string[]]$RequiredScopes, [switch]$Reconnect, [switch]$Quiet) return $true }
+        function Write-PSFMessage { param($Level, $Message, $ErrorRecord) }
+        function Get-GTGraphErrorDetails { param($Exception, $ResourceType) return @{ LogLevel = 'Error'; Reason = 'Mock Error'; ErrorMessage = 'Mock Error Message' } }
+
         # Mock Get-MgContext to simulate being connected
         Mock -CommandName "Get-MgContext" -MockWith {
             return @{ Scopes = @('RoleManagement.Read.Directory', 'Directory.Read.All') }

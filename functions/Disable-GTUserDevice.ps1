@@ -112,7 +112,7 @@ Function Disable-GTUserDevice
             {
                 # Performance Optimization: Get user ID first, then query devices directly with filter
                 # This reduces API calls from 1+N to just 2 per user (1 for user ID, 1 for all enabled devices)
-                $userResp = Invoke-MgGraphRequest -Method GET -Uri "v1.0/users/$User?`$select=id" -ErrorAction Stop
+                $userResp = Invoke-GTGraphRequest -Method GET -Uri "v1.0/users/$($User)?`$select=id" -ErrorAction Stop
                 $userId = $userResp.id
 
                 # Validate that userId is a GUID to prevent OData injection
@@ -149,7 +149,7 @@ Function Disable-GTUserDevice
 
                         if ($PSCmdlet.ShouldProcess($target, $action))
                         {
-                            Invoke-MgGraphRequest -Method PATCH -Uri "v1.0/devices/$($device.id)" -Body @{ accountEnabled = $false } -ContentType 'application/json' -ErrorAction Stop
+                            $null = Invoke-GTGraphRequest -Method PATCH -Uri "v1.0/devices/$($device.id)" -Body @{ accountEnabled = $false } -ContentType 'application/json' -ErrorAction Stop
                             Write-PSFMessage -Level Verbose -Message "$User - Disable Device Action - Device disabled: $($device.displayName) (ID: $($device.id))"
 
                             $result = [PSCustomObject]@{
