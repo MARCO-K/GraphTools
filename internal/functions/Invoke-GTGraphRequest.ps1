@@ -222,7 +222,7 @@ function Invoke-GTGraphRequest
                 }
                 else
                 {
-                    $errDetails = Get-GTGraphErrorDetails -Exception $_.Exception -Uri $currentUri
+                    $errDetails = Get-GTGraphErrorDetails -Exception $_.Exception -Context $currentUri
                     Write-PSFMessage -Level $errDetails.LogLevel -Message "Microsoft Graph request failed: $($errDetails.Reason)"
                     throw
                 }
