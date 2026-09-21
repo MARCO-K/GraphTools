@@ -271,7 +271,7 @@ function Get-GTRiskyAppPermissionReport
                 Impact               = $impact
                 Desc                 = $desc
                 PrivilegeLevel       = $null
-                AdminConsentRequired = ($Scheme -eq 'Application' -or $baseScore -ge 6)
+                AdminConsentRequired = $null
             }
         }
 

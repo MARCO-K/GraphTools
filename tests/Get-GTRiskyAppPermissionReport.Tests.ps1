@@ -571,7 +571,7 @@ Describe "Get-GTRiskyAppPermissionReport" {
             $result.Type | Should -Match "Specific User"
         }
 
-        It "should infer High risk for unmapped *.ReadWrite.All scope via regex heuristics" {
+        It "should infer High risk for unmapped *.Manage.All scope via regex heuristics" {
             Mock -CommandName "Invoke-MgGraphRequest" -MockWith {
                 param($Method, $Uri, $ErrorAction)
                 if ($Uri -like "*00000003-0000-0000-c000-000000000000*") {
@@ -611,6 +611,7 @@ Describe "Get-GTRiskyAppPermissionReport" {
             $result.RiskLevel | Should -Be "High"
             $result.RiskScore | Should -Be 8
             $result.Impact | Should -Be "Broad Modification"
+            $result.AdminConsentRequired | Should -BeNullOrEmpty
         }
 
         It "should scope tenant-wide delegated grant queries to Microsoft Graph resourceId" {

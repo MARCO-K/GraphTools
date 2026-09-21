@@ -37,7 +37,7 @@ When an application is granted permissions via user delegation (`consentType = '
 ### Heuristic Fallback & RSC Permissions
 
 - **Resource-Specific Application Permissions (RSC)**: Automatically discovers and maps application permissions defined under `resourceSpecificApplicationPermissions` on the Microsoft Graph service principal (e.g. Teams/Chat scopes).
-- **Naming Heuristics**: Permissions unmapped in the offline catalog are dynamically inferred from standard naming conventions (e.g., `*.ReadWrite.All` $\rightarrow$ Score 7/8 `High`, `*.Read.All` $\rightarrow$ Score 5/6 `Medium`) with an application-scope elevation (+1 score) when running unconstrained without user context.
+- **Naming Heuristics**: Permissions unmapped in the offline catalog are dynamically inferred from standard naming conventions (e.g., `*.ReadWrite.All` → Score 7/8 `High`, `*.Read.All` → Score 5/6 `Medium`) with an application-scope elevation (+1 score) when running unconstrained without user context.
 
 ## Syntax
 
