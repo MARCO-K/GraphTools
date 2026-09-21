@@ -52,13 +52,25 @@ function Initialize-GTGraphConnection
             Disconnect-MgGraph -ErrorAction SilentlyContinue
         }
 
-        # Check for existing context
-        $context = Get-MgContext
+        # Check for existing zero-dependency token cache
+        $now = [DateTime]::UtcNow
+        if ($script:GTTokenCache -and $script:GTTokenCache.AccessToken -and ($script:GTTokenCache.ExpiresAt -gt $now))
+        {
+            Write-PSFMessage -Level Verbose -Message 'Using existing zero-dependency Microsoft Graph token.'
+            return $true
+        }
+
+        # Check for existing SDK context if available
+        $context = $null
+        if (Get-Command -Name Get-MgContext -ErrorAction SilentlyContinue)
+        {
+            $context = Get-MgContext
+        }
 
         if ($SkipConnect)
         {
-            # Just return whether context exists
-            return ($null -ne $context)
+            # Just return whether context or cached token exists
+            return ($null -ne $context -or ($null -ne $script:GTTokenCache -and $script:GTTokenCache.AccessToken))
         }
 
         if (-not $context)
@@ -66,6 +78,12 @@ function Initialize-GTGraphConnection
             if (-not $Scopes)
             {
                 Write-PSFMessage -Level Warning -Message 'No Microsoft Graph context found and no scopes provided.'
+                return $false
+            }
+
+            if (-not (Get-Command -Name Connect-MgGraph -ErrorAction SilentlyContinue))
+            {
+                Write-PSFMessage -Level Warning -Message 'Connect-MgGraph is not available. Use Connect-GTGraph to establish a connection.'
                 return $false
             }
 

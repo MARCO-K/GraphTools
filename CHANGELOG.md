@@ -7,6 +7,25 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.20.0] - 2026-09-21
+
+### Added
+
+- **Zero-Dependency Microsoft Graph REST Engine**:
+  - Implemented `Get-GTCachedGraphToken` supporting RFC 7523 Certificate-based Client Assertion (RS256 JWT via native .NET cryptography) and Client Secret credentials with sliding expiration buffers to eliminate token-endpoint throttling (HTTP 429).
+  - Implemented `Invoke-GTGraphRequest` central REST invoker providing automatic Bearer token injection, URL normalization (relative to full endpoint URI), header management (`ConsistencyLevel`, `client-request-id`), automatic `@odata.nextLink` pagination (`-All`), and resilient retry with exponential backoff on HTTP 429 and 503.
+  - Added new public connection management cmdlets:
+    - `Connect-GTGraph`: Zero-dependency authentication via Certificate Thumbprint, `X509Certificate2` object, Client Secret, or direct Access Token.
+    - `Disconnect-GTGraph`: Flushes session context and in-memory token cache.
+    - `Get-GTConnection`: Inspects active connection status and token expiration.
+  - Comprehensive documentation added in `docs/Connect-GTGraph.md`.
+  - Pester 5.7+ test suites added in `tests/Get-GTCachedGraphToken.Tests.ps1`, `tests/Invoke-GTGraphRequest.Tests.ps1`, `tests/Connect-GTGraph.Tests.ps1`, and `tests/Invoke-GTGraphPagedRequest.Tests.ps1`.
+
+### Changed
+
+- **`Invoke-GTGraphPagedRequest`**: Updated to delegate directly to `Invoke-GTGraphRequest -All`, immediately upgrading all 40+ module callers to the zero-dependency REST engine without breaking backward compatibility.
+- **`Initialize-GTGraphConnection`**: Updated to inspect and reuse the zero-dependency `$script:GTTokenCache` in addition to SDK contexts, with safe fallback guards when `Connect-MgGraph` is not installed.
+
 ### Added
 
 - **Enhanced Permission Extraction & Risk Analysis (`Get-GTRiskyAppPermissionReport`)**:
