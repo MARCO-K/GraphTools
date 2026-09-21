@@ -9,6 +9,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **Enhanced Permission Extraction & Risk Analysis (`Get-GTRiskyAppPermissionReport`)**:
+  - Added support for Microsoft Graph Resource-Specific Consent (RSC) permissions via `resourceSpecificApplicationPermissions` caching.
+  - Scoped tenant-wide OAuth2 delegated permission grant queries strictly to the Microsoft Graph resource ID (`$filter=resourceId eq '{graphSpId}'`).
+  - Added Tier-0 curated attack vectors: `OnPremDirectorySynchronization.ReadWrite.All` (Score 10, Hybrid Identity Takeover), `Domain.ReadWrite.All` (Score 10, Domain Takeover), `UserAuthenticationMethod.ReadWrite.All` (Score 10, Credential Manipulation), `DelegatedPermissionGrant.ReadWrite.All` (Score 10, Privilege Escalation), and `BitlockerKey.Read.All` (Score 8, Cryptographic Exfiltration).
+  - Implemented Delegated Privilege Ceiling: adjusts score and level when delegated permissions are granted via user consent (`consentType = 'Principal'`), recognizing that user-scoped grants cannot exceed the delegating user's privileges.
+  - Added regex naming heuristics (`\.(ReadWrite|Write|Manage)\.All$`, etc.) with application-scope elevation (+1 score) for unmapped or custom permissions.
 - **DevX Permissions Metadata Integration (`Get-GTRiskyAppPermissionReport`)** - Resolves [#80](https://github.com/MARCO-K/GraphTools/issues/80).
   - Integrates official Microsoft Graph DevX permissions metadata with `privilegeLevel` (1–5) for both `Application` and `DelegatedWork` schemes.
   - Added compiled offline metadata fixture `data/graph-permissions.json` (926 permissions) for fast, zero-latency runtime evaluation without external HTTP dependencies.

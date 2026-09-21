@@ -17,7 +17,27 @@ Permissions are evaluated against the Microsoft Graph DevX metadata catalog (`da
 | **3** | `Medium` | 6 | Standard tenant-wide read or scoped write access |
 | **1–2** | `Low` | 2–4 | Least-privilege basic reads or user-scoped operations |
 
-Specific critical attack vectors retain curated risk classifications (e.g. `RoleManagement.ReadWrite.Directory` and `AppRoleAssignment.ReadWrite.All` as Score 10 `Critical` with impact *Privilege Escalation*; `Directory.ReadWrite.All` as Score 9 `Critical` with impact *Tenant Destruction*).
+### Curated Threat Vectors
+
+Specific critical attack vectors retain curated risk classifications:
+- **`RoleManagement.ReadWrite.Directory`**, **`AppRoleAssignment.ReadWrite.All`**, **`DelegatedPermissionGrant.ReadWrite.All`**: Score 10 (`Critical`), Impact *Privilege Escalation*
+- **`OnPremDirectorySynchronization.ReadWrite.All`**: Score 10 (`Critical`), Impact *Hybrid Identity Takeover*
+- **`Domain.ReadWrite.All`**: Score 10 (`Critical`), Impact *Domain Takeover*
+- **`UserAuthenticationMethod.ReadWrite.All`**: Score 10 (`Critical`), Impact *Credential Manipulation*
+- **`Directory.ReadWrite.All`**: Score 9 (`Critical`), Impact *Tenant Destruction*
+- **`Mail.ReadWrite`**, **`Files.ReadWrite.All`**: Score 8 (`High`), Impact *Data Integrity*
+- **`BitlockerKey.Read.All`**: Score 8 (`High`), Impact *Cryptographic Exfiltration*
+- **`Mail.Read`**, **`Files.Read.All`**: Score 7 (`High`), Impact *Data Exfiltration*
+- **`Mail.Send`**, **`User.ReadWrite.All`**: Score 6 (`Medium`), Impact *Impersonation* / *User Modification*
+
+### Delegated Privilege Ceiling
+
+When an application is granted permissions via user delegation (`consentType = 'Principal'`), the effective blast radius is bounded by the delegating user's direct directory roles. In these scenarios, `Get-GTRiskyAppPermissionReport` applies a privilege ceiling adjustment (score decremented by 1, with `Critical` capped at `High`). Tenant-wide administrator consents (`consentType = 'AllPrincipals'`) retain full risk weighting.
+
+### Heuristic Fallback & RSC Permissions
+
+- **Resource-Specific Application Permissions (RSC)**: Automatically discovers and maps application permissions defined under `resourceSpecificApplicationPermissions` on the Microsoft Graph service principal (e.g. Teams/Chat scopes).
+- **Naming Heuristics**: Permissions unmapped in the offline catalog are dynamically inferred from standard naming conventions (e.g., `*.ReadWrite.All` $\rightarrow$ Score 7/8 `High`, `*.Read.All` $\rightarrow$ Score 5/6 `Medium`) with an application-scope elevation (+1 score) when running unconstrained without user context.
 
 ## Syntax
 

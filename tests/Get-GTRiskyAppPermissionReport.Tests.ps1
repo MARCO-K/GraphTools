@@ -432,6 +432,212 @@ Describe "Get-GTRiskyAppPermissionReport" {
         }
     }
 
+    Context "Enhanced Risk Analysis & Extraction Features" {
+        It "should map and report resource-specific application permissions (RSC)" {
+            Mock -CommandName "Invoke-MgGraphRequest" -MockWith {
+                param($Method, $Uri, $ErrorAction)
+                if ($Uri -like "*00000003-0000-0000-c000-000000000000*") {
+                    return [PSCustomObject]@{
+                        value = @(
+                            [PSCustomObject]@{
+                                id = "graph-sp-id"
+                                appRoles = @()
+                                resourceSpecificApplicationPermissions = @(
+                                    [PSCustomObject]@{ id = "rsc-role-1"; value = "ChatMessage.Read.Group" }
+                                )
+                            }
+                        )
+                    }
+                }
+                return $null
+            }
+            Mock -CommandName "Invoke-GTGraphPagedRequest" -MockWith {
+                param($Uri, $Headers)
+                if ($Uri -like "*servicePrincipals*") {
+                    return @(
+                        [PSCustomObject]@{
+                            id = "sp-rsc"
+                            appId = "app-rsc"
+                            displayName = "RSC App"
+                            signInActivity = $null
+                            appRoleAssignments = @(
+                                [PSCustomObject]@{
+                                    resourceId = "graph-sp-id"
+                                    appRoleId = "rsc-role-1"
+                                    creationTimestamp = (Get-Date)
+                                }
+                            )
+                        }
+                    )
+                }
+                return @()
+            }
+
+            $result = Get-GTRiskyAppPermissionReport -PermissionType AppOnly -HighRiskScopes "ChatMessage.Read.Group"
+            $result | Should -Not -BeNullOrEmpty
+            $result.Permission | Should -Be "ChatMessage.Read.Group"
+            $result.Type | Should -Be "Application (App-Only)"
+        }
+
+        It "should detect Tier-0 curated threat vectors with Critical score 10" {
+            Mock -CommandName "Invoke-MgGraphRequest" -MockWith {
+                param($Method, $Uri, $ErrorAction)
+                if ($Uri -like "*00000003-0000-0000-c000-000000000000*") {
+                    return [PSCustomObject]@{
+                        value = @(
+                            [PSCustomObject]@{
+                                id = "graph-sp-id"
+                                appRoles = @(
+                                    [PSCustomObject]@{ id = "role-sync"; value = "OnPremDirectorySynchronization.ReadWrite.All" }
+                                    [PSCustomObject]@{ id = "role-mfa"; value = "UserAuthenticationMethod.ReadWrite.All" }
+                                )
+                            }
+                        )
+                    }
+                }
+                return $null
+            }
+            Mock -CommandName "Invoke-GTGraphPagedRequest" -MockWith {
+                param($Uri, $Headers)
+                if ($Uri -like "*servicePrincipals*") {
+                    return @(
+                        [PSCustomObject]@{
+                            id = "sp-tier0"
+                            appId = "app-tier0"
+                            displayName = "Tier-0 App"
+                            signInActivity = $null
+                            appRoleAssignments = @(
+                                [PSCustomObject]@{ resourceId = "graph-sp-id"; appRoleId = "role-sync"; creationTimestamp = (Get-Date) }
+                                [PSCustomObject]@{ resourceId = "graph-sp-id"; appRoleId = "role-mfa"; creationTimestamp = (Get-Date) }
+                            )
+                        }
+                    )
+                }
+                return @()
+            }
+
+            $result = Get-GTRiskyAppPermissionReport -PermissionType AppOnly
+            @($result).Count | Should -Be 2
+            ($result | Where-Object { $_.Permission -eq "OnPremDirectorySynchronization.ReadWrite.All" }).RiskScore | Should -Be 10
+            ($result | Where-Object { $_.Permission -eq "OnPremDirectorySynchronization.ReadWrite.All" }).Impact | Should -Be "Hybrid Identity Takeover"
+            ($result | Where-Object { $_.Permission -eq "UserAuthenticationMethod.ReadWrite.All" }).RiskScore | Should -Be 10
+            ($result | Where-Object { $_.Permission -eq "UserAuthenticationMethod.ReadWrite.All" }).Impact | Should -Be "Credential Manipulation"
+        }
+
+        It "should apply privilege ceiling when delegated consent is user-specific" {
+            Mock -CommandName "Invoke-MgGraphRequest" -MockWith {
+                param($Method, $Uri, $ErrorAction)
+                if ($Uri -like "*00000003-0000-0000-c000-000000000000*") {
+                    return [PSCustomObject]@{
+                        value = @([PSCustomObject]@{ id = "graph-sp-id"; appRoles = @() })
+                    }
+                }
+                if ($Uri -like "*v1.0/users/*") {
+                    return [PSCustomObject]@{ userPrincipalName = "victim@contoso.com" }
+                }
+                return $null
+            }
+            Mock -CommandName "Invoke-GTGraphPagedRequest" -MockWith {
+                param($Uri, $Headers)
+                if ($Uri -like "*servicePrincipals*") {
+                    return @(
+                        [PSCustomObject]@{
+                            id = "sp-delegated"
+                            appId = "app-delegated"
+                            displayName = "Delegated App"
+                            signInActivity = $null
+                        }
+                    )
+                }
+                if ($Uri -like "*oauth2PermissionGrants*") {
+                    return @(
+                        [PSCustomObject]@{
+                            clientId = "sp-delegated"
+                            scope = "Directory.ReadWrite.All"
+                            consentType = "Principal"
+                            startTime = (Get-Date)
+                            principalId = "user-id-123"
+                        }
+                    )
+                }
+                return @()
+            }
+
+            $result = Get-GTRiskyAppPermissionReport -PermissionType Delegated
+            $result | Should -Not -BeNullOrEmpty
+            # Tenant-wide is Score 9 / Critical; user-ceiling reduces to Score 8 / High
+            $result.RiskScore | Should -Be 8
+            $result.RiskLevel | Should -Be "High"
+            $result.Type | Should -Match "Specific User"
+        }
+
+        It "should infer High risk for unmapped *.ReadWrite.All scope via regex heuristics" {
+            Mock -CommandName "Invoke-MgGraphRequest" -MockWith {
+                param($Method, $Uri, $ErrorAction)
+                if ($Uri -like "*00000003-0000-0000-c000-000000000000*") {
+                    return [PSCustomObject]@{
+                        value = @(
+                            [PSCustomObject]@{
+                                id = "graph-sp-id"
+                                appRoles = @(
+                                    [PSCustomObject]@{ id = "role-heuristic"; value = "UnknownEntity.Manage.All" }
+                                )
+                            }
+                        )
+                    }
+                }
+                return $null
+            }
+            Mock -CommandName "Invoke-GTGraphPagedRequest" -MockWith {
+                param($Uri, $Headers)
+                if ($Uri -like "*servicePrincipals*") {
+                    return @(
+                        [PSCustomObject]@{
+                            id = "sp-heuristic"
+                            appId = "app-heuristic"
+                            displayName = "Heuristic App"
+                            signInActivity = $null
+                            appRoleAssignments = @(
+                                [PSCustomObject]@{ resourceId = "graph-sp-id"; appRoleId = "role-heuristic"; creationTimestamp = (Get-Date) }
+                            )
+                        }
+                    )
+                }
+                return @()
+            }
+
+            $result = Get-GTRiskyAppPermissionReport -PermissionType AppOnly -HighRiskScopes "UnknownEntity.Manage.All"
+            $result | Should -Not -BeNullOrEmpty
+            $result.RiskLevel | Should -Be "High"
+            $result.RiskScore | Should -Be 8
+            $result.Impact | Should -Be "Broad Modification"
+        }
+
+        It "should scope tenant-wide delegated grant queries to Microsoft Graph resourceId" {
+            $capturedGrantUri = $null
+            Mock -CommandName "Invoke-MgGraphRequest" -MockWith {
+                param($Method, $Uri, $ErrorAction)
+                if ($Uri -like "*00000003-0000-0000-c000-000000000000*") {
+                    return [PSCustomObject]@{
+                        value = @([PSCustomObject]@{ id = "expected-graph-sp-id"; appRoles = @() })
+                    }
+                }
+                return $null
+            }
+            Mock -CommandName "Invoke-GTGraphPagedRequest" -MockWith {
+                param($Uri, $Headers)
+                if ($Uri -like "*oauth2PermissionGrants*") {
+                    $script:capturedGrantUri = $Uri
+                    return @()
+                }
+                return @()
+            }
+
+            $null = Get-GTRiskyAppPermissionReport -PermissionType Delegated
+            $script:capturedGrantUri | Should -Match "resourceId eq 'expected-graph-sp-id'"
+        }
+    }
+
     Context "Error Handling" {
         It "should handle Graph API errors gracefully" {
             Mock -CommandName "Invoke-MgGraphRequest" -MockWith { throw "Graph API Error" }

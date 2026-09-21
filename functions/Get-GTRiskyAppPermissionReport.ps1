@@ -85,15 +85,20 @@ function Get-GTRiskyAppPermissionReport
 
         # 4. Curated High-Impact Overrides
         $CuratedOverrides = @{
-            'RoleManagement.ReadWrite.Directory' = @{ Score = 10; Level = 'Critical'; Impact = 'Privilege Escalation'; Desc = 'Can promote self to Global Admin' }
-            'AppRoleAssignment.ReadWrite.All'    = @{ Score = 10; Level = 'Critical'; Impact = 'Privilege Escalation'; Desc = 'Can grant self any permission' }
-            'Directory.ReadWrite.All'            = @{ Score = 9;  Level = 'Critical'; Impact = 'Tenant Destruction';   Desc = 'Can delete users, groups, and apps' }
-            'Mail.ReadWrite'                     = @{ Score = 8;  Level = 'High';     Impact = 'Data Integrity';       Desc = 'Can read and modify all email' }
-            'Files.ReadWrite.All'                = @{ Score = 8;  Level = 'High';     Impact = 'Data Integrity';       Desc = 'Can read/modify all files' }
-            'Mail.Read'                          = @{ Score = 7;  Level = 'High';     Impact = 'Data Exfiltration';    Desc = 'Can read all email' }
-            'Files.Read.All'                     = @{ Score = 7;  Level = 'High';     Impact = 'Data Exfiltration';    Desc = 'Can read all files' }
-            'Mail.Send'                          = @{ Score = 6;  Level = 'Medium';   Impact = 'Impersonation';        Desc = 'Can send email as any user' }
-            'User.ReadWrite.All'                 = @{ Score = 6;  Level = 'Medium';   Impact = 'User Modification';    Desc = 'Can modify user profiles' }
+            'RoleManagement.ReadWrite.Directory'           = @{ Score = 10; Level = 'Critical'; Impact = 'Privilege Escalation';       Desc = 'Can promote self to Global Admin' }
+            'AppRoleAssignment.ReadWrite.All'              = @{ Score = 10; Level = 'Critical'; Impact = 'Privilege Escalation';       Desc = 'Can grant self any permission' }
+            'OnPremDirectorySynchronization.ReadWrite.All' = @{ Score = 10; Level = 'Critical'; Impact = 'Hybrid Identity Takeover';   Desc = 'Can tamper with directory synchronization accounts' }
+            'Domain.ReadWrite.All'                         = @{ Score = 10; Level = 'Critical'; Impact = 'Domain Takeover';            Desc = 'Can manipulate verified tenant domains' }
+            'UserAuthenticationMethod.ReadWrite.All'       = @{ Score = 10; Level = 'Critical'; Impact = 'Credential Manipulation';    Desc = 'Can reset MFA and authentication methods for users' }
+            'DelegatedPermissionGrant.ReadWrite.All'       = @{ Score = 10; Level = 'Critical'; Impact = 'Privilege Escalation';       Desc = 'Can grant arbitrary delegated permissions' }
+            'Directory.ReadWrite.All'                      = @{ Score = 9;  Level = 'Critical'; Impact = 'Tenant Destruction';         Desc = 'Can delete users, groups, and apps' }
+            'Mail.ReadWrite'                               = @{ Score = 8;  Level = 'High';     Impact = 'Data Integrity';             Desc = 'Can read and modify all email' }
+            'Files.ReadWrite.All'                          = @{ Score = 8;  Level = 'High';     Impact = 'Data Integrity';             Desc = 'Can read/modify all files' }
+            'BitlockerKey.Read.All'                        = @{ Score = 8;  Level = 'High';     Impact = 'Cryptographic Exfiltration'; Desc = 'Can extract BitLocker volume recovery keys' }
+            'Mail.Read'                                    = @{ Score = 7;  Level = 'High';     Impact = 'Data Exfiltration';          Desc = 'Can read all email' }
+            'Files.Read.All'                               = @{ Score = 7;  Level = 'High';     Impact = 'Data Exfiltration';          Desc = 'Can read all files' }
+            'Mail.Send'                                    = @{ Score = 6;  Level = 'Medium';   Impact = 'Impersonation';              Desc = 'Can send email as any user' }
+            'User.ReadWrite.All'                           = @{ Score = 6;  Level = 'Medium';   Impact = 'User Modification';          Desc = 'Can modify user profiles' }
         }
 
         $UserCache = @{}
@@ -110,7 +115,8 @@ function Get-GTRiskyAppPermissionReport
         $CalculateRisk = {
             param(
                 [string]$PermissionName,
-                [ValidateSet('Application', 'Delegated')][string]$Scheme = 'Application'
+                [ValidateSet('Application', 'Delegated')][string]$Scheme = 'Application',
+                [string]$ConsentType = 'AllPrincipals'
             )
 
             # Check curated attack profiles first
@@ -123,9 +129,21 @@ function Get-GTRiskyAppPermissionReport
                 } else { $null }
                 $adminConsent = if ($devxMeta) { $devxMeta['requiresAdminConsent'] } else { $true }
 
+                $curatedScore = $curated.Score
+                $curatedLevel = $curated.Level
+
+                # Delegated privilege ceiling: user-consented grants cannot exceed the delegating user's rights
+                if ($Scheme -eq 'Delegated' -and $ConsentType -eq 'Principal')
+                {
+                    $curatedScore = [Math]::Max(2, $curatedScore - 1)
+                    if ($curatedLevel -eq 'Critical') { $curatedLevel = 'High' }
+                    elseif ($curatedScore -le 4) { $curatedLevel = 'Low' }
+                    elseif ($curatedScore -le 6) { $curatedLevel = 'Medium' }
+                }
+
                 return [PSCustomObject]@{
-                    Score                = $curated.Score
-                    Level                = $curated.Level
+                    Score                = $curatedScore
+                    Level                = $curatedLevel
                     Impact               = $curated.Impact
                     Desc                 = $curated.Desc
                     PrivilegeLevel       = if ($null -ne $devxPriv) { [int]$devxPriv } else { 4 }
@@ -147,69 +165,113 @@ function Get-GTRiskyAppPermissionReport
                 $adminConsent = [bool]$meta['requiresAdminConsent']
                 $desc = if ($meta['description']) { $meta['description'] } else { "Microsoft Graph permission: $PermissionName" }
 
+                $catScore = 2
+                $catLevel = 'Low'
+                $catImpact = 'Least Privilege'
+
                 switch ($privLevel)
                 {
                     { $_ -ge 5 } {
-                        return [PSCustomObject]@{
-                            Score                = 10
-                            Level                = 'Critical'
-                            Impact               = 'Critical Privilege'
-                            Desc                 = $desc
-                            PrivilegeLevel       = [int]$privLevel
-                            AdminConsentRequired = $adminConsent
-                        }
+                        $catScore = 10
+                        $catLevel = 'Critical'
+                        $catImpact = 'Critical Privilege'
                     }
                     4 {
-                        return [PSCustomObject]@{
-                            Score                = 8
-                            Level                = 'High'
-                            Impact               = 'High Privilege'
-                            Desc                 = $desc
-                            PrivilegeLevel       = [int]$privLevel
-                            AdminConsentRequired = $adminConsent
-                        }
+                        $catScore = 8
+                        $catLevel = 'High'
+                        $catImpact = 'High Privilege'
                     }
                     3 {
-                        return [PSCustomObject]@{
-                            Score                = 6
-                            Level                = 'Medium'
-                            Impact               = 'Medium Privilege'
-                            Desc                 = $desc
-                            PrivilegeLevel       = 3
-                            AdminConsentRequired = $adminConsent
-                        }
+                        $catScore = 6
+                        $catLevel = 'Medium'
+                        $catImpact = 'Medium Privilege'
                     }
                     2 {
-                        return [PSCustomObject]@{
-                            Score                = 4
-                            Level                = 'Low'
-                            Impact               = 'Low Privilege'
-                            Desc                 = $desc
-                            PrivilegeLevel       = 2
-                            AdminConsentRequired = $adminConsent
-                        }
+                        $catScore = 4
+                        $catLevel = 'Low'
+                        $catImpact = 'Low Privilege'
                     }
                     default {
-                        return [PSCustomObject]@{
-                            Score                = 2
-                            Level                = 'Low'
-                            Impact               = 'Least Privilege'
-                            Desc                 = $desc
-                            PrivilegeLevel       = if ($null -ne $privLevel) { [int]$privLevel } else { 1 }
-                            AdminConsentRequired = $adminConsent
-                        }
+                        $catScore = 2
+                        $catLevel = 'Low'
+                        $catImpact = 'Least Privilege'
                     }
+                }
+
+                # Delegated privilege ceiling: user-consented grants cannot exceed the delegating user's rights
+                if ($Scheme -eq 'Delegated' -and $ConsentType -eq 'Principal')
+                {
+                    $catScore = [Math]::Max(2, $catScore - 1)
+                    if ($catLevel -eq 'Critical') { $catLevel = 'High' }
+                    elseif ($catScore -le 4) { $catLevel = 'Low' }
+                    elseif ($catScore -le 6) { $catLevel = 'Medium' }
+                }
+
+                return [PSCustomObject]@{
+                    Score                = $catScore
+                    Level                = $catLevel
+                    Impact               = $catImpact
+                    Desc                 = $desc
+                    PrivilegeLevel       = if ($null -ne $privLevel) { [int]$privLevel } else { 1 }
+                    AdminConsentRequired = $adminConsent
                 }
             }
 
-            # Unknown or custom scope
+            # 3. Heuristic fallback for unmapped or custom scopes
+            $baseScore = 5
+            $baseLevel = 'Medium'
+            $impact = 'Custom Definition'
+            $desc = 'Unmapped scope inferred from naming convention'
+
+            if ($PermissionName -match '\.(ReadWrite|Write|Manage)\.All$')
+            {
+                $baseScore = 7
+                $baseLevel = 'High'
+                $impact = 'Broad Modification'
+            }
+            elseif ($PermissionName -match '\.(ReadWrite|Write)$')
+            {
+                $baseScore = 5
+                $baseLevel = 'Medium'
+                $impact = 'Scoped Modification'
+            }
+            elseif ($PermissionName -match '\.(Read|ReadBasic)\.All$')
+            {
+                $baseScore = 5
+                $baseLevel = 'Medium'
+                $impact = 'Broad Read Access'
+            }
+            else
+            {
+                $baseScore = 5
+                $baseLevel = 'Medium'
+                $impact = 'Custom Definition'
+                $desc = 'Flagged by user parameter'
+            }
+
+            # Application permissions run without user context (bump score by +1)
+            if ($Scheme -eq 'Application' -and $baseScore -lt 10)
+            {
+                $baseScore = [Math]::Min($baseScore + 1, 10)
+                if ($baseScore -ge 8) { $baseLevel = 'High' }
+                elseif ($baseScore -ge 6) { $baseLevel = 'Medium' }
+            }
+
+            # Delegated privilege ceiling for user-scoped consent
+            if ($Scheme -eq 'Delegated' -and $ConsentType -eq 'Principal' -and $baseScore -gt 2)
+            {
+                $baseScore = [Math]::Max(2, $baseScore - 1)
+                if ($baseScore -le 4) { $baseLevel = 'Low' }
+                elseif ($baseScore -le 6) { $baseLevel = 'Medium' }
+            }
+
             return [PSCustomObject]@{
-                Score                = 5
-                Level                = 'Medium'
-                Impact               = 'Custom Definition'
-                Desc                 = 'Flagged by user parameter'
+                Score                = $baseScore
+                Level                = $baseLevel
+                Impact               = $impact
+                Desc                 = $desc
                 PrivilegeLevel       = $null
-                AdminConsentRequired = $null
+                AdminConsentRequired = ($Scheme -eq 'Application' -or $baseScore -ge 6)
             }
         }
 
@@ -218,12 +280,17 @@ function Get-GTRiskyAppPermissionReport
 
         try
         {
-            # Cache Microsoft Graph App Roles for app-only ID-to-Name resolution
+            # Cache Microsoft Graph App Roles and Resource-Specific Application Permissions for app-only ID-to-Name resolution
             Write-PSFMessage -Level Verbose -Message "Caching Microsoft Graph App Roles..."
-            $graphSpResp = Invoke-MgGraphRequest -Method GET -Uri "v1.0/servicePrincipals?`$filter=appId eq '00000003-0000-0000-c000-000000000000'&`$select=id,appRoles" -ErrorAction Stop
+            $graphSpResp = Invoke-MgGraphRequest -Method GET -Uri "v1.0/servicePrincipals?`$filter=appId eq '00000003-0000-0000-c000-000000000000'&`$select=id,appRoles,resourceSpecificApplicationPermissions" -ErrorAction Stop
             $graphSp = $graphSpResp.value[0]
             $roleMap = @{}
-            foreach ($role in $graphSp.appRoles) { $roleMap[$role.id] = $role.value }
+            if ($graphSp.appRoles) {
+                foreach ($role in $graphSp.appRoles) { $roleMap[$role.id] = $role.value }
+            }
+            if ($graphSp.resourceSpecificApplicationPermissions) {
+                foreach ($rsc in $graphSp.resourceSpecificApplicationPermissions) { $roleMap[$rsc.id] = $rsc.value }
+            }
 
             # Fetch Service Principals
             # beta required: signInActivity is not available on servicePrincipals in v1.0
@@ -329,7 +396,7 @@ function Get-GTRiskyAppPermissionReport
                     }
                 }
                 else {
-                    $grants = Invoke-GTGraphPagedRequest -Uri "v1.0/oauth2PermissionGrants"
+                    $grants = Invoke-GTGraphPagedRequest -Uri "v1.0/oauth2PermissionGrants?`$filter=resourceId eq '$($graphSp.id)'"
                 }
 
                 foreach ($grant in $grants)
@@ -340,7 +407,7 @@ function Get-GTRiskyAppPermissionReport
                     {
                         if (-not [string]::IsNullOrWhiteSpace($scope))
                         {
-                            $riskInfo = & $CalculateRisk -PermissionName $scope -Scheme 'Delegated'
+                            $riskInfo = & $CalculateRisk -PermissionName $scope -Scheme 'Delegated' -ConsentType $grant.consentType
 
                             # Inclusion decision
                             $isCandidate = $false
