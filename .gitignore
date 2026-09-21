@@ -2,3 +2,5 @@
 functions/GraphTools.code-workspace
 .env
 example_code/
+*.cer
+*.pfx
