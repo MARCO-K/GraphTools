@@ -24,6 +24,13 @@ Describe "Disable-GTUserDevice" -Tag 'Unit' {
             . $errorHelperFile
         }
 
+        # Load internal helpers
+        $installHelper = Join-Path $PSScriptRoot '..' 'internal' 'functions' 'Install-GTRequiredModule.ps1'
+        if (Test-Path $installHelper) { . $installHelper }
+
+        $initHelper = Join-Path $PSScriptRoot '..' 'internal' 'functions' 'Initialize-GTGraphConnection.ps1'
+        if (Test-Path $initHelper) { . $initHelper }
+
         $functionFile = Join-Path $PSScriptRoot '..' 'functions' 'Disable-GTUserDevice.ps1'
         if (-not (Test-Path $functionFile))
         {

@@ -566,5 +566,4 @@ Describe "Get-GTAdminCountReport" {
             $result.GroupCount | Should -Be 0
         }
     }
-}</content>
-<parameter name="filePath">c:\tools\personal\git\GraphTools\tests\Get-GTAdminCountReport.Tests.ps1
+}
