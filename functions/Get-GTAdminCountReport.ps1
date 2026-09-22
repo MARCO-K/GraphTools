@@ -35,7 +35,7 @@ function Get-GTAdminCountReport
     [CmdletBinding()]
     [OutputType([PSCustomObject])]
     param (
-        [Parameter(Position = 0)]
+        [Parameter(Position = 0, ValueFromPipeline = $true)]
         [string[]]$RoleName,
 
         [switch]$ShowMembers,
@@ -44,24 +44,19 @@ function Get-GTAdminCountReport
 
     begin
     {
-        $modules = @('Microsoft.Graph.Authentication')
-        Install-GTRequiredModule -ModuleNames $modules -Verbose:$VerbosePreference
-
         # 1. Scopes Check
         # RoleManagement.Read.Directory allows reading role definitions and assignments
         $requiredScopes = @('RoleManagement.Read.Directory', 'Directory.Read.All')
         
         if (-not (Test-GTGraphScopes -RequiredScopes $requiredScopes -Reconnect -Quiet))
         {
-            Write-Error "Failed to acquire required permissions ($($requiredScopes -join ', ')). Aborting."
-            return
+            throw "Failed to acquire required permissions ($($requiredScopes -join ', ')). Aborting."
         }
 
         # 2. Connection Initialization
         if (-not (Initialize-GTGraphConnection -Scopes $requiredScopes -NewSession:$NewSession))
         {
-            Write-Error "Failed to initialize session."
-            return
+            throw "Failed to initialize session."
         }
 
         # 3. Define Risk Tiers
@@ -106,20 +101,21 @@ function Get-GTAdminCountReport
                 {
                     foreach ($member in $role.members)
                     {
-                        $type = $member.'@odata.type'
+                        $type = if ($member.'@odata.type') { $member.'@odata.type' } elseif ($member.AdditionalProperties) { $member.AdditionalProperties.'@odata.type' } else { $null }
                         
-                        if ($type -match 'user') { 
+                        if ($type -and $type -match 'user') { 
                             $userCount++
                             if ($ShowMembers) { 
-                                $name = if ($member.userPrincipalName) { $member.userPrincipalName } else { $member.displayName }
+                                $upn = if ($member.userPrincipalName) { $member.userPrincipalName } elseif ($member.AdditionalProperties) { $member.AdditionalProperties.userPrincipalName } else { $null }
+                                $name = if ($upn) { $upn } else { $member.displayName }
                                 $memberNames.Add("$name (User)")
                             }
                         }
-                        elseif ($type -match 'servicePrincipal') { 
+                        elseif ($type -and $type -match 'servicePrincipal') { 
                             $spCount++ 
                             if ($ShowMembers) { $memberNames.Add("$($member.displayName) (SP)") }
                         }
-                        elseif ($type -match 'group') { 
+                        elseif ($type -and $type -match 'group') { 
                             $groupCount++ 
                             if ($ShowMembers) { $memberNames.Add("$($member.displayName) (Group)") }
                         }

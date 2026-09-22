@@ -31,21 +31,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Comprehensive documentation added in `docs/Connect-GTGraph.md`.
   - Implemented `Invoke-GTGraphBatch` internal helper supporting Microsoft Graph JSON batching (combining up to 20 subrequests into a single HTTP POST to `/$batch` with automatic chunking for arbitrary request counts).
   - Pester 5.7+ test suites added in `tests/Get-GTCachedGraphToken.Tests.ps1`, `tests/Invoke-GTGraphRequest.Tests.ps1`, `tests/Connect-GTGraph.Tests.ps1`, `tests/Invoke-GTGraphPagedRequest.Tests.ps1`, and `tests/Invoke-GTGraphBatch.Tests.ps1`.
-
-### Changed
-
-- **`Invoke-GTGraphPagedRequest`**: Updated to delegate directly to `Invoke-GTGraphRequest -All`, immediately upgrading all 40+ module callers to the zero-dependency REST engine without breaking backward compatibility.
-- **`Initialize-GTGraphConnection`**: Updated to inspect and reuse the zero-dependency `$script:GTTokenCache` in addition to SDK contexts, with safe fallback guards when `Connect-MgGraph` is not installed.
-
-### Added
-
 - **Enhanced Permission Extraction & Risk Analysis (`Get-GTRiskyAppPermissionReport`)**:
   - Added support for Microsoft Graph Resource-Specific Consent (RSC) permissions via `resourceSpecificApplicationPermissions` caching.
   - Scoped tenant-wide OAuth2 delegated permission grant queries strictly to the Microsoft Graph resource ID (`$filter=resourceId eq '{graphSpId}'`).
   - Added Tier-0 curated attack vectors: `OnPremDirectorySynchronization.ReadWrite.All` (Score 10, Hybrid Identity Takeover), `Domain.ReadWrite.All` (Score 10, Domain Takeover), `UserAuthenticationMethod.ReadWrite.All` (Score 10, Credential Manipulation), `DelegatedPermissionGrant.ReadWrite.All` (Score 10, Privilege Escalation), and `BitlockerKey.Read.All` (Score 8, Cryptographic Exfiltration).
   - Implemented Delegated Privilege Ceiling: adjusts score and level when delegated permissions are granted via user consent (`consentType = 'Principal'`), recognizing that user-scoped grants cannot exceed the delegating user's privileges.
   - Added regex naming heuristics (`\.(ReadWrite|Write|Manage)\.All$`, etc.) with application-scope elevation (+1 score) for unmapped or custom permissions.
-- **DevX Permissions Metadata Integration (`Get-GTRiskyAppPermissionReport`)** - Resolves [#80](https://github.com/MARCO-K/GraphTools/issues/80).
+- **DevX Permissions Metadata Integration (`Get-GTRiskyAppPermissionReport`)** - Resolves [#80](https://github.com/MARCO-K/GraphTools/issues/80):
   - Integrates official Microsoft Graph DevX permissions metadata with `privilegeLevel` (1–5) for both `Application` and `DelegatedWork` schemes.
   - Added compiled offline metadata fixture `data/graph-permissions.json` (926 permissions) for fast, zero-latency runtime evaluation without external HTTP dependencies.
   - Added internal helper `Get-GTPermissionDefinition` with in-memory caching and custom `-PermissionsFile` support.
@@ -53,64 +45,41 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Added `-MinPrivilegeLevel` and `-PermissionsFile` parameters to `Get-GTRiskyAppPermissionReport`.
   - Enriched output `[PSCustomObject]` with `PrivilegeLevel` and `AdminConsentRequired` properties while maintaining complete backward compatibility with existing properties and curated attack vector profiles (*Privilege Escalation*, *Tenant Destruction*).
   - Added dedicated documentation in `docs/Get-GTRiskyAppPermissionReport.md`.
+- **License Cost Reporting (`Get-GTLicenseCostReport`)**:
+  - Generates license utilization and cost optimization reports across the tenant.
+  - Detects "shelfware" (unassigned licenses) and "zombie" licenses (assigned to inactive users).
+  - Accepts flexible price input via `-PriceList` (by SkuPartNumber or SkuId string) and supports decimal parsing.
+  - Supports `-SkuNameMap` or `-SkuNameFile` to resolve SKU friendly names; falls back to shipped `data/sku-names.json` fixture.
+  - Provides `MinWastedThreshold` to filter trivial waste and returns ordered results with `WastedSpend` and remediation recommendations.
+  - Includes Pester tests and shipped fixture for deterministic CI runs.
+  - Added documentation in `docs/Get-GTLicenseCostReport.md`.
+- **Inactive User Safety Filters (`Get-GTInactiveUser`)**:
+  - Added `-ExcludeUPN` parameter to explicitly protect specific UPNs from appearing in cleanup candidate output.
+  - Added `-ExcludeGlobalAdministrators` switch to exclude members of the Global Administrator role.
+  - When `-ExcludeGlobalAdministrators` is requested, role membership resolution failures stop processing to avoid unsafe actions.
 
 ### Changed
 
-- **SDK dependency elimination** - Migrated all public functions and internal helpers to use only `Microsoft.Graph.Authentication` as the required SDK module. All Graph API calls now use `Invoke-MgGraphRequest` (single resource) or `Invoke-GTGraphPagedRequest` (paged collections) instead of individual `Microsoft.Graph.*` SDK cmdlets.
-  - `Disable-GTUserDevice` — replaced `Get-MgUser`, `Get-MgDevice`, `Update-MgDevice` with REST calls
-  - `Get-GTBreakGlassPolicyReport` — replaced `Get-MgUser`, `Get-MgIdentityConditionalAccessPolicy`
-  - `Get-GTLegacyAuthReport` — replaced streaming `Get-MgAuditLogSignIn` with `Invoke-GTGraphPagedRequest` + `foreach`
-  - `Get-GTRiskyAppPermissionReport` — replaced `Get-MgBetaServicePrincipal`, `Get-MgBetaOauth2PermissionGrant`, `Get-MgUser`
-  - `Get-GTPIMRoleReport` — replaced `Get-MgBetaRoleManagementDirectory*` cmdlets; `beta` endpoints kept with justification comment
-  - `Get-MFAReport` — replaced `Get-MgBetaReportAuthenticationMethodUserRegistrationDetail`; `beta` endpoint kept with justification comment
-  - `Remove-GTUserEntitlements` — replaced `Get-MgBetaUser` with `Invoke-MgGraphRequest`; removed non-Auth SDK modules
-  - `Remove-GTPIMRoleEligibility` — replaced `Get-MgUser`, `Get-MgBetaRoleManagement*` cmdlets; `beta` endpoints kept with justification
-  - `internal/Remove-GTUserAppRoleAssignments` — replaced `Get-MgBetaUserAppRoleAssignment`, `Remove-MgBetaUserAppRoleAssignment`
-  - `internal/Remove-GTUserGroupMemberships` — replaced `Get-MgBetaUserTransitiveMemberOfAsGroup`, `Remove-MgBetaGroupMemberByRef`
-  - `internal/Remove-GTUserAdministrativeUnitMemberships` — replaced `Get-MgBetaUserMemberOf`, `Remove-MgBetaDirectoryAdministrativeUnitMemberByRef`
-  - `internal/Remove-GTUserEnterpriseAppOwnership` — replaced `Get-MgBetaUserOwnedObject`, `Get-MgBetaApplicationOwner`, `Get-MgBetaServicePrincipalOwner`, and `Remove-MgBeta*OwnerByRef` calls
-  - `internal/Remove-GTUserDelegatedPermissionGrants` — replaced `Get-MgBetaOauth2PermissionGrant`, `Get-MgBetaServicePrincipal`, `Remove-MgBetaOauth2PermissionGrant`
-  - `internal/Remove-GTUserGroupOwnerships` — replaced `Get-MgBetaUserOwnedObject`, `Get-MgBetaGroupOwner`, `Remove-MgBetaGroupOwnerByRef`
-  - `internal/Remove-GTUserLicenses` — replaced `Get-MgBetaUserLicenseDetail`, `Set-MgBetaUserLicense`
-  - `internal/Remove-GTUserRoleAssignments` — replaced `Get-MgBetaRoleManagementDirectoryRoleAssignment`, `Remove-MgBetaRoleManagementDirectoryRoleAssignment`
-  - `internal/Remove-GTPIMRoleEligibilityInternal` — replaced `Get-MgBetaRoleManagementDirectoryRoleEligibilitySchedule`, `Remove-MgBetaRoleManagementDirectoryRoleEligibilitySchedule`
-  - `internal/Remove-GTUserServicePrincipalOwnerships` — replaced `Get-MgBetaServicePrincipal`, `Remove-MgBetaServicePrincipalOwnerByRef`
-- **`GraphTools.psd1`** — removed `Microsoft.Graph.Beta.Reports` from `RequiredModules`; only `PSFramework` is now a hard dependency at module level. All Graph SDK modules are loaded on-demand via `Install-GTRequiredModule` using only `Microsoft.Graph.Authentication`.
-- **beta endpoint audit** — all functions validated against Microsoft Learn docs; `beta` is now used only where the property or endpoint is genuinely unavailable in `v1.0`:
+- **Complete Elimination of External SDK Dependencies**:
+  - Fully decoupled the entire module from `Microsoft.Graph.Authentication`, `Microsoft.Graph.*`, `Connect-MgGraph`, `Disconnect-MgGraph`, `Get-MgContext`, and `Invoke-MgGraphRequest`.
+  - All 22+ public functions and 27 internal helpers now strictly interact with Microsoft Graph via native REST invokers (`Invoke-GTGraphRequest`, `Invoke-GTGraphPagedRequest`, and `Invoke-GTGraphBatch`) and native token caching (`Connect-GTGraph`, `Get-GTCachedGraphToken`).
+  - Removed obsolete `Install-GTRequiredModule` invocations and SDK pre-requisite declarations across all cmdlets.
+- **`Invoke-GTGraphPagedRequest`**: Updated to delegate directly to `Invoke-GTGraphRequest -All`, immediately upgrading all module callers to the zero-dependency REST engine without breaking backward compatibility.
+- **`Initialize-GTGraphConnection`**: Updated to purely inspect and reuse `$script:GTTokenCache` and connection configuration from `Connect-GTGraph` without external SDK fallback.
+- **`GraphTools.psd1`**: Removed external SDK dependencies from `RequiredModules`; only `PSFramework` is now a hard dependency at module level.
+- **Beta Endpoint Audit**: All functions validated against Microsoft Learn docs; `beta` is now strictly used only where the property or endpoint is genuinely unavailable in `v1.0`:
   - `signInActivity` on servicePrincipal (not in v1.0): `Get-GTUnusedApps`, `Get-GTServicePrincipalReport` (when `-IncludeSignInActivity`), `Get-GTRiskyAppPermissionReport`
   - `authenticationMethodsUserRegistrationDetails` (not in v1.0): `Get-MFAReport`
   - PIM `roleManagement/directory/*` endpoints: `Get-GTPIMRoleReport`, `Remove-GTPIMRoleEligibility`, `internal/Remove-GTUserRoleAssignments`, `internal/Remove-GTPIMRoleEligibilityInternal`
-- **Property casing** — all REST response property accesses updated from PascalCase (SDK) to camelCase (REST); output `PSCustomObject` property names preserved in PascalCase for backward compatibility
-- **AdditionalProperties eliminated** — all `$obj.AdditionalProperties['key']` patterns replaced with direct property access `$obj.key`
-- **`return` → `continue`** in `Get-GTLegacyAuthReport` and `Get-GTOrphanedGroup` filter loops (was inside `ForEach-Object`, now inside `foreach`)
-
-- **License Cost Reporting** - New function `Get-GTLicenseCostReport`
-  - Generates license utilization and cost optimization reports across the tenant
-  - Detects "shelfware" (unassigned licenses) and "zombie" licenses (assigned to inactive users)
-  - Accepts flexible price input via `-PriceList` (by SkuPartNumber or SkuId string) and supports decimal parsing
-  - Supports `-SkuNameMap` or `-SkuNameFile` to resolve SKU friendly names; falls back to shipped `data/sku-names.json` fixture
-  - Provides `MinWastedThreshold` to filter trivial waste and returns ordered results with `WastedSpend` and remediation recommendations
-  - Includes Pester tests and shipped fixture for deterministic CI runs
-- **Inactive User Safety Filters** - Enhanced `Get-GTInactiveUser` with cleanup guardrails
-  - Added `-ExcludeUPN` parameter to explicitly protect specific UPNs from appearing in cleanup candidate output
-  - Added `-ExcludeGlobalAdministrators` switch to exclude members of the Global Administrator role
-  - When `-ExcludeGlobalAdministrators` is requested, role membership resolution failures stop processing to avoid unsafe actions
-
-### Changed
-
-- Documentation: Added `docs/Get-GTLicenseCostReport.md` explaining usage, parameters and examples
-- Repository layout: Moved `Get-GTAdminCountReport.ps1` and `Get-GTLegacyAuthReport.ps1` into `functions/` so module loading and tests use the same path.
-- Development guidance: Updated `.github/copilot-instructions.md` to match current file counts, function naming, and environment wording.
-- `Get-GTInactiveUser`: Sign-in-only artifact records (Id + sign-in timestamps with no user profile fields) are now excluded by default for safer cleanup targeting; added opt-in switch `-IncludeSignInOnlyRecords`.
-- `Get-GTInactiveUser`: Replaced `Get-MgBetaUser` calls with direct `Invoke-MgGraphRequest` usage (with paging) to reduce SDK surface dependency to `Microsoft.Graph.Authentication`.
-- `Get-GTInactiveUser`: Switched role and user queries from `/beta` to `/v1.0` endpoints (`/directoryRoles` and `/users` with `signInActivity`) based on current Microsoft Graph REST documentation.
-- Reporting refactor: Migrated `Get-GTGuestUserReport`, `Get-GTLicenseCostReport`, and `Get-M365LicenseOverview` from `Get-MgBetaUser`/SDK-specific user calls to `Invoke-MgGraphRequest` with explicit paging.
-- Endpoint preference: Updated reporting queries to prefer `v1.0` endpoints where supported.
-- Instructions: Updated `.github/copilot-instructions.md` to require `Invoke-MgGraphRequest` usage and `v1.0`-first endpoint selection (use `beta` only when necessary).
-- DRY refactor: Added internal helper `Initialize-GTBeginBlock` and adopted it in `Get-GTInactiveUser`, `Get-GTGuestUserReport`, and `Get-M365LicenseOverview` to centralize module/scopes/connection bootstrap logic.
-- DRY refactor: Added internal helper `New-GTODataFilter` and adopted it in `Get-GTInactiveUser`, `Get-GTGuestUserReport`, and `Get-M365LicenseOverview` to centralize OData filter composition.
-- DRY refactor: Added internal helper `Invoke-GTGraphPagedRequest` and adopted it in `Get-GTInactiveUser`, `Get-GTGuestUserReport`, and `Get-M365LicenseOverview` to centralize Microsoft Graph paging/nextLink handling.
-- UTC standardization: Replaced remaining direct `(Get-Date).ToUniversalTime()` calls with `Get-UTCTime` in public functions and aligned `Get-UTCTime` implementation to `[DateTime]::UtcNow`.
+- **Property Casing Standardization**: All REST response property accesses updated from PascalCase (SDK) to camelCase (REST); output `PSCustomObject` property names preserved in PascalCase for backward compatibility.
+- **Elimination of `AdditionalProperties`**: Removed all `$obj.AdditionalProperties['key']` lookups across all models and replaced with direct property access `$obj.key`.
+- **`Get-GTInactiveUser`**: Sign-in-only artifact records (Id + sign-in timestamps with no user profile fields) are now excluded by default for safer cleanup targeting; added opt-in switch `-IncludeSignInOnlyRecords`. Switched role and user queries to `v1.0` endpoints (`/directoryRoles` and `/users` with `signInActivity`).
+- **DRY Refactoring**: Added internal helpers `Initialize-GTBeginBlock`, `New-GTODataFilter`, and `Invoke-GTGraphPagedRequest` to centralize bootstrap, OData filter composition, and Microsoft Graph pagination handling.
+- **Repository Layout & Development Guidance**:
+  - Moved `Get-GTAdminCountReport.ps1` and `Get-GTLegacyAuthReport.ps1` into `functions/` so module loading and tests use the same path.
+  - Updated `.github/copilot-instructions.md` to reflect native REST invokers and zero external SDK dependencies.
+- **UTC Standardization**: Aligned timestamp generation across public functions to `Get-UTCTime` and `[DateTime]::UtcNow`.
+- **Loop Control**: Replaced `return` with `continue` in `Get-GTLegacyAuthReport` and `Get-GTOrphanedGroup` filter loops.
 
 ### Fixed
 
@@ -143,9 +112,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Automatic sorting by risk tier and member count for security review prioritization
   - Comprehensive test coverage with 15+ test scenarios covering parameter validation, member counting, risk analysis, and output formatting
 
-### Changed
-
-### Added
 
 - **Test Coverage Enhancement** - Comprehensive test suite for application permission risk analysis
   - Added `Get-GTRiskyAppPermissionReport.Tests.ps1` with full Pester test coverage

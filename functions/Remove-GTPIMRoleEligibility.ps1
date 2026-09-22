@@ -27,9 +27,6 @@ function Remove-GTPIMRoleEligibility {
     )
 
     begin {
-        $modules = @('Microsoft.Graph.Authentication')
-        Install-GTRequiredModule -ModuleNames $modules -Verbose:$VerbosePreference
-
         # 1. Scopes Check (CRITICAL FIX)
         # PIM splits permissions between "Assignment" (Active) and "Eligibility" (Eligible).
         # You must have BOTH ReadWrite permissions to clean up a user completely.
@@ -46,18 +43,18 @@ function Remove-GTPIMRoleEligibility {
 
         # 2. Validation (Gold Standard)
         # Validate UserId
-        Test-GTGuid -InputObject $UserId
+        Test-GTGuid -InputObject $UserId | Out-Null
 
         # Validate RoleDefinitionId if provided (Prevents OData injection)
         if ($RoleDefinitionId) {
-            Test-GTGuid -InputObject $RoleDefinitionId
+            Test-GTGuid -InputObject $RoleDefinitionId | Out-Null
         }
 
         # 3. Self-Protection Check
         try {
-            $context = Get-MgContext
-            if ($context.AuthType -eq 'Delegated') {
-                $meResp = Invoke-MgGraphRequest -Method GET -Uri "v1.0/me?`$select=id" -ErrorAction Stop
+            $conn = Get-GTConnection
+            if ($conn.AuthType -eq 'Delegated') {
+                $meResp = Invoke-GTGraphRequest -Method GET -Uri "v1.0/me?`$select=id" -ErrorAction Stop
                 if ($meResp.id -eq $UserId) {
                     Write-Warning "You are attempting to remove PIM roles from YOURSELF. Proceed with caution."
                     if (-not $PSCmdlet.ShouldProcess("YOURSELF ($UserId)", "Remove PIM Roles")) {
@@ -86,11 +83,11 @@ function Remove-GTPIMRoleEligibility {
                 try {
                     if ($Type -eq 'Active') {
                         # Revoke Active Assignment
-                        Invoke-MgGraphRequest -Method DELETE -Uri "beta/roleManagement/directory/roleAssignmentSchedules/$($Assignment.roleAssignmentScheduleId)" -ErrorAction Stop
+                        Invoke-GTGraphRequest -Method DELETE -Uri "beta/roleManagement/directory/roleAssignmentSchedules/$($Assignment.roleAssignmentScheduleId)" -ErrorAction Stop
                     }
                     else {
                         # Revoke Eligible Assignment
-                        Invoke-MgGraphRequest -Method DELETE -Uri "beta/roleManagement/directory/roleEligibilitySchedules/$($Assignment.roleEligibilityScheduleId)" -ErrorAction Stop
+                        Invoke-GTGraphRequest -Method DELETE -Uri "beta/roleManagement/directory/roleEligibilitySchedules/$($Assignment.roleEligibilityScheduleId)" -ErrorAction Stop
                     }
 
                     $results.Add([PSCustomObject]@{

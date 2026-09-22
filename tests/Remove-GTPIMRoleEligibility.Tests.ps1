@@ -1,65 +1,69 @@
 Describe "Remove-GTPIMRoleEligibility" {
     BeforeAll {
-        $functionPath = "$PSScriptRoot/../functions/Remove-GTPIMRoleEligibility.ps1"
-        # Use Pester Mocks before dot-sourcing so the function file can load and calls are intercepted
-        Mock -CommandName Install-GTRequiredModule -MockWith { } -Verifiable
-        Mock -CommandName Initialize-GTGraphConnection -MockWith { } -Verifiable
-        Mock -CommandName Get-MgContext -MockWith { } -Verifiable
-        Mock -CommandName Get-MgBetaUser -MockWith { } -Verifiable
-        Mock -CommandName Test-GTGuid -MockWith { return $true } -Verifiable
-        Mock -CommandName Test-GTGraphScopes -MockWith { return $true } -Verifiable
-        Mock -CommandName Write-PSFMessage -MockWith { } -Verifiable
-        Mock -CommandName Get-GTGraphErrorDetails -MockWith { return [PSCustomObject]@{ LogLevel = 'Error'; Reason = 'Mock Error'; ErrorMessage = 'Mock Error Message' } } -Verifiable
-        Mock -CommandName Get-MgBetaRoleManagementDirectoryRoleAssignmentScheduleInstance -MockWith { } -Verifiable
-        Mock -CommandName Remove-MgBetaRoleManagementDirectoryRoleAssignmentSchedule -MockWith { } -Verifiable
-        Mock -CommandName Get-MgBetaRoleManagementDirectoryRoleEligibilityScheduleInstance -MockWith { } -Verifiable
-        Mock -CommandName Remove-MgBetaRoleManagementDirectoryRoleEligibilitySchedule -MockWith { } -Verifiable
-        Mock -CommandName Get-MgUser -MockWith { return [PSCustomObject]@{ Id = 'AdminId' } } -Verifiable
+        function global:Install-GTRequiredModule { param([string[]]$ModuleNames, [string]$Scope, [switch]$AllowPrerelease) }
+        function global:Initialize-GTGraphConnection { param([string[]]$Scopes, [switch]$NewSession) return $true }
+        function global:Get-GTConnection { return [PSCustomObject]@{ AuthType = 'AppOnly' } }
+        function global:Test-GTGuid { param($InputObject) return $true }
+        function global:Test-GTGraphScopes { param([string[]]$RequiredScopes, [switch]$Reconnect, [switch]$Quiet) return $true }
+        function global:Write-PSFMessage { param($Level, $Message, $ErrorRecord) }
+        function global:Get-GTGraphErrorDetails { param($Exception, $ResourceType) return [PSCustomObject]@{ LogLevel = 'Error'; Reason = 'Mock Error'; ErrorMessage = 'Mock Error Message' } }
+        function global:Invoke-GTGraphPagedRequest { param($Uri, [switch]$All) return @() }
+        function global:Invoke-GTGraphRequest { param($Uri, $Method = 'GET', $Body, $Headers, $ContentType, [switch]$All, [int]$MaxRetries, [int]$RetryBaseDelaySeconds, $Token, [switch]$Raw, $ErrorAction) return @{} }
 
-        if (Test-Path $functionPath)
-        {
-            # Dot-source the function under test
-            . $functionPath
-        }
-        else
-        {
-            Write-Error "Function file not found at $functionPath"
-        }
+        . "$PSScriptRoot/../functions/Remove-GTPIMRoleEligibility.ps1"
     }
 
     Context "Functionality" {
         It "should remove active assignments" {
+            $userId = '00000000-0000-0000-0000-000000000001'
             $mockActive = @(
                 [PSCustomObject]@{
-                    RoleAssignmentScheduleId = "Sched1"
-                    RoleDefinition           = [PSCustomObject]@{ DisplayName = "Global Admin" }
+                    roleAssignmentScheduleId = "Sched1"
+                    roleDefinition           = [PSCustomObject]@{ displayName = "Global Admin" }
                 }
             )
-            Mock -CommandName "Get-MgBetaRoleManagementDirectoryRoleAssignmentScheduleInstance" -MockWith { return $mockActive }
-            Mock -CommandName "Remove-MgBetaRoleManagementDirectoryRoleAssignmentSchedule" -MockWith { }
+            Mock -CommandName "Invoke-GTGraphPagedRequest" -MockWith {
+                param($Uri)
+                if ($Uri -like "*roleAssignmentScheduleInstances*") {
+                    return $mockActive
+                }
+                return @()
+            }
+            Mock -CommandName "Invoke-GTGraphRequest" -MockWith { }
 
-            $results = Remove-GTPIMRoleEligibility -UserId "User1" -Confirm:$false
-            
-            Assert-MockCalled -CommandName "Remove-MgBetaRoleManagementDirectoryRoleAssignmentSchedule" -Times 1 -ParameterFilter { $UnifiedRoleAssignmentScheduleId -eq "Sched1" }
+            $results = Remove-GTPIMRoleEligibility -UserId $userId -Confirm:$false
+
+            Assert-MockCalled -CommandName "Invoke-GTGraphRequest" -Times 1 -ParameterFilter {
+                $Method -eq 'DELETE' -and $Uri -eq 'beta/roleManagement/directory/roleAssignmentSchedules/Sched1'
+            }
             $results.Count | Should -Be 1
-            $results[0].Status | Should -Be "Removed"
+            $results[0].Status | Should -Be "Success"
         }
 
         It "should remove eligible assignments" {
-            Mock -CommandName "Get-MgBetaRoleManagementDirectoryRoleAssignmentScheduleInstance" -MockWith { return @() }
-            
+            $userId = '00000000-0000-0000-0000-000000000001'
             $mockEligible = @(
                 [PSCustomObject]@{
-                    RoleEligibilityScheduleId = "Sched2"
-                    RoleDefinition            = [PSCustomObject]@{ DisplayName = "User Admin" }
+                    roleEligibilityScheduleId = "Sched2"
+                    roleDefinition            = [PSCustomObject]@{ displayName = "User Admin" }
                 }
             )
-            Mock -CommandName "Get-MgBetaRoleManagementDirectoryRoleEligibilityScheduleInstance" -MockWith { return $mockEligible }
-            Mock -CommandName "Remove-MgBetaRoleManagementDirectoryRoleEligibilitySchedule" -MockWith { }
+            Mock -CommandName "Invoke-GTGraphPagedRequest" -MockWith {
+                param($Uri)
+                if ($Uri -like "*roleEligibilityScheduleInstances*") {
+                    return $mockEligible
+                }
+                return @()
+            }
+            Mock -CommandName "Invoke-GTGraphRequest" -MockWith { }
 
-            Remove-GTPIMRoleEligibility -UserId "User1" -Confirm:$false
+            $results = Remove-GTPIMRoleEligibility -UserId $userId -Confirm:$false
 
-            Assert-MockCalled -CommandName "Remove-MgBetaRoleManagementDirectoryRoleEligibilitySchedule" -Times 1 -ParameterFilter { $UnifiedRoleEligibilityScheduleId -eq "Sched2" }
+            Assert-MockCalled -CommandName "Invoke-GTGraphRequest" -Times 1 -ParameterFilter {
+                $Method -eq 'DELETE' -and $Uri -eq 'beta/roleManagement/directory/roleEligibilitySchedules/Sched2'
+            }
+            $results.Count | Should -Be 1
+            $results[0].Status | Should -Be "Success"
         }
     }
 }

@@ -32,16 +32,22 @@ function Test-GTGraphScopes
     )
 
     # Check Graph connection
-    $context = Get-MgContext
-    if (-not $context)
+    $conn = Get-GTConnection
+    if (-not $conn.Connected)
     {
         if (-not $Quiet) { Write-Error "No Microsoft Graph connection found" }
         return $false
     }
 
-    # Determine permission type (delegated vs application)
-    $permissionType = if ($context.AuthType -eq 'Delegated') { 'Scopes' } else { 'AppRoles' }
-    $currentPermissions = $context.$permissionType
+    $currentPermissions = if ($conn.Scopes) { $conn.Scopes } elseif ($conn.Scope) { $conn.Scope -split ' ' } else { @() }
+
+    # If App-only (.default), all consented app roles are available
+    $hasDefaultScope = ($currentPermissions -contains 'https://graph.microsoft.com/.default') -or ($currentPermissions -contains '.default')
+    if ($hasDefaultScope)
+    {
+        if (-not $Quiet) { Write-Verbose "All required permissions present (.default scope)" }
+        return $true
+    }
 
     # Find missing permissions using helper function
     $missing = Get-GTMissingScopes -RequiredScopes $RequiredScopes -CurrentScopes $currentPermissions
@@ -53,41 +59,38 @@ function Test-GTGraphScopes
             Write-Warning "Missing scopes: $($missing -join ', ')"
         }
 
-        if ($Reconnect)
+        if ($Reconnect -and $script:GTConnectionConfig)
         {
             try
             {
-                if ($permissionType -eq 'Scopes')
-                {
-                    # Combine current scopes with all required scopes for a seamless reconnect
-                    $allScopes = ($context.Scopes + $RequiredScopes) | Select-Object -Unique
-                    $null = Connect-MgGraph -Scopes $allScopes -NoWelcome -ErrorAction Stop
-                    
-                    # Post-reconnect verification: ensure all required permissions were granted
-                    $newContext = Get-MgContext
-                    if (-not $newContext)
-                    {
-                        if (-not $Quiet) { Write-Error "Reconnection succeeded but context validation failed" }
-                        return $false
-                    }
-                    
-                    # Verify all required scopes are present in the new context
-                    $stillMissing = Get-GTMissingScopes -RequiredScopes $RequiredScopes -CurrentScopes $newContext.Scopes
-                    
-                    if ($stillMissing.Count -gt 0)
-                    {
-                        if (-not $Quiet)
-                        {
-                            Write-Warning "Reconnection completed but some scopes were not granted: $($stillMissing -join ', ')"
-                        }
-                        return $false
-                    }
+                # Combine current scopes with all required scopes for reconnect
+                $allScopes = ($currentPermissions + $RequiredScopes) | Select-Object -Unique
+                $connectParams = @{
+                    Scope = ($allScopes -join ' ')
                 }
-                else
+                if ($script:GTConnectionConfig.TenantId) { $connectParams['TenantId'] = $script:GTConnectionConfig.TenantId }
+                if ($script:GTConnectionConfig.ClientId) { $connectParams['ClientId'] = $script:GTConnectionConfig.ClientId }
+                if ($script:GTConnectionConfig.Thumbprint) { $connectParams['Thumbprint'] = $script:GTConnectionConfig.Thumbprint }
+                if ($script:GTConnectionConfig.Certificate) { $connectParams['Certificate'] = $script:GTConnectionConfig.Certificate }
+                if ($script:GTConnectionConfig.ClientSecret) { $connectParams['ClientSecret'] = $script:GTConnectionConfig.ClientSecret }
+
+                $null = Connect-GTGraph @connectParams -ErrorAction Stop
+
+                $newConn = Get-GTConnection
+                if (-not $newConn.Connected)
+                {
+                    if (-not $Quiet) { Write-Error "Reconnection succeeded but connection validation failed" }
+                    return $false
+                }
+
+                $newPermissions = if ($newConn.Scopes) { $newConn.Scopes } elseif ($newConn.Scope) { $newConn.Scope -split ' ' } else { @() }
+                $stillMissing = Get-GTMissingScopes -RequiredScopes $RequiredScopes -CurrentScopes $newPermissions
+
+                if ($stillMissing.Count -gt 0)
                 {
                     if (-not $Quiet)
                     {
-                        Write-Warning "Application permissions require manual reconnection. Missing permissions: $($missing -join ', ')"
+                        Write-Warning "Reconnection completed but some scopes were not granted: $($stillMissing -join ', ')"
                     }
                     return $false
                 }

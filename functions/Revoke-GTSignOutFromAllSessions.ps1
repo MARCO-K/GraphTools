@@ -36,10 +36,6 @@ function Revoke-GTSignOutFromAllSessions
     )
 
     Begin {
-        # Module Management
-        $modules = @('Microsoft.Graph.Authentication')
-        Install-GTRequiredModule -ModuleNames $modules -Verbose
-
         # Graph Connection Handling
         if (-not (Initialize-GTGraphConnection -Scopes 'User.ReadWrite.All' -NewSession:$NewSession)) {
             throw "Failed to establish Microsoft Graph connection"

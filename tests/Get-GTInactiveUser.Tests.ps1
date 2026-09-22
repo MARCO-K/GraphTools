@@ -2,6 +2,13 @@
 
 Describe "Get-GTInactiveUser" {
     BeforeAll {
+        function global:Install-GTRequiredModule { param($ModuleNames, $Verbose) }
+        function global:Test-GTGraphScopes { param($RequiredScopes, $Reconnect, $Quiet) return $true }
+        function global:Initialize-GTGraphConnection { param($Scopes, [switch]$NewSession, [switch]$SkipConnect) return $true }
+        function global:Get-GTGraphErrorDetails { param($Exception, $ResourceType) return @{ LogLevel = 'Error'; Reason = 'Stub' } }
+        function global:Write-PSFMessage { param($Level, $Message, $ErrorRecord) }
+        function global:Invoke-GTGraphRequest { param($Method, $Uri, $Body, $ContentType, $ErrorAction, [switch]$All) return $null }
+
         # Use Pester Mocks before dot-sourcing so the function file can load and calls are intercepted
         Mock -CommandName Install-GTRequiredModule -MockWith { } -Verifiable
         Mock -CommandName Test-GTGraphScopes -MockWith { param($RequiredScopes, $Reconnect, $Quiet) return $true } -Verifiable
@@ -11,15 +18,18 @@ Describe "Get-GTInactiveUser" {
         # Helpers to capture the last users request and to swap returned users per-test
         $script:LastUsersRequestUri = $null
         $script:CurrentUsers = @()
-        Mock -CommandName Invoke-MgGraphRequest -MockWith {
-            param($Method, $Uri)
+        Mock -CommandName Invoke-GTGraphRequest -MockWith {
+            param($Method, $Uri, $Body, $ContentType, $ErrorAction, [switch]$All)
 
-            if ($Uri -like '/v1.0/users*' -or $Uri -like 'https://graph.microsoft.com/v1.0/users*') {
+            if ($Uri -like '*users*') {
                 $script:LastUsersRequestUri = [string]$Uri
+                if ($All) {
+                    return @($script:CurrentUsers)
+                }
                 return [PSCustomObject]@{ value = @($script:CurrentUsers) }
             }
 
-            if ($Uri -like '/v1.0/directoryRoles/role-global-admin/members*') {
+            if ($Uri -like '*/directoryRoles/*/members*') {
                 return [PSCustomObject]@{
                     value = @(
                         [PSCustomObject]@{ id = 'id-admin'; userPrincipalName = 'admin@contoso.com' }
@@ -27,7 +37,7 @@ Describe "Get-GTInactiveUser" {
                 }
             }
 
-            if ($Uri -like '/v1.0/directoryRoles*') {
+            if ($Uri -like '*/directoryRoles*') {
                 return [PSCustomObject]@{
                     value = @([PSCustomObject]@{ id = 'role-global-admin' })
                 }
@@ -38,6 +48,7 @@ Describe "Get-GTInactiveUser" {
 
         . "$PSScriptRoot/../internal/functions/Initialize-GTBeginBlock.ps1"
         . "$PSScriptRoot/../internal/functions/New-GTODataFilter.ps1"
+        . "$PSScriptRoot/../internal/functions/Format-ODataDateTime.ps1"
         . "$PSScriptRoot/../internal/functions/Invoke-GTGraphPagedRequest.ps1"
         . "$PSScriptRoot/../internal/functions/Get-UTCTime.ps1"
 

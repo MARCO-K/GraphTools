@@ -16,11 +16,6 @@ Describe "Get-GTBreakGlassPolicyReport" {
         function Get-GTGraphErrorDetails { param($Exception, $ResourceType) return [PSCustomObject]@{ LogLevel = 'Error'; Reason = 'Error'; ErrorMessage = 'Error' } }
         function Invoke-GTGraphRequest { param($Method, $Uri, $Body, $ContentType, $ErrorAction) }
         function Invoke-GTGraphPagedRequest { param($Uri, $Headers) return @() }
-
-        # Mock Get-MgContext to simulate being connected
-        Mock -CommandName "Get-MgContext" -MockWith {
-            return @{ Scopes = @('Policy.Read.All', 'User.Read.All'); AuthType = 'Delegated' }
-        }
         $functionPath = "$PSScriptRoot/../functions/Get-GTBreakGlassPolicyReport.ps1"
         if (Test-Path $functionPath) { . $functionPath } else { Throw "Function file not found: $functionPath" }
     }

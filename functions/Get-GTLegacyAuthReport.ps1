@@ -53,7 +53,7 @@ function Get-GTLegacyAuthReport
         [int]$DaysAgo = 7,
 
         [Parameter(ValueFromPipeline = $true)]
-        [Alias('UPN','UserPrincipalName','Users','User','UserName','UPNName')]
+        [Alias('UPN','Users','User','UserName','UPNName')]
         [ValidateScript({$_ -match $script:GTValidationRegex.UPN})]
         [string[]]$UserPrincipalName,
 
@@ -83,22 +83,17 @@ function Get-GTLegacyAuthReport
         $targetApps  = [System.Collections.Generic.List[string]]::new()
         $targetIPs   = [System.Collections.Generic.List[string]]::new()
 
-        $modules = @('Microsoft.Graph.Authentication')
-        Install-GTRequiredModule -ModuleNames $modules -Verbose:$VerbosePreference
-
         # 2. Scopes Check
         $requiredScopes = @('AuditLog.Read.All')
         if (-not (Test-GTGraphScopes -RequiredScopes $requiredScopes -Reconnect -Quiet))
         {
-            Write-Error "Failed to acquire required permissions ($($requiredScopes -join ', ')). Aborting."
-            return
+            throw "Failed to acquire required permissions ($($requiredScopes -join ', ')). Aborting."
         }
 
         # 3. Connection Initialization
         if (-not (Initialize-GTGraphConnection -Scopes $requiredScopes -NewSession:$NewSession))
         {
-            Write-Error "Failed to initialize session."
-            return
+            throw "Failed to initialize session."
         }
 
         # 4. Define Protocol Lists
@@ -170,6 +165,7 @@ function Get-GTLegacyAuthReport
                 # --- PROCESSING ---
 
                 $isSuccess = ($log.status.errorCode -eq 0)
+                if ($SuccessOnly -and -not $isSuccess) { continue }
                 
                 $resultType = if ($isSuccess) { "Security Gap (Success)" } else { "Attack Attempt (Failed)" }
                 

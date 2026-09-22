@@ -29,6 +29,8 @@ function Get-GTConnection
     $scope    = if ($script:GTConnectionConfig) { $script:GTConnectionConfig.Scope } elseif ($script:GTTokenCache) { $script:GTTokenCache.Scope } else { $null }
     $expires  = if ($script:GTTokenCache) { $script:GTTokenCache.ExpiresAt } else { $null }
 
+    $scopesList = if ($scope) { @($scope -split ' ') } else { @() }
+
     [PSCustomObject]@{
         PSTypeName = 'GraphTools.ConnectionStatus'
         Connected  = $isValid
@@ -36,6 +38,7 @@ function Get-GTConnection
         ClientId   = $clientId
         AuthType   = $authType
         Scope      = $scope
+        Scopes     = $scopesList
         ExpiresAt  = $expires
         TimeUtc    = $now.ToString('o')
     }

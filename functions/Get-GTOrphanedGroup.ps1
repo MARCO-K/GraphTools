@@ -49,9 +49,6 @@ function Get-GTOrphanedGroup
 
     begin
     {
-        $modules = @('Microsoft.Graph.Authentication')
-        Install-GTRequiredModule -ModuleNames $modules -Verbose:$VerbosePreference
-
         # 1. Scopes Check (Gold Standard)
         $requiredScopes = @('Group.Read.All', 'User.Read.All')
         
@@ -115,7 +112,7 @@ function Get-GTOrphanedGroup
                     {
                         $isEnabled = $null
                 
-                        # Invoke-MgGraphRequest returns hashtables; access accountEnabled directly
+                        # Access accountEnabled directly
                         if ($null -ne $owner.accountEnabled)
                         {
                             $isEnabled = $owner.accountEnabled

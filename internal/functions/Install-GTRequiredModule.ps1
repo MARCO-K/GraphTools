@@ -42,6 +42,13 @@ function Install-GTRequiredModule
         {
             try
             {
+                # Microsoft Graph modules are no longer required (zero-dependency REST engine)
+                if ($module -like 'Microsoft.Graph*')
+                {
+                    Write-PSFMessage -Level Verbose -Message "Module '$module' is no longer required by GraphTools (zero-dependency REST engine). Skipping."
+                    continue
+                }
+
                 # Check if module is already installed
                 if (Get-Module -Name $module -ListAvailable -ErrorAction Stop)
                 {

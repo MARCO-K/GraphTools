@@ -7,45 +7,42 @@ if (-not (Get-Command Get-GTGraphErrorDetails -ErrorAction SilentlyContinue)) { 
 
 Describe "Get-GTAdminCountReport" {
     BeforeAll {
-        function Install-GTRequiredModule { param([string[]]$ModuleNames, [string]$Scope, [switch]$AllowPrerelease) }
-        function Initialize-GTGraphConnection { param([string[]]$Scopes, [switch]$NewSession, [switch]$SkipConnect) return $true }
-        function Test-GTGraphScopes { param([string[]]$RequiredScopes, [switch]$Reconnect, [switch]$Quiet) return $true }
-        function Write-PSFMessage { param($Level, $Message, $ErrorRecord) }
-        function Get-GTGraphErrorDetails { param($Exception, $ResourceType) return @{ LogLevel = 'Error'; Reason = 'Mock Error'; ErrorMessage = 'Mock Error Message' } }
+        function global:Install-GTRequiredModule { param([string[]]$ModuleNames, [string]$Scope, [switch]$AllowPrerelease) }
+        function global:Initialize-GTGraphConnection { param([string[]]$Scopes, [switch]$NewSession) return $true }
+        function global:Test-GTGraphScopes { param([string[]]$RequiredScopes, [switch]$Reconnect, [switch]$Quiet) return $true }
+        function global:Write-PSFMessage { param($Level, $Message, $ErrorRecord) }
+        function global:Get-GTGraphErrorDetails { param($Exception, $ResourceType) return [PSCustomObject]@{ LogLevel = 'Error'; Reason = 'Mock Error'; ErrorMessage = 'Mock Error Message' } }
+        function global:Invoke-GTGraphPagedRequest { param($Uri, [switch]$All) return @() }
 
-        # Mock Get-MgContext to simulate being connected
-        Mock -CommandName "Get-MgContext" -MockWith {
-            return @{ Scopes = @('RoleManagement.Read.Directory', 'Directory.Read.All') }
-        }
         $functionPath = "$PSScriptRoot/../functions/Get-GTAdminCountReport.ps1"
         if (Test-Path $functionPath) { . $functionPath } else { Throw "Function file not found: $functionPath" }
     }
 
     Context "Parameter Validation" {
         It "should accept RoleName parameter" {
-            Mock -CommandName "Get-MgDirectoryRole" -MockWith { return @() }
+            Mock -CommandName "Invoke-GTGraphPagedRequest" -MockWith { return @() }
             { Get-GTAdminCountReport -RoleName "Global Administrator" } | Should -Not -Throw
         }
 
         It "should accept multiple RoleName values" {
-            Mock -CommandName "Get-MgDirectoryRole" -MockWith { return @() }
+            Mock -CommandName "Invoke-GTGraphPagedRequest" -MockWith { return @() }
             { Get-GTAdminCountReport -RoleName @("Global Administrator", "User Administrator") } | Should -Not -Throw
         }
 
         It "should accept ShowMembers switch" {
-            Mock -CommandName "Get-MgDirectoryRole" -MockWith { return @() }
+            Mock -CommandName "Invoke-GTGraphPagedRequest" -MockWith { return @() }
             { Get-GTAdminCountReport -ShowMembers } | Should -Not -Throw
         }
 
         It "should accept NewSession switch" {
-            Mock -CommandName "Get-MgDirectoryRole" -MockWith { return @() }
+            Mock -CommandName "Invoke-GTGraphPagedRequest" -MockWith { return @() }
             { Get-GTAdminCountReport -NewSession } | Should -Not -Throw
         }
     }
 
     Context "Pipeline Input" {
         BeforeEach {
-            Mock -CommandName "Get-MgDirectoryRole" -MockWith { return @() }
+            Mock -CommandName "Invoke-GTGraphPagedRequest" -MockWith { return @() }
         }
 
         It "should accept RoleName from pipeline" {
@@ -63,7 +60,7 @@ Describe "Get-GTAdminCountReport" {
 
     Context "Role Filtering" {
         BeforeEach {
-            Mock -CommandName "Get-MgDirectoryRole" -MockWith {
+            Mock -CommandName "Invoke-GTGraphPagedRequest" -MockWith {
                 return @(
                     [PSCustomObject]@{
                         DisplayName = "Global Administrator"
@@ -108,7 +105,7 @@ Describe "Get-GTAdminCountReport" {
 
     Context "Member Counting" {
         It "should count user members correctly" {
-            Mock -CommandName "Get-MgDirectoryRole" -MockWith {
+            Mock -CommandName "Invoke-GTGraphPagedRequest" -MockWith {
                 return @(
                     [PSCustomObject]@{
                         DisplayName = "Global Administrator"
@@ -134,7 +131,7 @@ Describe "Get-GTAdminCountReport" {
         }
 
         It "should count service principal members correctly" {
-            Mock -CommandName "Get-MgDirectoryRole" -MockWith {
+            Mock -CommandName "Invoke-GTGraphPagedRequest" -MockWith {
                 return @(
                     [PSCustomObject]@{
                         DisplayName = "Application Administrator"
@@ -160,7 +157,7 @@ Describe "Get-GTAdminCountReport" {
         }
 
         It "should count group members correctly" {
-            Mock -CommandName "Get-MgDirectoryRole" -MockWith {
+            Mock -CommandName "Invoke-GTGraphPagedRequest" -MockWith {
                 return @(
                     [PSCustomObject]@{
                         DisplayName = "Security Administrator"
@@ -182,7 +179,7 @@ Describe "Get-GTAdminCountReport" {
         }
 
         It "should count mixed member types correctly" {
-            Mock -CommandName "Get-MgDirectoryRole" -MockWith {
+            Mock -CommandName "Invoke-GTGraphPagedRequest" -MockWith {
                 return @(
                     [PSCustomObject]@{
                         DisplayName = "Global Administrator"
@@ -212,7 +209,7 @@ Describe "Get-GTAdminCountReport" {
         }
 
         It "should handle roles with no members" {
-            Mock -CommandName "Get-MgDirectoryRole" -MockWith {
+            Mock -CommandName "Invoke-GTGraphPagedRequest" -MockWith {
                 return @(
                     [PSCustomObject]@{
                         DisplayName = "Empty Role"
@@ -234,14 +231,14 @@ Describe "Get-GTAdminCountReport" {
             $tier0Roles = @('Global Administrator', 'Privileged Role Administrator', 'Security Administrator', 'Hybrid Identity Administrator')
 
             foreach ($roleName in $tier0Roles) {
-                Mock -CommandName "Get-MgDirectoryRole" -MockWith {
+                Mock -CommandName "Invoke-GTGraphPagedRequest" -MockWith ({
                     return @(
                         [PSCustomObject]@{
                             DisplayName = $roleName
                             Members = @()
                         }
                     )
-                }
+                }.GetNewClosure())
 
                 $result = Get-GTAdminCountReport
                 $result.Tier | Should -Be "Tier 0 (Critical)"
@@ -252,14 +249,14 @@ Describe "Get-GTAdminCountReport" {
             $tier1Roles = @('Exchange Administrator', 'SharePoint Administrator', 'User Administrator', 'Authentication Administrator', 'Cloud Application Administrator', 'Intune Administrator')
 
             foreach ($roleName in $tier1Roles) {
-                Mock -CommandName "Get-MgDirectoryRole" -MockWith {
+                Mock -CommandName "Invoke-GTGraphPagedRequest" -MockWith ({
                     return @(
                         [PSCustomObject]@{
                             DisplayName = $roleName
                             Members = @()
                         }
                     )
-                }
+                }.GetNewClosure())
 
                 $result = Get-GTAdminCountReport
                 $result.Tier | Should -Be "Tier 1 (High)"
@@ -267,7 +264,7 @@ Describe "Get-GTAdminCountReport" {
         }
 
         It "should classify other roles as Tier 2 (Standard)" {
-            Mock -CommandName "Get-MgDirectoryRole" -MockWith {
+            Mock -CommandName "Invoke-GTGraphPagedRequest" -MockWith {
                 return @(
                     [PSCustomObject]@{
                         DisplayName = "Helpdesk Administrator"
@@ -283,7 +280,7 @@ Describe "Get-GTAdminCountReport" {
 
     Context "Risk Analysis" {
         It "should flag Global Administrator with >5 users" {
-            Mock -CommandName "Get-MgDirectoryRole" -MockWith {
+            Mock -CommandName "Invoke-GTGraphPagedRequest" -MockWith {
                 $members = @()
                 for ($i = 1; $i -le 6; $i++) {
                     $members += [PSCustomObject]@{
@@ -305,7 +302,7 @@ Describe "Get-GTAdminCountReport" {
         }
 
         It "should not flag Global Administrator with <=5 users" {
-            Mock -CommandName "Get-MgDirectoryRole" -MockWith {
+            Mock -CommandName "Invoke-GTGraphPagedRequest" -MockWith {
                 $members = @()
                 for ($i = 1; $i -le 5; $i++) {
                     $members += [PSCustomObject]@{
@@ -327,7 +324,7 @@ Describe "Get-GTAdminCountReport" {
         }
 
         It "should flag roles with group assignments" {
-            Mock -CommandName "Get-MgDirectoryRole" -MockWith {
+            Mock -CommandName "Invoke-GTGraphPagedRequest" -MockWith {
                 return @(
                     [PSCustomObject]@{
                         DisplayName = "User Administrator"
@@ -346,7 +343,7 @@ Describe "Get-GTAdminCountReport" {
         }
 
         It "should not have risk notes for normal assignments" {
-            Mock -CommandName "Get-MgDirectoryRole" -MockWith {
+            Mock -CommandName "Invoke-GTGraphPagedRequest" -MockWith {
                 return @(
                     [PSCustomObject]@{
                         DisplayName = "User Administrator"
@@ -367,7 +364,7 @@ Describe "Get-GTAdminCountReport" {
 
     Context "ShowMembers Functionality" {
         It "should include member details when ShowMembers is used" {
-            Mock -CommandName "Get-MgDirectoryRole" -MockWith {
+            Mock -CommandName "Invoke-GTGraphPagedRequest" -MockWith {
                 return @(
                     [PSCustomObject]@{
                         DisplayName = "Global Administrator"
@@ -392,7 +389,7 @@ Describe "Get-GTAdminCountReport" {
         }
 
         It "should not include Members property when ShowMembers is not used" {
-            Mock -CommandName "Get-MgDirectoryRole" -MockWith {
+            Mock -CommandName "Invoke-GTGraphPagedRequest" -MockWith {
                 return @(
                     [PSCustomObject]@{
                         DisplayName = "Global Administrator"
@@ -411,7 +408,7 @@ Describe "Get-GTAdminCountReport" {
         }
 
         It "should handle missing userPrincipalName gracefully" {
-            Mock -CommandName "Get-MgDirectoryRole" -MockWith {
+            Mock -CommandName "Invoke-GTGraphPagedRequest" -MockWith {
                 return @(
                     [PSCustomObject]@{
                         DisplayName = "Global Administrator"
@@ -432,7 +429,7 @@ Describe "Get-GTAdminCountReport" {
 
     Context "Output Format and Sorting" {
         It "should return PSCustomObject with correct properties" {
-            Mock -CommandName "Get-MgDirectoryRole" -MockWith {
+            Mock -CommandName "Invoke-GTGraphPagedRequest" -MockWith {
                 return @(
                     [PSCustomObject]@{
                         DisplayName = "Global Administrator"
@@ -453,7 +450,7 @@ Describe "Get-GTAdminCountReport" {
         }
 
         It "should sort by Tier then TotalMembers (descending)" {
-            Mock -CommandName "Get-MgDirectoryRole" -MockWith {
+            Mock -CommandName "Invoke-GTGraphPagedRequest" -MockWith {
                 return @(
                     [PSCustomObject]@{
                         DisplayName = "Helpdesk Administrator"  # Tier 2, 1 member
@@ -487,7 +484,7 @@ Describe "Get-GTAdminCountReport" {
         }
 
         It "should return empty array when no roles found" {
-            Mock -CommandName "Get-MgDirectoryRole" -MockWith { return @() }
+            Mock -CommandName "Invoke-GTGraphPagedRequest" -MockWith { return @() }
 
             $result = Get-GTAdminCountReport
             $result | Should -Be @()
@@ -496,7 +493,7 @@ Describe "Get-GTAdminCountReport" {
 
     Context "Error Handling" {
         It "should handle Graph API errors gracefully" {
-            Mock -CommandName "Get-MgDirectoryRole" -MockWith { throw "Graph API Error" }
+            Mock -CommandName "Invoke-GTGraphPagedRequest" -MockWith { throw "Graph API Error" }
 
             { Get-GTAdminCountReport } | Should -Throw
         }
@@ -516,7 +513,7 @@ Describe "Get-GTAdminCountReport" {
 
     Context "Performance and Edge Cases" {
         It "should handle roles with empty members array" {
-            Mock -CommandName "Get-MgDirectoryRole" -MockWith {
+            Mock -CommandName "Invoke-GTGraphPagedRequest" -MockWith {
                 return @(
                     [PSCustomObject]@{
                         DisplayName = "Empty Role"
@@ -530,7 +527,7 @@ Describe "Get-GTAdminCountReport" {
         }
 
         It "should handle members with missing AdditionalProperties" {
-            Mock -CommandName "Get-MgDirectoryRole" -MockWith {
+            Mock -CommandName "Invoke-GTGraphPagedRequest" -MockWith {
                 return @(
                     [PSCustomObject]@{
                         DisplayName = "Test Role"
@@ -551,7 +548,7 @@ Describe "Get-GTAdminCountReport" {
         }
 
         It "should handle unknown member types" {
-            Mock -CommandName "Get-MgDirectoryRole" -MockWith {
+            Mock -CommandName "Invoke-GTGraphPagedRequest" -MockWith {
                 return @(
                     [PSCustomObject]@{
                         DisplayName = "Test Role"

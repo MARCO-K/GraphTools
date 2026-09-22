@@ -59,7 +59,7 @@ function Remove-GTUserLicenses
             if ($PSCmdlet.ShouldProcess($User.UserPrincipalName, $action))
             {
                 Write-PSFMessage -Level Verbose -Message "Removing licenses from user $($User.UserPrincipalName)"
-                Invoke-MgGraphRequest -Method POST -Uri "v1.0/users/$($User.Id)/assignLicense" -Body @{ addLicenses = @(); removeLicenses = @($licenses.skuId) } -ContentType 'application/json' -ErrorAction Stop
+                Invoke-GTGraphRequest -Method POST -Uri "v1.0/users/$($User.Id)/assignLicense" -Body @{ addLicenses = @(); removeLicenses = @($licenses.skuId) } -ContentType 'application/json' -ErrorAction Stop
                 $output['Status'] = 'Success'
             }
         }

@@ -1,32 +1,47 @@
 Describe "Revoke-GTSignOutFromAllSessions" {
     BeforeAll {
-        # Use Pester Mocks before dot-sourcing so the function file can load and calls are intercepted
-        # Mock the required modules and functions
-        Mock -ModuleName "Microsoft.Graph.Users" -CommandName "Get-MgUser" -MockWith {
-            [PSCustomObject]@{
-                Id = "mock-user-id"
-            }
-        }
-        Mock -ModuleName "Microsoft.Graph.Users.Actions" -CommandName "Revoke-MgUserSignInSession" -MockWith { }
+        function global:Install-GTRequiredModule { param([string[]]$ModuleNames, [string]$Scope, [switch]$AllowPrerelease) }
+        function global:Initialize-GTGraphConnection { param([string[]]$Scopes, [switch]$NewSession) return $true }
+        function global:Write-PSFMessage { param($Level, $Message, $ErrorRecord) }
+        function global:Get-GTGraphErrorDetails { param($Exception, $ResourceType) return [PSCustomObject]@{ LogLevel = 'Error'; Reason = 'Mock Error'; ErrorMessage = 'Mock Error Message' } }
+        function global:Invoke-GTGraphRequest { param($Uri, $Method = 'GET', $Body, $Headers, $ContentType, [switch]$All, [int]$MaxRetries, [int]$RetryBaseDelaySeconds, $Token, [switch]$Raw, $ErrorAction) return @{} }
 
-        # Dot-source the function under test
+        . "$PSScriptRoot/../internal/functions/GTValidation.ps1"
         . "$PSScriptRoot/../functions/Revoke-GTSignOutFromAllSessions.ps1"
     }
 
+    BeforeEach {
+        Mock -CommandName Invoke-GTGraphRequest -MockWith {
+            param($Uri, $Method)
+            if ($Method -eq 'GET' -and $Uri -like "v1.0/users/*") {
+                return [PSCustomObject]@{ Id = "mock-user-id" }
+            }
+            return @{}
+        }
+    }
+
     Context "Happy Path" {
-        It "should call Revoke-MgUserSignInSession with the correct UserId" {
+        It "should call Invoke-GTGraphRequest revokeSignInSessions with the correct UserId" {
             Revoke-GTSignOutFromAllSessions -UPN "test.user@example.com"
-            Assert-MockCalled -CommandName "Revoke-MgUserSignInSession" -Times 1 -ParameterFilter {
-                $UserId -eq "mock-user-id"
+            Assert-MockCalled -CommandName "Invoke-GTGraphRequest" -Times 1 -ParameterFilter {
+                $Method -eq 'POST' -and $Uri -eq "v1.0/users/mock-user-id/revokeSignInSessions"
             }
         }
     }
 
     Context "Error Handling" {
-        It "should not call Revoke-MgUserSignInSession if Get-MgUser returns null" {
-            Mock -ModuleName "Microsoft.Graph.Users" -CommandName "Get-MgUser" -MockWith { $null }
+        It "should not call revokeSignInSessions if user lookup returns null" {
+            Mock -CommandName Invoke-GTGraphRequest -MockWith {
+                param($Uri, $Method)
+                if ($Method -eq 'GET') {
+                    return $null
+                }
+                return @{}
+            }
             Revoke-GTSignOutFromAllSessions -UPN "non.existent.user@example.com"
-            Assert-MockCalled -CommandName "Revoke-MgUserSignInSession" -Times 0
+            Assert-MockCalled -CommandName "Invoke-GTGraphRequest" -Times 0 -ParameterFilter {
+                $Method -eq 'POST' -and $Uri -like "*revokeSignInSessions*"
+            }
         }
 
         It "should throw an error for an invalid UPN" {

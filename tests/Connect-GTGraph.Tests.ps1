@@ -99,7 +99,6 @@ Describe "Connect-GTGraph, Disconnect-GTGraph & Get-GTConnection" -Tag 'Unit' {
                 AccessToken = 'expired-token'
                 ExpiresAt   = [DateTime]::UtcNow.AddHours(-1)
             }
-            Mock -CommandName Get-MgContext -MockWith { return $null }
 
             $result = Initialize-GTGraphConnection -SkipConnect
 
@@ -111,7 +110,6 @@ Describe "Connect-GTGraph, Disconnect-GTGraph & Get-GTConnection" -Tag 'Unit' {
                 AccessToken = 'valid-token'
                 ExpiresAt   = [DateTime]::UtcNow.AddHours(1)
             }
-            Mock -CommandName Get-MgContext -MockWith { return $null }
 
             $result = Initialize-GTGraphConnection -SkipConnect
 

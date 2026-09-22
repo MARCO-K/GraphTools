@@ -1,24 +1,20 @@
 Describe "Get-GTPIMRoleReport" {
     BeforeAll {
         # Define stubs for dependencies to ensure Mock works
-        function Install-GTRequiredModule {}
-        function Test-GTGraphScopes { return $true }
-        function Initialize-GTGraphConnection { return $true }
-        function Write-PSFMessage {}
-        function Get-GTGraphErrorDetails {}
-        function Test-GTGuid { return $true }
-        function Get-MgBetaRoleManagementDirectoryRoleDefinition {}
-        function Get-MgBetaRoleManagementDirectoryRoleEligibilityScheduleInstance {}
-        function Get-MgBetaRoleManagementDirectoryRoleAssignmentScheduleInstance {}
+        function global:Install-GTRequiredModule {}
+        function global:Test-GTGraphScopes { return $true }
+        function global:Initialize-GTGraphConnection { return $true }
+        function global:Write-PSFMessage {}
+        function global:Get-GTGraphErrorDetails { return @{ LogLevel = 'Error'; Reason = 'Mock Error' } }
+        function global:Test-GTGuid { return $true }
+        function global:Invoke-GTGraphPagedRequest { param($Uri, $Headers) return @() }
+        function global:Invoke-GTGraphRequest { param($Method, $Uri, $Body, $ContentType, $ErrorAction, [switch]$All) return $null }
 
         $functionPath = "$PSScriptRoot/../functions/Get-GTPIMRoleReport.ps1"
         # Use Pester Mocks for external dependencies before dot-sourcing
         Mock -CommandName Install-GTRequiredModule -MockWith {} -Verifiable
         Mock -CommandName Test-GTGraphScopes -MockWith { return $true } -Verifiable
         Mock -CommandName Initialize-GTGraphConnection -MockWith { return $true } -Verifiable
-        Mock -CommandName Get-MgBetaRoleManagementDirectoryRoleDefinition -MockWith {} -Verifiable
-        Mock -CommandName Get-MgBetaRoleManagementDirectoryRoleEligibilityScheduleInstance -MockWith {} -Verifiable
-        Mock -CommandName Get-MgBetaRoleManagementDirectoryRoleAssignmentScheduleInstance -MockWith {} -Verifiable
         Mock -CommandName Test-GTGuid -MockWith { return $true } -Verifiable
         Mock -CommandName Get-GTGraphErrorDetails -MockWith { return @{ LogLevel = 'Error'; Reason = 'Mock Error' } } -Verifiable
         Mock -CommandName Write-PSFMessage -MockWith {} -Verifiable
@@ -38,46 +34,47 @@ Describe "Get-GTPIMRoleReport" {
         It "should generate a report with eligible and active assignments including PrincipalType" {
             # Mock Role Definitions
             $mockRoles = @(
-                [PSCustomObject]@{ Id = "Role1"; DisplayName = "Global Admin" }
-                [PSCustomObject]@{ Id = "Role2"; DisplayName = "User Admin" }
+                [PSCustomObject]@{ id = "Role1"; displayName = "Global Admin" }
+                [PSCustomObject]@{ id = "Role2"; displayName = "User Admin" }
             )
-            Mock -CommandName "Get-MgBetaRoleManagementDirectoryRoleDefinition" -MockWith { return $mockRoles }
 
             # Mock Eligible (User)
             $mockEligible = @(
                 [PSCustomObject]@{
-                    PrincipalId      = "User1"
-                    RoleDefinitionId = "Role1"
-                    StartDateTime    = (Get-Date)
-                    EndDateTime      = (Get-Date).AddDays(1)
-                    Principal        = [PSCustomObject]@{ 
-                        DisplayName          = "User One" 
-                        AdditionalProperties = @{ 
-                            userPrincipalName = "user1@contoso.com"
-                            '@odata.type'     = '#microsoft.graph.user'
-                        } 
+                    principalId      = "User1"
+                    roleDefinitionId = "Role1"
+                    startDateTime    = (Get-Date)
+                    endDateTime      = (Get-Date).AddDays(1)
+                    principal        = [PSCustomObject]@{ 
+                        displayName       = "User One" 
+                        userPrincipalName = "user1@contoso.com"
+                        '@odata.type'     = '#microsoft.graph.user'
                     }
                 }
             )
-            Mock -CommandName "Get-MgBetaRoleManagementDirectoryRoleEligibilityScheduleInstance" -MockWith { return $mockEligible }
 
             # Mock Active (Group)
             $mockActive = @(
                 [PSCustomObject]@{
-                    PrincipalId      = "Group1"
-                    RoleDefinitionId = "Role2"
-                    AssignmentType   = "Assigned"
-                    StartDateTime    = (Get-Date)
-                    EndDateTime      = $null
-                    Principal        = [PSCustomObject]@{ 
-                        DisplayName          = "Admin Group" 
-                        AdditionalProperties = @{ 
-                            '@odata.type' = '#microsoft.graph.group'
-                        } 
+                    principalId      = "Group1"
+                    roleDefinitionId = "Role2"
+                    assignmentType   = "Assigned"
+                    startDateTime    = (Get-Date)
+                    endDateTime      = $null
+                    principal        = [PSCustomObject]@{ 
+                        displayName  = "Admin Group" 
+                        '@odata.type' = '#microsoft.graph.group'
                     }
                 }
             )
-            Mock -CommandName "Get-MgBetaRoleManagementDirectoryRoleAssignmentScheduleInstance" -MockWith { return $mockActive }
+
+            Mock -CommandName "Invoke-GTGraphPagedRequest" -MockWith {
+                param($Uri, $Headers)
+                if ($Uri -like "*roleDefinitions*") { return $mockRoles }
+                if ($Uri -like "*roleEligibilityScheduleInstances*") { return $mockEligible }
+                if ($Uri -like "*roleAssignmentScheduleInstances*") { return $mockActive }
+                return @()
+            }
 
             $results = Get-GTPIMRoleReport
             $results.Count | Should -Be 2
@@ -98,11 +95,13 @@ Describe "Get-GTPIMRoleReport" {
         It "should filter by RoleName" {
             # Mock Role Definitions
             $mockRoles = @(
-                [PSCustomObject]@{ Id = "Role1"; DisplayName = "Global Admin" }
+                [PSCustomObject]@{ id = "Role1"; displayName = "Global Admin" }
             )
-            Mock -CommandName "Get-MgBetaRoleManagementDirectoryRoleDefinition" -MockWith { return $mockRoles }
-            Mock -CommandName "Get-MgBetaRoleManagementDirectoryRoleEligibilityScheduleInstance" -MockWith { return @() }
-            Mock -CommandName "Get-MgBetaRoleManagementDirectoryRoleAssignmentScheduleInstance" -MockWith { return @() }
+            Mock -CommandName "Invoke-GTGraphPagedRequest" -MockWith {
+                param($Uri, $Headers)
+                if ($Uri -like "*roleDefinitions*") { return $mockRoles }
+                return @()
+            }
 
             Get-GTPIMRoleReport -RoleName "Global Admin"
             # Verify logic inside loop handles filtering (mock returns empty so just ensuring no error)

@@ -69,7 +69,7 @@ function Remove-GTUserGroupOwnerships
             if ($PSCmdlet.ShouldProcess($Group.displayName, $action))
             {
                 Write-PSFMessage -Level Verbose -Message "Removing user $($User.UserPrincipalName) from groupowner $($Group.displayName)"
-                Invoke-MgGraphRequest -Method DELETE -Uri "v1.0/groups/$($Group.id)/owners/$($User.Id)/`$ref" -ErrorAction Stop
+                Invoke-GTGraphRequest -Method DELETE -Uri "v1.0/groups/$($Group.id)/owners/$($User.Id)/`$ref" -ErrorAction Stop
                 $output['Status'] = 'Success'
             }
         }

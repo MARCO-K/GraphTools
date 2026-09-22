@@ -23,8 +23,7 @@ function Get-GTInactiveDevices
     Finds all enabled devices inactive for more than 90 days.
     
     .NOTES
-    Requires the Microsoft Graph PowerShell SDK (Microsoft.Graph.Identity.DirectoryManagement) and the
-    Graph scope: Device.Read.All. The function uses server-side OData filtering for efficiency.
+    Requires the Graph scope: Device.Read.All. The function uses server-side OData filtering for efficiency.
     DaysInactive will be an integer number of days (floor of total days) when a last sign-in
     timestamp exists in Graph; when the device has never signed in, DaysInactive will be $null.
     #>
@@ -42,10 +41,6 @@ function Get-GTInactiveDevices
 
     begin
     {
-        $modules = @('Microsoft.Graph.Authentication')
-        # Prefer the standard -Verbose switch; do not pass $VerbosePreference to a switch parameter
-        Install-GTRequiredModule -ModuleNames $modules -Verbose
-
         # 1. Scopes Check
         $requiredScopes = @('Device.Read.All')
         if (-not (Test-GTGraphScopes -RequiredScopes $requiredScopes -Reconnect -Quiet))

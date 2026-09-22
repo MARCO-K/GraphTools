@@ -70,9 +70,6 @@ function Get-MFAReport
         if ($AdminsOnly -and $UsersWithoutMFA) {
             throw "You cannot use -AdminsOnly and -UsersWithoutMFA together."
         }
-        # Module Management
-        $modules = ('Microsoft.Graph.Authentication')
-        Install-GTRequiredModule -ModuleNames $modules -Verbose
 
         # Graph Connection Handling
         $graphConnected = Initialize-GTGraphConnection -Scopes $Scope -NewSession:$NewSession

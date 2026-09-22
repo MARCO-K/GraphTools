@@ -13,10 +13,18 @@ $script:GTValidationRegex = @{
 
 Describe "Get-GTLegacyAuthReport" {
     BeforeAll {
-        # Mock Get-MgContext to simulate being connected
-        Mock -CommandName "Get-MgContext" -MockWith {
-            return @{ Scopes = @('AuditLog.Read.All') }
+        function global:Install-GTRequiredModule { param([string[]]$ModuleNames, [string]$Scope, [switch]$AllowPrerelease) }
+        function global:Initialize-GTGraphConnection { param([string[]]$Scopes, [switch]$NewSession) return $true }
+        function global:Test-GTGraphScopes { param([string[]]$RequiredScopes, [switch]$Reconnect, [switch]$Quiet) return $true }
+        function global:Write-PSFMessage { param($Level, $Message, $ErrorRecord) }
+        function global:Get-GTGraphErrorDetails { param($Exception, $ResourceType) return [PSCustomObject]@{ LogLevel = 'Error'; Reason = 'Mock Error'; ErrorMessage = 'Mock Error Message' } }
+        function global:Get-UTCTime { return [DateTime]::UtcNow }
+        function global:Invoke-GTGraphPagedRequest { param($Uri, [switch]$All) return @() }
+
+        $script:GTValidationRegex = @{
+            UPN = '^[^@\s]+@[^@\s]+\.[^@\s]+$'
         }
+
         $functionPath = "$PSScriptRoot/../functions/Get-GTLegacyAuthReport.ps1"
         if (Test-Path $functionPath) { . $functionPath } else { Throw "Function file not found: $functionPath" }
     }
@@ -43,7 +51,7 @@ Describe "Get-GTLegacyAuthReport" {
         }
 
         It "should accept standard UPN aliases" {
-            Mock -CommandName "Get-MgAuditLogSignIn" -MockWith { return @() }
+            Mock -CommandName "Invoke-GTGraphPagedRequest" -MockWith { return @() }
             { Get-GTLegacyAuthReport -UPN "user@contoso.com" } | Should -Not -Throw
             { Get-GTLegacyAuthReport -Users "user@contoso.com" } | Should -Not -Throw
             { Get-GTLegacyAuthReport -User "user@contoso.com" } | Should -Not -Throw
@@ -52,7 +60,7 @@ Describe "Get-GTLegacyAuthReport" {
 
     Context "Pipeline Input" {
         BeforeEach {
-            Mock -CommandName "Get-MgAuditLogSignIn" -MockWith { return @() }
+            Mock -CommandName "Invoke-GTGraphPagedRequest" -MockWith { return @() }
         }
 
         It "should accept single UPN from pipeline" {
@@ -88,7 +96,7 @@ Describe "Get-GTLegacyAuthReport" {
 
     Context "Protocol Detection" {
         BeforeEach {
-            Mock -CommandName "Get-MgAuditLogSignIn" -MockWith {
+            Mock -CommandName "Invoke-GTGraphPagedRequest" -MockWith {
                 return @(
                     [PSCustomObject]@{
                         CreatedDateTime = (Get-Date).AddDays(-1)
@@ -135,7 +143,7 @@ Describe "Get-GTLegacyAuthReport" {
             )
 
             foreach ($protocol in $legacyProtocols) {
-                Mock -CommandName "Get-MgAuditLogSignIn" -MockWith {
+                Mock -CommandName "Invoke-GTGraphPagedRequest" -MockWith ({
                     return @(
                         [PSCustomObject]@{
                             CreatedDateTime = (Get-Date).AddDays(-1)
@@ -148,7 +156,7 @@ Describe "Get-GTLegacyAuthReport" {
                             Id = "request-1"
                         }
                     )
-                }
+                }.GetNewClosure())
 
                 $result = Get-GTLegacyAuthReport
                 $result.ClientAppUsed | Should -Contain $protocol
@@ -158,7 +166,7 @@ Describe "Get-GTLegacyAuthReport" {
 
     Context "User Filtering" {
         BeforeEach {
-            Mock -CommandName "Get-MgAuditLogSignIn" -MockWith {
+            Mock -CommandName "Invoke-GTGraphPagedRequest" -MockWith {
                 return @(
                     [PSCustomObject]@{
                         CreatedDateTime = (Get-Date).AddDays(-1)
@@ -200,7 +208,7 @@ Describe "Get-GTLegacyAuthReport" {
 
     Context "IP Address Filtering" {
         BeforeEach {
-            Mock -CommandName "Get-MgAuditLogSignIn" -MockWith {
+            Mock -CommandName "Invoke-GTGraphPagedRequest" -MockWith {
                 return @(
                     [PSCustomObject]@{
                         CreatedDateTime = (Get-Date).AddDays(-1)
@@ -233,7 +241,7 @@ Describe "Get-GTLegacyAuthReport" {
         }
 
         It "should filter by IPv6 address" {
-            Mock -CommandName "Get-MgAuditLogSignIn" -MockWith {
+            Mock -CommandName "Invoke-GTGraphPagedRequest" -MockWith {
                 return @(
                     [PSCustomObject]@{
                         CreatedDateTime = (Get-Date).AddDays(-1)
@@ -266,7 +274,7 @@ Describe "Get-GTLegacyAuthReport" {
 
     Context "Success/Failure Classification" {
         It "should classify successful legacy auth as security gap" {
-            Mock -CommandName "Get-MgAuditLogSignIn" -MockWith {
+            Mock -CommandName "Invoke-GTGraphPagedRequest" -MockWith {
                 return @(
                     [PSCustomObject]@{
                         CreatedDateTime = (Get-Date).AddDays(-1)
@@ -288,7 +296,7 @@ Describe "Get-GTLegacyAuthReport" {
         }
 
         It "should classify failed legacy auth as attack attempt" {
-            Mock -CommandName "Get-MgAuditLogSignIn" -MockWith {
+            Mock -CommandName "Invoke-GTGraphPagedRequest" -MockWith {
                 return @(
                     [PSCustomObject]@{
                         CreatedDateTime = (Get-Date).AddDays(-1)
@@ -323,7 +331,7 @@ Describe "Get-GTLegacyAuthReport" {
             }
 
             foreach ($errorCode in $errorMappings.Keys) {
-                Mock -CommandName "Get-MgAuditLogSignIn" -MockWith {
+                Mock -CommandName "Invoke-GTGraphPagedRequest" -MockWith ({
                     return @(
                         [PSCustomObject]@{
                             CreatedDateTime = (Get-Date).AddDays(-1)
@@ -336,7 +344,7 @@ Describe "Get-GTLegacyAuthReport" {
                             Id = "request-1"
                         }
                     )
-                }
+                }.GetNewClosure())
 
                 $result = Get-GTLegacyAuthReport
                 $result.FailureReason | Should -Contain $errorMappings[$errorCode]
@@ -344,7 +352,7 @@ Describe "Get-GTLegacyAuthReport" {
         }
 
         It "should use original failure reason for unmapped errors" {
-            Mock -CommandName "Get-MgAuditLogSignIn" -MockWith {
+            Mock -CommandName "Invoke-GTGraphPagedRequest" -MockWith {
                 return @(
                     [PSCustomObject]@{
                         CreatedDateTime = (Get-Date).AddDays(-1)
@@ -366,7 +374,7 @@ Describe "Get-GTLegacyAuthReport" {
 
     Context "SuccessOnly Switch" {
         It "should filter to only successful authentications when SuccessOnly is used" {
-            Mock -CommandName "Get-MgAuditLogSignIn" -MockWith {
+            Mock -CommandName "Invoke-GTGraphPagedRequest" -MockWith {
                 return @(
                     [PSCustomObject]@{
                         CreatedDateTime = (Get-Date).AddDays(-1)
@@ -400,7 +408,7 @@ Describe "Get-GTLegacyAuthReport" {
 
     Context "Output Format" {
         BeforeEach {
-            Mock -CommandName "Get-MgAuditLogSignIn" -MockWith {
+            Mock -CommandName "Invoke-GTGraphPagedRequest" -MockWith {
                 return @(
                     [PSCustomObject]@{
                         CreatedDateTime = (Get-Date).AddDays(-1)
@@ -450,7 +458,7 @@ Describe "Get-GTLegacyAuthReport" {
 
     Context "Error Handling" {
         It "should handle Graph API errors gracefully" {
-            Mock -CommandName "Get-MgAuditLogSignIn" -MockWith { throw "Graph API Error" }
+            Mock -CommandName "Invoke-GTGraphPagedRequest" -MockWith { throw "Graph API Error" }
 
             { Get-GTLegacyAuthReport } | Should -Throw
         }
@@ -470,21 +478,21 @@ Describe "Get-GTLegacyAuthReport" {
 
     Context "Performance and Filtering" {
         It "should apply server-side time filtering" {
-            Mock -CommandName "Get-MgAuditLogSignIn" -MockWith {
-                param($Filter)
+            Mock -CommandName "Invoke-GTGraphPagedRequest" -MockWith {
+                param($Uri)
                 # Verify the filter contains date filtering
-                $Filter | Should -Match "createdDateTime ge"
+                [Uri]::UnescapeDataString($Uri) | Should -Match "createdDateTime ge"
                 return @()
             }
 
-            Get-GTLegacyAuthReport -DaysAgo 5
+            Get-GTLegacyAuthReport -DaysAgo 7
         }
 
         It "should apply SuccessOnly filter server-side" {
-            Mock -CommandName "Get-MgAuditLogSignIn" -MockWith {
-                param($Filter)
+            Mock -CommandName "Invoke-GTGraphPagedRequest" -MockWith {
+                param($Uri)
                 # Verify the filter contains success filtering when SuccessOnly is used
-                $Filter | Should -Match "status/errorCode eq 0"
+                [Uri]::UnescapeDataString($Uri) | Should -Match "status/errorCode eq 0"
                 return @()
             }
 
@@ -492,7 +500,7 @@ Describe "Get-GTLegacyAuthReport" {
         }
 
         It "should accumulate pipeline input correctly" {
-            Mock -CommandName "Get-MgAuditLogSignIn" -MockWith {
+            Mock -CommandName "Invoke-GTGraphPagedRequest" -MockWith {
                 return @(
                     [PSCustomObject]@{
                         CreatedDateTime = (Get-Date).AddDays(-1)
@@ -526,7 +534,7 @@ Describe "Get-GTLegacyAuthReport" {
     Context "Defensive Protocol Detection" {
         It "should exclude modern protocols even if listed as legacy" {
             # This tests the defensive logic where a protocol must be in Legacy AND NOT in Modern
-            Mock -CommandName "Get-MgAuditLogSignIn" -MockWith {
+            Mock -CommandName "Invoke-GTGraphPagedRequest" -MockWith {
                 return @(
                     [PSCustomObject]@{
                         CreatedDateTime = (Get-Date).AddDays(-1)
@@ -546,7 +554,7 @@ Describe "Get-GTLegacyAuthReport" {
         }
 
         It "should include protocols that are legacy but not modern" {
-            Mock -CommandName "Get-MgAuditLogSignIn" -MockWith {
+            Mock -CommandName "Invoke-GTGraphPagedRequest" -MockWith {
                 return @(
                     [PSCustomObject]@{
                         CreatedDateTime = (Get-Date).AddDays(-1)

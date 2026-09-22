@@ -1,5 +1,16 @@
-﻿Describe "Get-M365LicenseOverview" {
+Describe "Get-M365LicenseOverview" {
     BeforeAll {
+        $validationFile = Join-Path $PSScriptRoot '..' 'internal' 'functions' 'GTValidation.ps1'
+        if (Test-Path $validationFile) { . $validationFile }
+
+        function global:Install-GTRequiredModule { param($ModuleNames, $Scope, $AllowPrerelease) }
+        function global:Test-GTGraphScopes { param($RequiredScopes, [switch]$Reconnect, [switch]$Quiet) return $true }
+        function global:Initialize-GTGraphConnection { param($Scopes, [switch]$NewSession, [switch]$SkipConnect) return $true }
+        function global:Get-GTGraphErrorDetails { param($Exception, $ResourceType, $Uri) [PSCustomObject]@{ LogLevel = 'Error'; Reason = 'Test error'; ErrorMessage = 'Test error message' } }
+        function global:Write-PSFMessage { param($Level, $Message, $ErrorRecord) }
+        function global:Invoke-GTGraphPagedRequest { param($Uri, $Headers) return @() }
+        function global:Invoke-GTGraphRequest { param($Method, $Uri, $Body, $ContentType, $ErrorAction, [switch]$All) return @() }
+
         # Mock required functions and modules
         Mock Install-GTRequiredModule { }
         Mock Test-GTGraphScopes { param($RequiredScopes, [switch]$Reconnect, [switch]$Quiet) $true }
@@ -47,7 +58,7 @@
 
     Context "Parameter Validation" {
         It "should accept FilterUser prefix values for startsWith filtering" {
-            Mock Invoke-MgGraphRequest { @() }
+            Mock Invoke-GTGraphPagedRequest { @() }
             { Get-M365LicenseOverview -FilterUser "invalid-user" } | Should -Not -Throw
         }
 
@@ -60,7 +71,7 @@
         }
 
         It "should accept valid FilterUser" {
-            Mock Invoke-MgGraphRequest { @() }
+            Mock Invoke-GTGraphPagedRequest { @() }
             { Get-M365LicenseOverview -FilterUser "user@domain.com" } | Should -Not -Throw
         }
 
@@ -73,7 +84,7 @@
 
     Context "CSV Caching and Download" {
         It "should cache CSV data in script scope" {
-            Mock Invoke-MgGraphRequest { @() }
+            Mock Invoke-GTGraphPagedRequest { @() }
 
             # First call should download and cache
             Get-M365LicenseOverview | Out-Null
@@ -85,7 +96,7 @@
         }
 
         It "should reuse cached data on subsequent calls" {
-            Mock Invoke-MgGraphRequest { @() }
+            Mock Invoke-GTGraphPagedRequest { @() }
 
             # First call
             Get-M365LicenseOverview | Out-Null
@@ -98,7 +109,7 @@
 
         It "should handle CSV download failure gracefully" {
             Mock Invoke-RestMethod { throw "Network error" }
-            Mock Invoke-MgGraphRequest { @() }
+            Mock Invoke-GTGraphPagedRequest { @() }
 
             # Should not throw, should continue with empty cache
             { Get-M365LicenseOverview } | Should -Not -Throw
@@ -128,7 +139,7 @@
                     Links = @([PSCustomObject]@{ href = 'https://example.com/fallback.csv' })
                 }
             }
-            Mock Invoke-MgGraphRequest { @() }
+            Mock Invoke-GTGraphPagedRequest { @() }
 
             Get-M365LicenseOverview | Out-Null
 
@@ -140,7 +151,7 @@
     Context "User Data Processing" {
         BeforeEach {
             # Mock user data with licenses
-            Mock Invoke-MgGraphRequest {
+            Mock Invoke-GTGraphPagedRequest {
                 @(
                     [PSCustomObject]@{
                         UserPrincipalName = 'user1@contoso.com'
@@ -199,7 +210,7 @@
         }
 
         It "should skip users with no assigned licenses" {
-            Mock Invoke-MgGraphRequest {
+            Mock Invoke-GTGraphPagedRequest {
                 @(
                     [PSCustomObject]@{
                         UserPrincipalName = 'user3@contoso.com'
@@ -216,7 +227,7 @@
 
     Context "Filtering Logic" {
         BeforeEach {
-            Mock Invoke-MgGraphRequest {
+            Mock Invoke-GTGraphPagedRequest {
                 @(
                     [PSCustomObject]@{
                         UserPrincipalName = 'john.doe@contoso.com'
@@ -299,8 +310,8 @@
             { Get-M365LicenseOverview } | Should -Not -Throw
         }
 
-        It "should handle Invoke-MgGraphRequest errors gracefully" {
-            Mock Invoke-MgGraphRequest { throw "Graph API Error" }
+        It "should handle Invoke-GTGraphPagedRequest errors gracefully" {
+            Mock Invoke-GTGraphPagedRequest { throw "Graph API Error" }
 
             { Get-M365LicenseOverview } | Should -Throw
         }
@@ -308,24 +319,22 @@
 
     Context "Output Format" {
         It "should return correct object properties" {
-            Mock Invoke-MgGraphRequest {
-                [PSCustomObject]@{
-                    value = @(
-                        [PSCustomObject]@{
-                            UserPrincipalName = 'test@contoso.com'
-                            DisplayName = 'Test User'
-                            SignInActivity = [PSCustomObject]@{ LastSignInDateTime = (Get-Date).AddDays(-5).ToString('o') }
-                            AssignedLicenses = @(
-                                [PSCustomObject]@{
-                                    SkuId = '12345678-1234-1234-1234-123456789012'
-                                    ServicePlans = @(
-                                        [PSCustomObject]@{ ServicePlanId = '87654321-4321-4321-4321-210987654321'; ProvisioningStatus = 'Success' }
-                                    )
-                                }
-                            )
-                        }
-                    )
-                }
+            Mock Invoke-GTGraphPagedRequest {
+                @(
+                    [PSCustomObject]@{
+                        UserPrincipalName = 'test@contoso.com'
+                        DisplayName = 'Test User'
+                        SignInActivity = [PSCustomObject]@{ LastSignInDateTime = (Get-Date).AddDays(-5).ToString('o') }
+                        AssignedLicenses = @(
+                            [PSCustomObject]@{
+                                SkuId = '12345678-1234-1234-1234-123456789012'
+                                ServicePlans = @(
+                                    [PSCustomObject]@{ ServicePlanId = '87654321-4321-4321-4321-210987654321'; ProvisioningStatus = 'Success' }
+                                )
+                            }
+                        )
+                    }
+                )
             }
 
             $result = Get-M365LicenseOverview
@@ -341,24 +350,22 @@
         }
 
         It "should handle GUID fallback when SKU not in cache" {
-            Mock Invoke-MgGraphRequest {
-                [PSCustomObject]@{
-                    value = @(
-                        [PSCustomObject]@{
-                            UserPrincipalName = 'test@contoso.com'
-                            DisplayName = 'Test User'
-                            SignInActivity = $null
-                            AssignedLicenses = @(
-                                [PSCustomObject]@{
-                                    SkuId = 'unknown-sku-guid'
-                                    ServicePlans = @(
-                                        [PSCustomObject]@{ ServicePlanId = 'unknown-plan-guid'; ProvisioningStatus = 'Success' }
-                                    )
-                                }
-                            )
-                        }
-                    )
-                }
+            Mock Invoke-GTGraphPagedRequest {
+                @(
+                    [PSCustomObject]@{
+                        UserPrincipalName = 'test@contoso.com'
+                        DisplayName = 'Test User'
+                        SignInActivity = $null
+                        AssignedLicenses = @(
+                            [PSCustomObject]@{
+                                SkuId = 'unknown-sku-guid'
+                                ServicePlans = @(
+                                    [PSCustomObject]@{ ServicePlanId = 'unknown-plan-guid'; ProvisioningStatus = 'Success' }
+                                )
+                            }
+                        )
+                    }
+                )
             }
 
             $result = Get-M365LicenseOverview
@@ -370,37 +377,35 @@
 
     Context "Edge Cases" {
         It "should handle empty user results" {
-            Mock Invoke-MgGraphRequest { @() }
+            Mock Invoke-GTGraphPagedRequest { @() }
 
             $results = Get-M365LicenseOverview
             $results | Should -HaveCount 0
         }
 
         It "should handle users with multiple licenses" {
-            Mock Invoke-MgGraphRequest {
-                [PSCustomObject]@{
-                    value = @(
-                        [PSCustomObject]@{
-                            UserPrincipalName = 'multi@contoso.com'
-                            DisplayName = 'Multi License User'
-                            SignInActivity = $null
-                            AssignedLicenses = @(
-                                [PSCustomObject]@{
-                                    SkuId = '12345678-1234-1234-1234-123456789012'
-                                    ServicePlans = @(
-                                        [PSCustomObject]@{ ServicePlanId = '87654321-4321-4321-4321-210987654321'; ProvisioningStatus = 'Success' }
-                                    )
-                                },
-                                [PSCustomObject]@{
-                                    SkuId = 'abcdef12-3456-7890-abcd-ef1234567890'
-                                    ServicePlans = @(
-                                        [PSCustomObject]@{ ServicePlanId = 'fedcba98-7654-3210-fedc-ba9876543210'; ProvisioningStatus = 'Success' }
-                                    )
-                                }
-                            )
-                        }
-                    )
-                }
+            Mock Invoke-GTGraphPagedRequest {
+                @(
+                    [PSCustomObject]@{
+                        UserPrincipalName = 'multi@contoso.com'
+                        DisplayName = 'Multi License User'
+                        SignInActivity = $null
+                        AssignedLicenses = @(
+                            [PSCustomObject]@{
+                                SkuId = '12345678-1234-1234-1234-123456789012'
+                                ServicePlans = @(
+                                    [PSCustomObject]@{ ServicePlanId = '87654321-4321-4321-4321-210987654321'; ProvisioningStatus = 'Success' }
+                                )
+                            },
+                            [PSCustomObject]@{
+                                SkuId = 'abcdef12-3456-7890-abcd-ef1234567890'
+                                ServicePlans = @(
+                                    [PSCustomObject]@{ ServicePlanId = 'fedcba98-7654-3210-fedc-ba9876543210'; ProvisioningStatus = 'Success' }
+                                )
+                            }
+                        )
+                    }
+                )
             }
 
             $results = Get-M365LicenseOverview
@@ -410,7 +415,7 @@
         }
 
         It "should handle licenses with no service plans" {
-            Mock Invoke-MgGraphRequest {
+            Mock Invoke-GTGraphPagedRequest {
                 @(
                     [PSCustomObject]@{
                         UserPrincipalName = 'test@contoso.com'

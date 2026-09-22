@@ -1,21 +1,18 @@
 Describe "Invoke-AuditLogQuery" {
     BeforeAll {
-        # Define stub functions FIRST
-        function Install-GTRequiredModule { param([string[]]$ModuleNames, [string]$Scope, [switch]$AllowPrerelease) }
-        function Test-GTGraphScopes { param([string[]]$RequiredScopes, [switch]$Reconnect, [switch]$Quiet) return $true }
-        function Write-PSFMessage { param($Level, $Message, $ErrorRecord) }
-        function Invoke-MgGraphRequest { param($Uri, $Body, $Method) return @{} }
+        $validationFile = Join-Path $PSScriptRoot '..' 'internal' 'functions' 'GTValidation.ps1'
+        if (Test-Path $validationFile) { . $validationFile }
 
-        # Set up validation regex required by the function
-        $script:GTValidationRegex = @{
-            UPN = '^[^@\s]+@[^@\s]+\.[^@\s]+$'
-            AuditLogFilterValue = '^[a-zA-Z0-9_\-]+$'
-            AuditLogProperty = '^[a-zA-Z0-9_]+(\.[a-zA-Z0-9_]+)*$'
-        }
+        # Define stub functions FIRST
+        function global:Install-GTRequiredModule { param([string[]]$ModuleNames, [string]$Scope, [switch]$AllowPrerelease) }
+        function global:Test-GTGraphScopes { param([string[]]$RequiredScopes, [switch]$Reconnect, [switch]$Quiet) return $true }
+        function global:Initialize-GTGraphConnection { param([string[]]$Scopes, [switch]$NewSession) return $true }
+        function global:Write-PSFMessage { param($Level, $Message, $ErrorRecord) }
+        function global:Invoke-GTGraphRequest { param($Uri, $Method = 'GET', $Body, $Headers, $ContentType, [switch]$All, [int]$MaxRetries, [int]$RetryBaseDelaySeconds, $Token, [switch]$Raw, $ErrorAction) return @{} }
 
         # Mock Get-Date to return a fixed timestamp
-        $fixedNow = Get-Date '2025-10-10T00:00:00Z'
-        Mock Get-Date { $fixedNow }
+        $script:fixedNow = [DateTime]'2025-10-10T00:00:00Z'
+        Mock Get-Date { $script:fixedNow }
 
         # Dot-source the function under test AFTER stubs
         . "$PSScriptRoot/../functions/Invoke-AuditLogQuery.ps1"
@@ -39,13 +36,13 @@ Describe "Invoke-AuditLogQuery" {
             }
         )
 
-        Mock -CommandName "Invoke-MgGraphRequest" -MockWith {
-            param($Uri, $Body, $Method)
+        Mock -CommandName "Invoke-GTGraphRequest" -MockWith {
+            param($Uri, $Method = 'GET', $Body, $Headers, $ContentType, [switch]$All, [int]$MaxRetries, [int]$RetryBaseDelaySeconds, $Token, [switch]$Raw, $ErrorAction)
             # POST: Create query
-            if ($Uri -like "*graph.microsoft.com/beta/security/auditLog/queries/" -and $Method -eq "POST")
+            if ($Uri -like "*auditLog/queries*" -and $Method -eq "POST")
             {
-                $bodyObj = $Body | ConvertFrom-Json
-                $script:storedFilter = $bodyObj.filter | ConvertFrom-Json
+                $bodyObj = if ($Body -is [string]) { $Body | ConvertFrom-Json } else { $Body }
+                $script:storedFilter = if ($bodyObj.filter -is [string]) { $bodyObj.filter | ConvertFrom-Json } else { $bodyObj.filter }
                 return @{
                     Id     = "test-query-id"
                     status = "succeeded"
@@ -73,7 +70,7 @@ Describe "Invoke-AuditLogQuery" {
                 }
                 if ($script:storedFilter -and $script:storedFilter.filterStartDateTime)
                 {
-                    $startDate = Get-Date($script:storedFilter.filterStartDateTime)
+                    $startDate = [DateTime]$script:storedFilter.filterStartDateTime
                     $records = @($records | Where-Object { $_.createdDateTime -ge $startDate })
                 }
 
@@ -124,18 +121,19 @@ Describe "Invoke-AuditLogQuery" {
 
     It "should pass the correct filter to the API" {
         Invoke-AuditLogQuery -Operations "FileDeleted" -UserIds "user1@contoso.com"
-        Assert-MockCalled -CommandName "Invoke-MgGraphRequest" -ParameterFilter {
-            $body = $Body | ConvertFrom-Json
-            ($body.filter.OperationFilters -contains "FileDeleted") -and ($body.filter.userIdsFilters -contains "user1@contoso.com")
+        Assert-MockCalled -CommandName "Invoke-GTGraphRequest" -ParameterFilter {
+            $body = if ($Body -is [string]) { $Body | ConvertFrom-Json } else { $Body }
+            $filter = if ($body.filter -is [string]) { $body.filter | ConvertFrom-Json } else { $body.filter }
+            ($filter.OperationFilters -contains "FileDeleted") -and ($filter.userIdsFilters -contains "user1@contoso.com")
         } -Times 1
     }
 
     It "should call the correct URIs" {
         Invoke-AuditLogQuery -Delete
-        Assert-MockCalled -CommandName "Invoke-MgGraphRequest" -ParameterFilter { $Uri -like "*/auditLog/queries" -and $Method -eq "POST" } -Times 1
-        Assert-MockCalled -CommandName "Invoke-MgGraphRequest" -ParameterFilter { $Uri -eq "/beta/security/auditLog/queries/test-query-id" -and $Method -eq "GET" } -Times 1
-        Assert-MockCalled -CommandName "Invoke-MgGraphRequest" -ParameterFilter { $Uri -eq "/beta/security/auditLog/queries/test-query-id/records" -and $Method -eq "GET" } -Times 1
-        Assert-MockCalled -CommandName "Invoke-MgGraphRequest" -ParameterFilter { $Uri -eq "/beta/security/auditLog/queries/test-query-id" -and $Method -eq "DELETE" } -Times 1
+        Assert-MockCalled -CommandName "Invoke-GTGraphRequest" -ParameterFilter { $Uri -like "*/auditLog/queries*" -and $Method -eq "POST" } -Times 1
+        Assert-MockCalled -CommandName "Invoke-GTGraphRequest" -ParameterFilter { $Uri -eq "/beta/security/auditLog/queries/test-query-id" -and $Method -eq "GET" } -Times 1
+        Assert-MockCalled -CommandName "Invoke-GTGraphRequest" -ParameterFilter { $Uri -eq "/beta/security/auditLog/queries/test-query-id/records" -and $Method -eq "GET" } -Times 1
+        Assert-MockCalled -CommandName "Invoke-GTGraphRequest" -ParameterFilter { $Uri -eq "/beta/security/auditLog/queries/test-query-id" -and $Method -eq "DELETE" } -Times 1
     }
 
     Context "Parameter Validation" {

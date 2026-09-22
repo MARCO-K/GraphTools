@@ -44,7 +44,7 @@ function Get-M365LicenseOverview
 
     begin
     {
-        $requiredModules = @('Microsoft.Graph.Authentication')
+        $requiredModules = @()
         $requiredScopes = @('User.Read.All', 'Organization.Read.All', 'AuditLog.Read.All')
 
         if (-not (Initialize-GTBeginBlock -ModuleNames $requiredModules -RequiredScopes $requiredScopes -ValidateScopes -InitializeConnection -NewSession:$NewSession -ScopeValidationErrorMessage "Failed to acquire required permissions ($($requiredScopes -join ', ')). Aborting." -ConnectionErrorMessage 'Failed to initialize session.'))

@@ -1,11 +1,12 @@
-## Provide lightweight stubs for common helpers in case they are missing during discovery
-if (-not (Get-Command Install-GTRequiredModule -ErrorAction SilentlyContinue)) { function Install-GTRequiredModule { param($ModuleNames, $Verbose) } }
-if (-not (Get-Command Initialize-GTGraphConnection -ErrorAction SilentlyContinue)) { function Initialize-GTGraphConnection { param([string[]]$Scopes, [switch]$NewSession, [switch]$SkipConnect) return $true } }
-if (-not (Get-Command Test-GTGraphScopes -ErrorAction SilentlyContinue)) { function Test-GTGraphScopes { param($RequiredScopes, $Reconnect, $Quiet) return $true } }
-if (-not (Get-Command Write-PSFMessage -ErrorAction SilentlyContinue)) { function Write-PSFMessage { param($Level, $Message, $ErrorRecord) } }
-
 Describe "Get-GTGuestUserReport" {
     BeforeAll {
+        function global:Install-GTRequiredModule { param($ModuleNames, $Verbose) }
+        function global:Initialize-GTGraphConnection { param([string[]]$Scopes, [switch]$NewSession, [switch]$SkipConnect) return $true }
+        function global:Test-GTGraphScopes { param($RequiredScopes, $Reconnect, $Quiet) return $true }
+        function global:Write-PSFMessage { param($Level, $Message, $ErrorRecord) }
+        function global:Invoke-GTGraphPagedRequest { param($Uri, $Headers) return @() }
+        function global:Invoke-GTGraphRequest { param($Method, $Uri, $Body, $ContentType, $ErrorAction, [switch]$All) return @() }
+
         $functionPath = "$PSScriptRoot/../functions/Get-GTGuestUserReport.ps1"
 
         # Use Pester Mocks before dot-sourcing so the function file can load and calls are intercepted
@@ -32,19 +33,19 @@ Describe "Get-GTGuestUserReport" {
 
     Context "Parameter Validation" {
         It "should accept PendingOnly switch" {
-            Mock -CommandName "Invoke-MgGraphRequest" -MockWith { [PSCustomObject]@{ value = @() } }
+            Mock -CommandName "Invoke-GTGraphPagedRequest" -MockWith { @() }
             { Get-GTGuestUserReport -PendingOnly } | Should -Not -Throw
         }
 
         It "should accept DaysSinceCreation parameter" {
-            Mock -CommandName "Invoke-MgGraphRequest" -MockWith { [PSCustomObject]@{ value = @() } }
+            Mock -CommandName "Invoke-GTGraphPagedRequest" -MockWith { @() }
             { Get-GTGuestUserReport -DaysSinceCreation 30 } | Should -Not -Throw
         }
     }
 
     Context "Functionality" {
         It "should use server-side filter for pending users" {
-            Mock -CommandName "Invoke-MgGraphRequest" -MockWith { [PSCustomObject]@{ value = @() } } -ParameterFilter {
+            Mock -CommandName "Invoke-GTGraphPagedRequest" -MockWith { @() } -ParameterFilter {
                 $Uri -match '/v1.0/users' -and
                 [System.Uri]::UnescapeDataString([string]$Uri) -match "externalUserState eq 'PendingAcceptance'" -and
                 [System.Uri]::UnescapeDataString([string]$Uri) -match "userType eq 'Guest'"
@@ -53,7 +54,7 @@ Describe "Get-GTGuestUserReport" {
             Get-GTGuestUserReport -PendingOnly
             
             # Verification is done via the ParameterFilter in the Mock
-            Assert-MockCalled "Invoke-MgGraphRequest" -Times 1
+            Assert-MockCalled "Invoke-GTGraphPagedRequest" -Times 1
         }
 
         It "should filter by creation date correctly (client-side)" {
@@ -73,7 +74,7 @@ Describe "Get-GTGuestUserReport" {
                     SignInActivity    = [PSCustomObject]@{ LastSignInDateTime = (Get-Date).ToUniversalTime().AddDays(-5) }
                 }
             )
-            Mock -CommandName "Invoke-MgGraphRequest" -MockWith { [PSCustomObject]@{ value = $mockUsers } }
+            Mock -CommandName "Invoke-GTGraphPagedRequest" -MockWith { return $mockUsers }
 
             $results = Get-GTGuestUserReport -DaysSinceCreation 30
             @($results).Count | Should -Be 1

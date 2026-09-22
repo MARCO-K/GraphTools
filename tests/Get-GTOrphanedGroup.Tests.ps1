@@ -1,21 +1,12 @@
 Describe "Get-GTOrphanedGroup" {
     BeforeAll {
-        # Define stubs for dependencies to ensure Mock works
-        function Install-GTRequiredModule {}
-        function Initialize-GTGraphConnection { return $true }
-        function Test-GTGraphScopes { return $true }
-        function Write-PSFMessage {}
-        function Stop-PSFFunction {}
-        function Get-GTGraphErrorDetails {}
-        function Get-MgBetaGroup {}
-
-        # Use Pester Mocks for dependencies
-        Mock -CommandName Install-GTRequiredModule -MockWith {} -Verifiable
-        Mock -CommandName Initialize-GTGraphConnection -MockWith { return $true } -Verifiable
-        Mock -CommandName Test-GTGraphScopes -MockWith { return $true } -Verifiable
-        Mock -CommandName Write-PSFMessage -MockWith {} -Verifiable
-        Mock -CommandName Stop-PSFFunction -MockWith {} -Verifiable
-        Mock -CommandName Get-GTGraphErrorDetails -MockWith {} -Verifiable
+        function global:Install-GTRequiredModule { param([string[]]$ModuleNames, [string]$Scope, [switch]$AllowPrerelease) }
+        function global:Initialize-GTGraphConnection { param([string[]]$Scopes, [switch]$NewSession) return $true }
+        function global:Test-GTGraphScopes { param([string[]]$RequiredScopes, [switch]$Reconnect, [switch]$Quiet) return $true }
+        function global:Write-PSFMessage { param($Level, $Message, $ErrorRecord) }
+        function global:Stop-PSFFunction { param($Message, $ErrorRecord, [switch]$EnableException) throw $Message }
+        function global:Get-GTGraphErrorDetails { param($Exception, $ResourceType) return [PSCustomObject]@{ LogLevel = 'Error'; Reason = 'Mock Error'; ErrorMessage = 'Mock Error Message' } }
+        function global:Invoke-GTGraphPagedRequest { param($Uri, [switch]$All) return @() }
 
         # Dot-source the function in the Describe scope
         . "$PSScriptRoot/../functions/Get-GTOrphanedGroup.ps1"
@@ -23,24 +14,24 @@ Describe "Get-GTOrphanedGroup" {
 
     Context "Function Execution" {
         It "should not throw when properly configured" {
-            Mock -CommandName "Get-MgBetaGroup" -MockWith { return @() }
+            Mock -CommandName "Invoke-GTGraphPagedRequest" -MockWith { return @() }
             { Get-GTOrphanedGroup } | Should -Not -Throw
         }
     }
 
     Context "Parameter Handling" {
         It "should accept NewSession switch" {
-            Mock -CommandName "Get-MgBetaGroup" -MockWith { return @() }
+            Mock -CommandName "Invoke-GTGraphPagedRequest" -MockWith { return @() }
             { Get-GTOrphanedGroup -NewSession } | Should -Not -Throw
         }
 
         It "should accept CheckEmpty switch" {
-            Mock -CommandName "Get-MgBetaGroup" -MockWith { return @() }
+            Mock -CommandName "Invoke-GTGraphPagedRequest" -MockWith { return @() }
             { Get-GTOrphanedGroup -CheckEmpty } | Should -Not -Throw
         }
 
         It "should accept CheckDisabledOwners switch" {
-            Mock -CommandName "Get-MgBetaGroup" -MockWith { return @() }
+            Mock -CommandName "Invoke-GTGraphPagedRequest" -MockWith { return @() }
             { Get-GTOrphanedGroup -CheckDisabledOwners } | Should -Not -Throw
         }
     }
@@ -59,7 +50,7 @@ Describe "Get-GTOrphanedGroup" {
                     Visibility      = "Private"
                     CreatedDateTime = (Get-Date)
                 })
-            Mock -CommandName "Get-MgBetaGroup" -MockWith { return $mockGroup }
+            Mock -CommandName "Invoke-GTGraphPagedRequest" -MockWith { return $mockGroup }
             
             $result = Get-GTOrphanedGroup
             $result.Count | Should -Be 1
@@ -84,7 +75,7 @@ Describe "Get-GTOrphanedGroup" {
                     Visibility      = "Private"
                     CreatedDateTime = (Get-Date)
                 })
-            Mock -CommandName "Get-MgBetaGroup" -MockWith { return $mockGroup }
+            Mock -CommandName "Invoke-GTGraphPagedRequest" -MockWith { return $mockGroup }
 
             $result = Get-GTOrphanedGroup -CheckDisabledOwners
             $result.Count | Should -Be 1
@@ -109,7 +100,7 @@ Describe "Get-GTOrphanedGroup" {
                     Visibility      = "Private"
                     CreatedDateTime = (Get-Date)
                 })
-            Mock -CommandName "Get-MgBetaGroup" -MockWith { return $mockGroup }
+            Mock -CommandName "Invoke-GTGraphPagedRequest" -MockWith { return $mockGroup }
 
             $result = Get-GTOrphanedGroup -CheckEmpty
             $result.Count | Should -Be 1
@@ -129,7 +120,7 @@ Describe "Get-GTOrphanedGroup" {
                     Visibility      = "Private"
                     CreatedDateTime = (Get-Date)
                 })
-            Mock -CommandName "Get-MgBetaGroup" -MockWith { return $mockGroup }
+            Mock -CommandName "Invoke-GTGraphPagedRequest" -MockWith { return $mockGroup }
 
             $result = Get-GTOrphanedGroup
             $result.Count | Should -Be 0
@@ -153,7 +144,7 @@ Describe "Get-GTOrphanedGroup" {
                     Visibility      = "Private"
                     CreatedDateTime = (Get-Date)
                 })
-            Mock -CommandName "Get-MgBetaGroup" -MockWith { return $mockGroup }
+            Mock -CommandName "Invoke-GTGraphPagedRequest" -MockWith { return $mockGroup }
 
             $result = Get-GTOrphanedGroup
             $result.Count | Should -Be 0

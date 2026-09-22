@@ -2,8 +2,7 @@
 .SYNOPSIS
     Resets user passwords in Microsoft Entra ID (Azure AD)
 .DESCRIPTION
-    Resets one or more user passwords to a randomly generated password.
-    This function requires Microsoft.Graph.Authentication and Microsoft.Graph.Beta.Users modules.
+    Resets one or more user passwords to a randomly generated password via native Microsoft Graph REST API.
     It validates UPN format and manages Microsoft Graph connection automatically.
     The password reset signals applications supporting Continuous Access Evaluation (CAE) to terminate active sessions.
 .PARAMETER UPN
@@ -48,10 +47,6 @@ Function Reset-GTUserPassword
 
     begin
     {
-        # Module Management
-        $modules = ('Microsoft.Graph.Authentication')
-        Install-GTRequiredModule -ModuleNames $modules -Verbose
-
         # Graph Connection Handling
         if (-not (Initialize-GTGraphConnection -Scopes 'User.ReadWrite.All' -NewSession:$NewSession)) {
             throw "Failed to establish Microsoft Graph connection"
@@ -73,7 +68,7 @@ Function Reset-GTUserPassword
                         password                      = $Password
                     }
 
-                    Invoke-MgGraphRequest -Method PATCH -Uri ("v1.0/users/{0}" -f $User) -Body @{ passwordProfile = $Passwordprofile } -ContentType 'application/json' -ErrorAction Stop
+                    Invoke-GTGraphRequest -Method PATCH -Uri ("v1.0/users/{0}" -f $User) -Body @{ passwordProfile = $Passwordprofile } -ContentType 'application/json' -ErrorAction Stop
                     Write-PSFMessage -Level Verbose -Message "$User - Reset Password Action - Password reset to random value"
                 }
                 catch

@@ -61,9 +61,6 @@ function Get-GTRiskyAppPermissionReport
 
     begin
     {
-        $modules = @('Microsoft.Graph.Authentication')
-        Install-GTRequiredModule -ModuleNames $modules -Verbose:$VerbosePreference
-
         # 1. Scopes Check
         $requiredScopes = @('AppRoleAssignment.Read.All', 'DelegatedPermissionGrant.Read.All', 'Application.Read.All', 'AuditLog.Read.All', 'User.Read.All')
         
@@ -282,7 +279,7 @@ function Get-GTRiskyAppPermissionReport
         {
             # Cache Microsoft Graph App Roles and Resource-Specific Application Permissions for app-only ID-to-Name resolution
             Write-PSFMessage -Level Verbose -Message "Caching Microsoft Graph App Roles..."
-            $graphSpResp = Invoke-MgGraphRequest -Method GET -Uri "v1.0/servicePrincipals?`$filter=appId eq '00000003-0000-0000-c000-000000000000'&`$select=id,appRoles,resourceSpecificApplicationPermissions" -ErrorAction Stop
+            $graphSpResp = Invoke-GTGraphRequest -Method GET -Uri "v1.0/servicePrincipals?`$filter=appId eq '00000003-0000-0000-c000-000000000000'&`$select=id,appRoles,resourceSpecificApplicationPermissions" -ErrorAction Stop
             $graphSp = $graphSpResp.value[0]
             $roleMap = @{}
             if ($graphSp.appRoles) {
@@ -453,7 +450,7 @@ function Get-GTRiskyAppPermissionReport
                                 elseif ($grant.principalId) {
                                     if (-not $UserCache.ContainsKey($grant.principalId)) {
                                         try {
-                                            $uResp = Invoke-MgGraphRequest -Method GET -Uri "v1.0/users/$($grant.principalId)?`$select=userPrincipalName" -ErrorAction SilentlyContinue
+                                            $uResp = Invoke-GTGraphRequest -Method GET -Uri "v1.0/users/$($grant.principalId)?`$select=userPrincipalName" -ErrorAction SilentlyContinue
                                             $UserCache[$grant.principalId] = if ($uResp) { $uResp.userPrincipalName } else { "Deleted User ($($grant.principalId))" }
                                         } catch {
                                             $UserCache[$grant.principalId] = "Unknown"

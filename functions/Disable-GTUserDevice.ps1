@@ -10,7 +10,6 @@
     this function gets all enabled devices directly with a single filtered query per user, reducing
     API calls from 1+N to just 2 per user (1 for user ID, 1 for filtered devices).
     
-    Requires Microsoft.Graph.Authentication, Microsoft.Graph.Users, and Microsoft.Graph.Identity.DirectoryManagement modules.
     It validates UPN format and manages Microsoft Graph connection automatically.
 
     This cmdlet supports -WhatIf and -Confirm via ShouldProcess (SupportsShouldProcess = $true).
@@ -88,10 +87,6 @@ Function Disable-GTUserDevice
     {
         # Prepare a collection for results. We'll emit a single array in End().
         $results = New-Object System.Collections.ArrayList
-
-        # Module Management
-        $modules = ('Microsoft.Graph.Authentication')
-        Install-GTRequiredModule -ModuleNames $modules -Verbose
 
         # Graph Connection Handling
         $connectionResult = Initialize-GTGraphConnection -Scopes 'Directory.AccessAsUser.All' -NewSession:$NewSession

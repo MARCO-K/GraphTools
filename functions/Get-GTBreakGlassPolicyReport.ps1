@@ -37,9 +37,6 @@ function Get-GTBreakGlassPolicyReport
 
     begin
     {
-        $modules = @('Microsoft.Graph.Authentication')
-        Install-GTRequiredModule -ModuleNames $modules -Verbose:$VerbosePreference
-
         # 1. Scopes Check
         $requiredScopes = @('Policy.Read.All', 'User.Read.All')
         

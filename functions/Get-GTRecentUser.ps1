@@ -46,9 +46,6 @@ function Get-GTRecentUser
 
     begin
     {
-        $modules = @('Microsoft.Graph.Authentication')
-        Install-GTRequiredModule -ModuleNames $modules -Verbose:$VerbosePreference
-
         # 1. Scopes Check (Gold Standard)
         # User.Read.All is required to read CreatedDateTime and filter users
         $requiredScopes = @('User.Read.All')

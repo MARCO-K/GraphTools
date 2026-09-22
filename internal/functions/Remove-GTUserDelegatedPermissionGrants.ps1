@@ -59,7 +59,7 @@ function Remove-GTUserDelegatedPermissionGrants
                 # Get service principal details for better logging
                 try
                 {
-                    $spResp = Invoke-MgGraphRequest -Method GET -Uri "v1.0/servicePrincipals/$($grant.clientId)?`$select=displayName" -ErrorAction SilentlyContinue
+                    $spResp = Invoke-GTGraphRequest -Method GET -Uri "v1.0/servicePrincipals/$($grant.clientId)?`$select=displayName" -ErrorAction SilentlyContinue
                     $appName = if ($spResp) { $spResp.displayName } else { "App-$($grant.clientId)" }
                 }
                 catch
@@ -83,7 +83,7 @@ function Remove-GTUserDelegatedPermissionGrants
                     {
                         Write-PSFMessage -Level Verbose -Message "Removing delegated permission grant for application '$appName' from user $($User.UserPrincipalName). Scopes: $scopes"
 
-                        Invoke-MgGraphRequest -Method DELETE -Uri "v1.0/oauth2PermissionGrants/$($grant.id)" -ErrorAction Stop
+                        Invoke-GTGraphRequest -Method DELETE -Uri "v1.0/oauth2PermissionGrants/$($grant.id)" -ErrorAction Stop
                         $output['Status'] = 'Success'
 
                         Write-PSFMessage -Level Verbose -Message "Successfully removed delegated permissions for '$appName'"

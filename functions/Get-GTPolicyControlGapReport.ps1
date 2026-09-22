@@ -31,9 +31,6 @@ function Get-GTPolicyControlGapReport
 
     begin
     {
-        $modules = @('Microsoft.Graph.Authentication')
-        Install-GTRequiredModule -ModuleNames $modules -Verbose:$VerbosePreference
-
         # 1. Scopes Check
         $requiredScopes = @('Policy.Read.All')
         if (-not (Test-GTGraphScopes -RequiredScopes $requiredScopes -Reconnect -Quiet))
