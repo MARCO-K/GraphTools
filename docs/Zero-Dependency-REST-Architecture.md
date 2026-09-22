@@ -168,7 +168,11 @@ sequenceDiagram
 ### C. JSON Batch Orchestrator ([`Invoke-GTGraphBatch.ps1`](file:///C:/tools/personal/git/GraphTools/internal/functions/Invoke-GTGraphBatch.ps1))
 * Microsoft Graph supports combining up to 20 subrequests into a single `POST https://graph.microsoft.com/v1.0/$batch`.
 * **Chunking Engine:** Slices arbitrary numbers of requests (e.g. 100 requests) into sequential chunks of 20, executing each batch through `Invoke-GTGraphRequest`.
-* **Correlated Responses:** Returns strongly typed `GraphTools.BatchResponse` objects containing `Id`, `Status`, `Headers`, and parsed `Body`.
+* **Two-Tiered Throttling & Error Handling:**
+  - **Envelope Level:** HTTP 429/503 on the root batch request is handled transparently with exponential backoff by `Invoke-GTGraphRequest`.
+  - **Subrequest Level:** Microsoft Graph returns `HTTP 200 OK` for the batch envelope even when individual subrequests return `429 Too Many Requests` or `503 Service Unavailable`. `Invoke-GTGraphBatch` scans each subrequest response, extracts subrequest-specific `Retry-After` headers, and automatically isolates and re-batches *only* the throttled subrequests up to `$MaxSubrequestRetries` (default: 3) with jittered backoff.
+  - **Missing Response Fallback:** Any subrequest dropped by the Graph batch endpoint is caught and re-attempted, or returned with structured `MissingBatchResponse` diagnostics.
+* **Correlated Responses:** Preserves the original subrequest sequence and returns strongly typed `GraphTools.BatchResponse` objects containing `Id`, `Status`, `Headers`, and parsed `Body`.
 
 ### D. Compatibility Bridge ([`Invoke-GTGraphPagedRequest.ps1`](file:///C:/tools/personal/git/GraphTools/internal/functions/Invoke-GTGraphPagedRequest.ps1))
 * Existing cmdlets in GraphTools (over 40 call sites) call `Invoke-GTGraphPagedRequest`.

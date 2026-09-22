@@ -71,4 +71,100 @@ Describe "Invoke-GTGraphBatch" -Tag 'Unit' {
             $responses.Count | Should -Be 25
         }
     }
+
+    Context "Subrequest Throttling & Retry (HTTP 429 / 503 / 504)" {
+        It "retries throttled subrequests (HTTP 429) and merges successful retry responses" {
+            $script:callCount = 0
+            $script:recordedRequests = [System.Collections.Generic.List[object]]::new()
+
+            Mock -CommandName Invoke-GTGraphRequest -MockWith {
+                $script:callCount++
+                $script:recordedRequests.Add($Body.requests)
+
+                if ($script:callCount -eq 1) {
+                    return @{
+                        responses = @(
+                            @{ id = 'req-1'; status = 200; body = @{ displayName = 'User 1' } },
+                            @{ id = 'req-2'; status = 429; headers = @{ 'Retry-After' = '1' }; body = @{ error = @{ code = 'ActivityLimitReached' } } }
+                        )
+                    }
+                }
+                else {
+                    return @{
+                        responses = @(
+                            @{ id = 'req-2'; status = 200; body = @{ displayName = 'User 2' } }
+                        )
+                    }
+                }
+            }
+
+            Mock -CommandName Start-Sleep -MockWith {}
+
+            $requests = @(
+                @{ id = 'req-1'; url = '/users/user1' }
+                @{ id = 'req-2'; url = '/users/user2' }
+            )
+
+            $responses = Invoke-GTGraphBatch -Requests $requests -MaxSubrequestRetries 3 -RetryBaseDelaySeconds 0
+
+            $script:callCount | Should -Be 2
+            # First call had both requests
+            $script:recordedRequests[0].Count | Should -Be 2
+            # Second call had only throttled req-2
+            $script:recordedRequests[1].Count | Should -Be 1
+            $script:recordedRequests[1][0]['id'] | Should -Be 'req-2'
+
+            # Both responses merged and in original order
+            $responses.Count | Should -Be 2
+            $responses[0].Id | Should -Be 'req-1'
+            $responses[0].Status | Should -Be 200
+            $responses[0].Body.displayName | Should -Be 'User 1'
+
+            $responses[1].Id | Should -Be 'req-2'
+            $responses[1].Status | Should -Be 200
+            $responses[1].Body.displayName | Should -Be 'User 2'
+        }
+
+        It "stops retrying and returns last error when subrequest retries are exhausted" {
+            $script:callCount = 0
+
+            Mock -CommandName Invoke-GTGraphRequest -MockWith {
+                $script:callCount++
+                return @{
+                    responses = @(
+                        @{ id = 'req-fail'; status = 429; body = @{ error = @{ code = 'ActivityLimitReached' } } }
+                    )
+                }
+            }
+
+            Mock -CommandName Start-Sleep -MockWith {}
+
+            $responses = Invoke-GTGraphBatch -Requests @(@{ id = 'req-fail'; url = '/users/fail' }) -MaxSubrequestRetries 2 -RetryBaseDelaySeconds 0
+
+            # 1 initial attempt + 2 retries = 3 calls
+            $script:callCount | Should -Be 3
+            $responses.Count | Should -Be 1
+            $responses[0].Id | Should -Be 'req-fail'
+            $responses[0].Status | Should -Be 429
+        }
+
+        It "does not retry permanent client errors (HTTP 400, 404)" {
+            $script:callCount = 0
+
+            Mock -CommandName Invoke-GTGraphRequest -MockWith {
+                $script:callCount++
+                return @{
+                    responses = @(
+                        @{ id = 'req-notfound'; status = 404; body = @{ error = @{ code = 'Request_ResourceNotFound' } } }
+                    )
+                }
+            }
+
+            $responses = Invoke-GTGraphBatch -Requests @(@{ id = 'req-notfound'; url = '/users/unknown' })
+
+            $script:callCount | Should -Be 1
+            $responses.Count | Should -Be 1
+            $responses[0].Status | Should -Be 404
+        }
+    }
 }

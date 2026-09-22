@@ -21,6 +21,12 @@ function Invoke-GTGraphBatch
     .PARAMETER BatchSize
         Maximum subrequests per batch chunk. Defaults to 20 (Microsoft Graph maximum).
 
+    .PARAMETER MaxSubrequestRetries
+        Maximum number of retries for throttled or transient failed subrequests (HTTP 429, 503, 504). Defaults to 3.
+
+    .PARAMETER RetryBaseDelaySeconds
+        Base delay seconds for exponential backoff when subrequests omit the Retry-After header. Defaults to 2.
+
     .OUTPUTS
         [PSCustomObject[]]
         Array of response objects containing Id, Status, Headers, and Body.
@@ -40,7 +46,11 @@ function Invoke-GTGraphBatch
         [object[]]$Requests,
 
         [ValidateRange(1, 20)]
-        [int]$BatchSize = 20
+        [int]$BatchSize = 20,
+
+        [int]$MaxSubrequestRetries = 3,
+
+        [int]$RetryBaseDelaySeconds = 2
     )
 
     begin
@@ -104,7 +114,7 @@ function Invoke-GTGraphBatch
     {
         if ($allRequests.Count -eq 0)
         {
-            return @()
+            return [PSCustomObject[]]@()
         }
 
         $allResponses = [System.Collections.Generic.List[PSCustomObject]]::new()
@@ -117,24 +127,187 @@ function Invoke-GTGraphBatch
 
             Write-PSFMessage -Level Verbose -Message "Executing batch request chunk ($($chunk.Count) subrequests)..."
 
-            $batchPayload = @{
-                requests = @($chunk)
+            # Pending subrequests for this chunk
+            $pendingRequests = [System.Collections.Generic.List[hashtable]]::new($chunk)
+            # Storage for completed subrequest responses indexed by request id
+            $chunkResponses = [System.Collections.Generic.Dictionary[string, PSCustomObject]]::new([System.StringComparer]::OrdinalIgnoreCase)
+            $subAttempt = 0
+
+            while ($pendingRequests.Count -gt 0 -and $subAttempt -le $MaxSubrequestRetries)
+            {
+                $batchPayload = @{
+                    requests = @($pendingRequests)
+                }
+
+                $batchResult = Invoke-GTGraphRequest -Uri 'v1.0/$batch' -Method POST -Body $batchPayload
+
+                $retryRequests = [System.Collections.Generic.List[hashtable]]::new()
+                $maxSubDelay = 0
+
+                if ($batchResult -and $batchResult.responses)
+                {
+                    # Build lookup for quick access to returned responses by id
+                    $returnedById = [System.Collections.Generic.Dictionary[string, object]]::new([System.StringComparer]::OrdinalIgnoreCase)
+                    foreach ($resp in $batchResult.responses)
+                    {
+                        if ($null -ne $resp.id)
+                        {
+                            $returnedById[[string]$resp.id] = $resp
+                        }
+                    }
+
+                    foreach ($req in $pendingRequests)
+                    {
+                        $reqId = [string]$req['id']
+                        if ($returnedById.ContainsKey($reqId))
+                        {
+                            $resp = $returnedById[$reqId]
+                            $statusCode = [int]$resp.status
+
+                            # Check for transient subrequest throttling / outage
+                            if ($statusCode -in 429, 503, 504 -and $subAttempt -lt $MaxSubrequestRetries)
+                            {
+                                [void]$retryRequests.Add($req)
+
+                                # Parse Retry-After header from subrequest headers if present
+                                $retryAfterSec = 0
+                                if ($resp.headers)
+                                {
+                                    $headerVal = $null
+                                    if ($resp.headers -is [hashtable])
+                                    {
+                                        foreach ($k in $resp.headers.Keys)
+                                        {
+                                            if ($k -like 'retry-after*')
+                                            {
+                                                $headerVal = [string]$resp.headers[$k]
+                                                break
+                                            }
+                                        }
+                                    }
+                                    elseif ($resp.headers.PSObject -and $resp.headers.PSObject.Properties)
+                                    {
+                                        foreach ($p in $resp.headers.PSObject.Properties)
+                                        {
+                                            if ($p.Name -like 'retry-after*')
+                                            {
+                                                $headerVal = [string]$p.Value
+                                                break
+                                            }
+                                        }
+                                    }
+
+                                    if ($headerVal)
+                                    {
+                                        $parsedInt = 0
+                                        $parsedDate = [DateTime]::MinValue
+                                        if ([int]::TryParse($headerVal, [ref]$parsedInt))
+                                        {
+                                            $retryAfterSec = $parsedInt
+                                        }
+                                        elseif ([DateTime]::TryParse($headerVal, [ref]$parsedDate))
+                                        {
+                                            $diff = $parsedDate.ToUniversalTime() - [DateTime]::UtcNow
+                                            $retryAfterSec = [int][Math]::Max(1, $diff.TotalSeconds)
+                                        }
+                                    }
+                                }
+
+                                if ($retryAfterSec -gt $maxSubDelay)
+                                {
+                                    $maxSubDelay = $retryAfterSec
+                                }
+                            }
+                            else
+                            {
+                                # Permanent response or retries exhausted
+                                $chunkResponses[$reqId] = [PSCustomObject]@{
+                                    PSTypeName = 'GraphTools.BatchResponse'
+                                    Id         = $resp.id
+                                    Status     = $statusCode
+                                    Headers    = $resp.headers
+                                    Body       = $resp.body
+                                }
+                            }
+                        }
+                        else
+                        {
+                            # Subrequest was missing from responses array (unexpected batch failure)
+                            if ($subAttempt -lt $MaxSubrequestRetries)
+                            {
+                                [void]$retryRequests.Add($req)
+                            }
+                            else
+                            {
+                                $chunkResponses[$reqId] = [PSCustomObject]@{
+                                    PSTypeName = 'GraphTools.BatchResponse'
+                                    Id         = $reqId
+                                    Status     = 500
+                                    Headers    = $null
+                                    Body       = @{
+                                        error = @{
+                                            code    = 'MissingBatchResponse'
+                                            message = "Subrequest '$reqId' was missing from batch response."
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+                else
+                {
+                    # No responses received at all
+                    if ($subAttempt -lt $MaxSubrequestRetries)
+                    {
+                        $retryRequests = [System.Collections.Generic.List[hashtable]]::new($pendingRequests)
+                    }
+                    else
+                    {
+                        foreach ($req in $pendingRequests)
+                        {
+                            $reqId = [string]$req['id']
+                            $chunkResponses[$reqId] = [PSCustomObject]@{
+                                PSTypeName = 'GraphTools.BatchResponse'
+                                Id         = $reqId
+                                Status     = 500
+                                Headers    = $null
+                                Body       = @{
+                                    error = @{
+                                        code    = 'EmptyBatchResponse'
+                                        message = 'Batch request returned empty response.'
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+
+                if ($retryRequests.Count -gt 0)
+                {
+                    $subAttempt++
+                    if ($maxSubDelay -le 0)
+                    {
+                        $maxSubDelay = [int]($RetryBaseDelaySeconds * [Math]::Pow(2, $subAttempt - 1)) + (Get-Random -Minimum 1 -Maximum 3)
+                    }
+
+                    Write-PSFMessage -Level Warning -Message "Batch chunk contains $($retryRequests.Count) throttled subrequest(s). Retrying after $maxSubDelay seconds (Attempt $subAttempt/$MaxSubrequestRetries)..."
+                    Start-Sleep -Seconds $maxSubDelay
+                    $pendingRequests = $retryRequests
+                }
+                else
+                {
+                    $pendingRequests.Clear()
+                }
             }
 
-            $batchResult = Invoke-GTGraphRequest -Uri 'v1.0/$batch' -Method POST -Body $batchPayload
-
-            if ($batchResult -and $batchResult.responses)
+            # Add responses in original chunk sequence
+            foreach ($req in $chunk)
             {
-                foreach ($resp in $batchResult.responses)
+                $reqId = [string]$req['id']
+                if ($chunkResponses.ContainsKey($reqId))
                 {
-                    $entry = [PSCustomObject]@{
-                        PSTypeName = 'GraphTools.BatchResponse'
-                        Id         = $resp.id
-                        Status     = [int]$resp.status
-                        Headers    = $resp.headers
-                        Body       = $resp.body
-                    }
-                    [void]$allResponses.Add($entry)
+                    [void]$allResponses.Add($chunkResponses[$reqId])
                 }
             }
         }

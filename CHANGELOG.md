@@ -7,6 +7,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- **Resilient Batch Subrequest Throttling & Error Handling (`Invoke-GTGraphBatch`)**:
+  - Implemented automated subrequest-level retry for HTTP `429` (Too Many Requests), `503` (Service Unavailable), and `504` (Gateway Timeout).
+  - Inspects subrequest `headers` in the JSON batch response for `Retry-After` (supporting integer delta seconds and RFC 1123 HTTP-dates) with case-insensitive parsing.
+  - Automatically isolates and re-batches *only* the throttled subrequests up to `-MaxSubrequestRetries` (default: 3) with jittered exponential backoff fallback.
+  - Handles dropped subrequests with structured `MissingBatchResponse` diagnostics.
+  - Preserves original subrequest sequence in the aggregated output array.
+  - Added Pester unit tests covering subrequest 429 retries, retries exhaustion, and permanent error handling.
+
 ## [0.20.0] - 2026-09-21
 
 ### Added
