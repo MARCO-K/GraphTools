@@ -31,6 +31,28 @@ Allows re-using a pre-acquired Bearer token (e.g. from Azure CLI, GitHub Actions
 Connect-GTGraph -AccessToken $BearerToken
 ```
 
+```mermaid
+flowchart TD
+    Invoke(["Connect-GTGraph Invoked"]) --> AuthCheck{"Parameter Set?"}
+
+    AuthCheck -- "Certificate / Thumbprint" --> ReadCert["Read X.509 Certificate (CurrentUser or LocalMachine)"]
+    ReadCert --> SignJWT["Sign RS256 JWT Assertion via native .NET cryptography"]
+    SignJWT --> RequestCertToken["POST /oauth2/v2.0/token (client_assertion)"]
+
+    AuthCheck -- "ClientSecret" --> RequestSecretToken["POST /oauth2/v2.0/token (client_secret)"]
+
+    AuthCheck -- "AccessToken" --> StoreDirect["Store and Validate Direct Token"]
+
+    RequestCertToken --> CacheToken["Store in in-memory token cache (with 5-min sliding buffer)"]
+    RequestSecretToken --> CacheToken
+    StoreDirect --> CacheToken
+
+    CacheToken --> PassThruCheck{"-PassThru Specified?"}
+    PassThruCheck -- "YES" --> EmitObj["Emit GraphTools.Connection PSCustomObject"]
+    PassThruCheck -- "NO" --> Done(["Silent Success (Logged via PSFramework)"])
+    EmitObj --> Done
+```
+
 ---
 
 ## ⚙️ Parameters

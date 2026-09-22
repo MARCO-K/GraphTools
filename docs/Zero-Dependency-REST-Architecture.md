@@ -174,6 +174,36 @@ sequenceDiagram
   - **Missing Response Fallback:** Any subrequest dropped by the Graph batch endpoint is caught and re-attempted, or returned with structured `MissingBatchResponse` diagnostics.
 * **Correlated Responses:** Preserves the original subrequest sequence and returns strongly typed `GraphTools.BatchResponse` objects containing `Id`, `Status`, `Headers`, and parsed `Body`.
 
+```mermaid
+flowchart TD
+    Start(["Invoke-GTGraphBatch Called"]) --> SplitChunks["1. Split requests into chunks (max 20 requests per chunk)"]
+    SplitChunks --> SendChunk["2. Execute POST /$batch via Invoke-GTGraphRequest"]
+
+    SendChunk --> CheckEnv{"HTTP Envelope Throttled? (429 or 503)"}
+    CheckEnv -- "YES" --> EnvRetry["Envelope Backoff and Retry (Invoke-GTGraphRequest)"]
+    EnvRetry --> SendChunk
+
+    CheckEnv -- "NO (Envelope 200 OK)" --> CheckSubs{"Any subrequest in (429, 503, 504)?"}
+
+    CheckSubs -- "NO (All Completed)" --> RecordSuccess["Store responses in chunk dictionary"]
+
+    CheckSubs -- "YES (Throttled Subrequests)" --> CheckRetries{"Retries Exhausted? (> MaxSubrequestRetries)"}
+
+    CheckRetries -- "YES" --> RecordFailed["Store last failure response in chunk dictionary"]
+    CheckRetries -- "NO" --> SubRetry["3. Extract throttled subrequests by ID and parse Retry-After headers"]
+
+    SubRetry --> CalcDelay["Calculate backoff: max(Retry-After, base * 2^attempt + jitter)"]
+    CalcDelay --> SleepWait["Start-Sleep -Seconds delay"]
+    SleepWait --> ReBatch["Re-batch ONLY pending throttled items"]
+    ReBatch --> SendChunk
+
+    RecordSuccess --> Assemble["4. Assemble responses in original request order"]
+    RecordFailed --> Assemble
+    Assemble --> MoreChunks{"More Chunks Pending?"}
+    MoreChunks -- "YES" --> SplitChunks
+    MoreChunks -- "NO" --> Done(["Return PSCustomObject array"])
+```
+
 ### D. Compatibility Bridge ([`Invoke-GTGraphPagedRequest.ps1`](file:///C:/tools/personal/git/GraphTools/internal/functions/Invoke-GTGraphPagedRequest.ps1))
 * Existing cmdlets in GraphTools (over 40 call sites) call `Invoke-GTGraphPagedRequest`.
 * Refactored into a pass-through delegating directly to `Invoke-GTGraphRequest -All`, immediately providing the entire module with the benefits of the new REST engine without rewriting individual public functions.
