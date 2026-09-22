@@ -69,8 +69,11 @@ function Initialize-GTGraphConnection
 
         if ($SkipConnect)
         {
-            # Just return whether context or cached token exists
-            return ($null -ne $context -or ($null -ne $script:GTTokenCache -and $script:GTTokenCache.AccessToken))
+            # Just return whether context or valid unexpired cached token exists
+            $hasValidCache = ($null -ne $script:GTTokenCache) -and
+                             [bool]$script:GTTokenCache.AccessToken -and
+                             ($script:GTTokenCache.ExpiresAt -gt $now)
+            return ($null -ne $context -or $hasValidCache)
         }
 
         if (-not $context)

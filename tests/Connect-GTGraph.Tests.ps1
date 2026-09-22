@@ -87,4 +87,35 @@ Describe "Connect-GTGraph, Disconnect-GTGraph & Get-GTConnection" -Tag 'Unit' {
             $script:GTTokenCache.AccessToken | Should -BeNullOrEmpty
         }
     }
+
+    Context "Initialize-GTGraphConnection -SkipConnect" {
+        BeforeAll {
+            $initFile = Join-Path -Path $PSScriptRoot -ChildPath '..\internal\functions\Initialize-GTGraphConnection.ps1'
+            if (Test-Path $initFile) { . $initFile }
+        }
+
+        It "returns false when cached token is expired and no SDK context exists" {
+            $script:GTTokenCache = @{
+                AccessToken = 'expired-token'
+                ExpiresAt   = [DateTime]::UtcNow.AddHours(-1)
+            }
+            Mock -CommandName Get-MgContext -MockWith { return $null }
+
+            $result = Initialize-GTGraphConnection -SkipConnect
+
+            $result | Should -Be $false
+        }
+
+        It "returns true when cached token is valid and unexpired" {
+            $script:GTTokenCache = @{
+                AccessToken = 'valid-token'
+                ExpiresAt   = [DateTime]::UtcNow.AddHours(1)
+            }
+            Mock -CommandName Get-MgContext -MockWith { return $null }
+
+            $result = Initialize-GTGraphConnection -SkipConnect
+
+            $result | Should -Be $true
+        }
+    }
 }

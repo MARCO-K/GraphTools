@@ -91,6 +91,6 @@ ExpiresAt  NoteProperty DateTime ExpiresAt=2026-09-21 19:25:40
 
 ## 🔄 Related Cmdlets
 
-- [`Disconnect-GTGraph`](file:///C:/tools/personal/git/GraphTools/functions/Disconnect-GTGraph.ps1): Clears connection configuration and flushes cached tokens.
-- [`Get-GTConnection`](file:///C:/tools/personal/git/GraphTools/functions/Get-GTConnection.ps1): Inspects active connection state and token validity.
-- [`Invoke-GTGraphRequest`](file:///C:/tools/personal/git/GraphTools/internal/functions/Invoke-GTGraphRequest.ps1): Executes REST queries using the cached connection.
+- [`Disconnect-GTGraph`](../functions/Disconnect-GTGraph.ps1): Clears connection configuration and flushes cached tokens.
+- [`Get-GTConnection`](../functions/Get-GTConnection.ps1): Inspects active connection state and token validity.
+- [`Invoke-GTGraphRequest`](../internal/functions/Invoke-GTGraphRequest.ps1): Executes REST queries using the cached connection.

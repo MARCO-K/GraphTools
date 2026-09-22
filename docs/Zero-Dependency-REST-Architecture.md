@@ -103,7 +103,7 @@ flowchart TD
 Rather than storing plaintext client secrets, enterprise systems should authenticate using hardware- or DPAPI-protected certificates.
 
 ### Token Request Lifecycle
-1. **Certificate Discovery:** [`Get-GTCachedGraphToken`](file:///C:/tools/personal/git/GraphTools/internal/functions/Get-GTCachedGraphToken.ps1) resolves the target certificate from `Cert:\LocalMachine\My` or `Cert:\CurrentUser\My` by thumbprint.
+1. **Certificate Discovery:** [`Get-GTCachedGraphToken`](../internal/functions/Get-GTCachedGraphToken.ps1) resolves the target certificate from `Cert:\LocalMachine\My` or `Cert:\CurrentUser\My` by thumbprint.
 2. **Key Extraction:** Extracts the RSA private key via `[System.Security.Cryptography.X509Certificates.RSACertificateExtensions]::GetRSAPrivateKey($cert)`. The key remains protected inside Windows CNG/CAPI and is never exported.
 3. **JWT Header (`alg=RS256`, `typ=JWT`, `x5t`):** Converts the certificate thumbprint hex string into a raw SHA-1 byte array and Base64Url encodes it into the `x5t` header claim.
 4. **JWT Payload Claims:**
@@ -144,7 +144,7 @@ sequenceDiagram
 
 ## 5. Core Engine Components
 
-### A. Token Manager ([`Get-GTCachedGraphToken.ps1`](file:///C:/tools/personal/git/GraphTools/internal/functions/Get-GTCachedGraphToken.ps1))
+### A. Token Manager ([`Get-GTCachedGraphToken.ps1`](../internal/functions/Get-GTCachedGraphToken.ps1))
 * **In-Memory Cache:** `$script:GTTokenCache` maintains the active `AccessToken`, `ExpiresAt`, `TenantId`, `ClientId`, and `AuthType`.
 * **Sliding Refresh Buffer (`$BufferMinutes = 5`):** Standard Entra tokens expire after 60 minutes (3599 seconds). When remaining validity drops below 5 minutes, a fresh token is requested proactively to avoid in-flight request expiration.
 * **Authentication Fallbacks:**
@@ -153,7 +153,7 @@ sequenceDiagram
   3. Direct Bearer token passthrough.
   4. Automatic adoption of active interactive SDK sessions if present in the runspace.
 
-### B. Central REST Invoker ([`Invoke-GTGraphRequest.ps1`](file:///C:/tools/personal/git/GraphTools/internal/functions/Invoke-GTGraphRequest.ps1))
+### B. Central REST Invoker ([`Invoke-GTGraphRequest.ps1`](../internal/functions/Invoke-GTGraphRequest.ps1))
 * **URI Normalization:** Transparently accepts relative endpoints (`v1.0/users`, `beta/servicePrincipals`) and resolves them to fully qualified URIs.
 * **Header Standardization:** Injects `Authorization`, `client-request-id` (UUID), `Accept = application/json`, and user-provided headers (such as `ConsistencyLevel = eventual`).
 * **Pagination (`-All`):** Recursively follows `@odata.nextLink` until exhausted, using high-performance `[System.Collections.Generic.List[object]]` accumulation.
@@ -163,9 +163,9 @@ sequenceDiagram
   - Automatically falls back to exponential backoff with jitter if `Retry-After` is missing:
     $$\text{Delay} = (\text{RetryBaseDelaySeconds} \times 2^{\text{attempt}}) + \text{random}(1, 3)$$
   - Retries up to `$MaxRetries` before failing.
-* **Diagnostics Integration:** All non-transient exceptions are piped directly into [`Get-GTGraphErrorDetails`](file:///C:/tools/personal/git/GraphTools/internal/functions/Get-GTGraphErrorDetails.ps1) for safe, enumeration-resistant error reporting.
+* **Diagnostics Integration:** All non-transient exceptions are piped directly into [`Get-GTGraphErrorDetails`](../internal/functions/Get-GTGraphErrorDetails.ps1) for safe, enumeration-resistant error reporting.
 
-### C. JSON Batch Orchestrator ([`Invoke-GTGraphBatch.ps1`](file:///C:/tools/personal/git/GraphTools/internal/functions/Invoke-GTGraphBatch.ps1))
+### C. JSON Batch Orchestrator ([`Invoke-GTGraphBatch.ps1`](../internal/functions/Invoke-GTGraphBatch.ps1))
 * Microsoft Graph supports combining up to 20 subrequests into a single `POST https://graph.microsoft.com/v1.0/$batch`.
 * **Chunking Engine:** Slices arbitrary numbers of requests (e.g. 100 requests) into sequential chunks of 20, executing each batch through `Invoke-GTGraphRequest`.
 * **Two-Tiered Throttling & Error Handling:**
@@ -204,7 +204,7 @@ flowchart TD
     MoreChunks -- "NO" --> Done(["Return PSCustomObject array"])
 ```
 
-### D. Compatibility Bridge ([`Invoke-GTGraphPagedRequest.ps1`](file:///C:/tools/personal/git/GraphTools/internal/functions/Invoke-GTGraphPagedRequest.ps1))
+### D. Compatibility Bridge ([`Invoke-GTGraphPagedRequest.ps1`](../internal/functions/Invoke-GTGraphPagedRequest.ps1))
 * Existing cmdlets in GraphTools (over 40 call sites) call `Invoke-GTGraphPagedRequest`.
 * Refactored into a pass-through delegating directly to `Invoke-GTGraphRequest -All`, immediately providing the entire module with the benefits of the new REST engine without rewriting individual public functions.
 
@@ -212,7 +212,7 @@ flowchart TD
 
 ## 6. Public Cmdlet Usage Guide
 
-### 1. Connecting to Microsoft Graph ([`Connect-GTGraph`](file:///C:/tools/personal/git/GraphTools/docs/Connect-GTGraph.md))
+### 1. Connecting to Microsoft Graph ([`Connect-GTGraph`](Connect-GTGraph.md))
 
 ```powershell
 # Certificate-based authentication (Recommended for enterprise / scheduled tasks)
@@ -228,7 +228,7 @@ Connect-GTGraph -TenantId $TenantId -ClientId $ClientId -ClientSecret $Secret
 Connect-GTGraph -AccessToken $BearerToken
 ```
 
-### 2. Inspecting Connection Status ([`Get-GTConnection`](file:///C:/tools/personal/git/GraphTools/functions/Get-GTConnection.ps1))
+### 2. Inspecting Connection Status ([`Get-GTConnection`](../functions/Get-GTConnection.ps1))
 
 ```powershell
 Get-GTConnection
@@ -247,7 +247,7 @@ ExpiresAt : 2026-09-21 19:54:53
 TimeUtc   : 2026-09-21T17:55:00.0000000Z
 ```
 
-### 3. Disconnecting & Cache Purge ([`Disconnect-GTGraph`](file:///C:/tools/personal/git/GraphTools/functions/Disconnect-GTGraph.ps1))
+### 3. Disconnecting & Cache Purge ([`Disconnect-GTGraph`](../functions/Disconnect-GTGraph.ps1))
 
 ```powershell
 Disconnect-GTGraph -PassThru
