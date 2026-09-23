@@ -13,15 +13,17 @@
 - [Overview](#overview)
 - [Key Features](#key-features)
   - [Zero-Dependency Microsoft Graph REST Engine](#zero-dependency-microsoft-graph-rest-engine)
-  - [Authentication & Connection Management](#authentication--connection-management)
   - [Security Incident Response](#security-incident-response)
+  - [Identity & Access Management](#identity--access-management)
   - [Reporting & Governance](#reporting--governance)
 - [Installation](#installation)
 - [Quick Start](#quick-start)
-- [Security Incident Response](#security-incident-response)
+- [Security Incident Response](#security-incident-response-1)
 - [Reporting & Analysis](#reporting--analysis)
 - [Parameter Flexibility](#parameter-flexibility)
-- [Prerequisites](#prerequisites)
+- [Error Handling & Reliability](#error-handling--reliability)
+- [Security & Input Validation](#security--input-validation)
+- [Prerequisites & Architecture](#prerequisites--architecture)
 - [Documentation](#documentation)
 - [Contributing](#contributing)
 - [License](#license)
@@ -603,11 +605,11 @@ Configure your Microsoft Entra ID App Registration with the appropriate scopes b
 - **[Zero-Dependency REST Architecture](docs/Zero-Dependency-REST-Architecture.md)** - Technical specification of the native REST engine, RFC 7523 JWT assertion, sliding token cache, and two-tiered `$batch` retry
 - **[Connect-GTGraph Guide](docs/Connect-GTGraph.md)** - Comprehensive guide to headless certificate auth, client secrets, and session management
 - **[Risky Application Permission Report](docs/Get-GTRiskyAppPermissionReport.md)** - DevX permissions metadata, Tier-0 curated attack vectors, and delegated privilege ceiling
-- **[Admin Role Count & Risk Report](docs/Get-GTAdminCountReport.md)** - Administrative role analysis and Tier-0 governance
-- **[Break Glass Account Auditing](docs/Get-GTBreakGlassPolicyReport.md)** - Emergency access account auditing across Conditional Access policies
-- **[Conditional Access Policy Control Gap Analysis](docs/Get-GTPolicyControlGapReport.md)** - CA policy coverage and gap reporting
+- **[Admin Role Count & Risk Report](docs/Admin-Count-Analysis.md)** - Administrative role analysis and Tier-0 governance
+- **[Conditional Access & Break Glass Policy Analysis](docs/Conditional-Access-Analysis.md)** - Policy control gap reporting and emergency access auditing across Conditional Access policies
 - **[Legacy Authentication Analysis](docs/Legacy-Authentication-Analysis.md)** - Legacy protocol detection and reporting
 - **[License Cost & Waste Report](docs/Get-GTLicenseCostReport.md)** - License optimization and unused assignment detection
+- **[PIM Role Governance Guide](docs/PIM-Management.md)** - Privileged Identity Management role eligibility reporting and schedule removal
 - **[User Security Response Guide](docs/User-Security-Response.md)** - Incident containment runbooks and containment workflows
 - **[Technical Highlights](docs/Technical-Highlights.md)** - Deep dive into architecture, parameter binding, and performance
 - **[Changelog](CHANGELOG.md)** - Version history and release notes
