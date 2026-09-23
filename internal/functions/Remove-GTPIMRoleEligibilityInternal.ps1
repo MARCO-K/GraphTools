@@ -19,7 +19,7 @@ function Remove-GTPIMRoleEligibility
     .PARAMETER Results
         Results collection to add output to
     .EXAMPLE
-        $user = Get-MgBetaUser -UserId 'user@contoso.com'
+        $user = Invoke-GTGraphRequest -Uri 'v1.0/users/user@contoso.com'
         $outputBase = @{ UserPrincipalName = $user.UserPrincipalName }
         $results = [System.Collections.Generic.List[PSObject]]::new()
         Remove-GTPIMRoleEligibility -User $user -OutputBase $outputBase -Results $results
@@ -71,7 +71,7 @@ function Remove-GTPIMRoleEligibility
                     if ($PSCmdlet.ShouldProcess($schedule.roleDefinition.displayName, $action))
                     {
                         Write-PSFMessage -Level Verbose -Message "Removing PIM role eligibility $($schedule.roleDefinition.displayName) from user $($User.UserPrincipalName)"
-                        Invoke-MgGraphRequest -Method DELETE -Uri "beta/roleManagement/directory/roleEligibilitySchedules/$($schedule.id)" -ErrorAction Stop
+                        Invoke-GTGraphRequest -Method DELETE -Uri "beta/roleManagement/directory/roleEligibilitySchedules/$($schedule.id)" -ErrorAction Stop
                         $output['Status'] = 'Success'
                     }
                 }

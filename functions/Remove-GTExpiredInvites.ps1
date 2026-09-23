@@ -18,7 +18,7 @@ function Remove-GTExpiredInvites {
     Shows which users would be removed if they haven't accepted invites sent over 90 days ago.
 
     .NOTES
-    Requires Microsoft Graph PowerShell SDK with User.ReadWrite.All permission.
+    Requires Microsoft Graph connection with User.ReadWrite.All permission.
     #>
     [CmdletBinding(SupportsShouldProcess)]
     param(
@@ -29,9 +29,6 @@ function Remove-GTExpiredInvites {
     )
 
     begin {
-        $modules = @('Microsoft.Graph.Authentication')
-        Install-GTRequiredModule -ModuleNames $modules -Verbose:$VerbosePreference
-
         if (-not (Initialize-GTGraphConnection -Scopes 'User.ReadWrite.All')) {
             Write-Error "Failed to initialize Microsoft Graph connection."
             return
@@ -63,7 +60,7 @@ function Remove-GTExpiredInvites {
                 if ($PSCmdlet.ShouldProcess("$($guest.DisplayName) ($($guest.UserPrincipalName))", "Remove Guest User (Expired Invite)")) {
                     if ($Force -or $PSCmdlet.ShouldContinue("Are you sure you want to delete guest user '$($guest.DisplayName)'?", "Confirm Deletion")) {
                         try {
-                            Invoke-MgGraphRequest -Method DELETE -Uri "v1.0/users/$($guest.Id)" -ErrorAction Stop
+                            Invoke-GTGraphRequest -Method DELETE -Uri "v1.0/users/$($guest.Id)" -ErrorAction Stop
                             Write-PSFMessage -Level Output -Message "Removed guest user: $($guest.DisplayName)"
                         }
                         catch {

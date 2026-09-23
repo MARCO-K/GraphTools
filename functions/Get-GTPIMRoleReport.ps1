@@ -45,11 +45,7 @@ function Get-GTPIMRoleReport
 
     begin
     {
-        # 1. Module Check
-        $modules = @('Microsoft.Graph.Authentication')
-        Install-GTRequiredModule -ModuleNames $modules -Verbose:$VerbosePreference
-
-        # 2. Scope Check
+        # 1. Scope Check
         $requiredScopes = @('RoleManagement.Read.Directory', 'User.Read.All', 'Group.Read.All')
         
         if (-not (Test-GTGraphScopes -RequiredScopes $requiredScopes -Reconnect -Quiet))
@@ -58,15 +54,15 @@ function Get-GTPIMRoleReport
             return
         }
 
-        # 3. Connection Initialization
+        # 2. Connection Initialization
         if (-not (Initialize-GTGraphConnection -Scopes $requiredScopes -NewSession:$NewSession))
         {
             Write-Error "Failed to initialize session."
             return
         }
 
-        # 4. Validate User ID
-        if ($UserId) { Test-GTGuid -InputObject $UserId }
+        # 3. Validate User ID
+        if ($UserId) { Test-GTGuid -InputObject $UserId | Out-Null }
 
         # 5. Cache Role Definitions & Resolve RoleName Filter
         Write-PSFMessage -Level Verbose -Message "Caching Role Definitions..."

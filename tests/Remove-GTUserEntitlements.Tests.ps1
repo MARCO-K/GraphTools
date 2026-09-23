@@ -1,58 +1,67 @@
-## Provide lightweight stubs for common helpers in case they are missing during discovery
-if (-not (Get-Command Install-GTRequiredModule -ErrorAction SilentlyContinue)) { function Install-GTRequiredModule { param([string[]]$ModuleNames, [string]$Scope, [switch]$AllowPrerelease) } }
-if (-not (Get-Command Initialize-GTGraphConnection -ErrorAction SilentlyContinue)) { function Initialize-GTGraphConnection { param([string[]]$Scopes, [switch]$NewSession, [switch]$SkipConnect) return $true } }
-if (-not (Get-Command Test-GTGraphScopes -ErrorAction SilentlyContinue)) { function Test-GTGraphScopes { param([string[]]$RequiredScopes, [switch]$Reconnect, [switch]$Quiet) return $true } }
-if (-not (Get-Command Write-PSFMessage -ErrorAction SilentlyContinue)) { function Write-PSFMessage { param($Level, $Message, $ErrorRecord) } }
-
 Describe "Remove-GTUserEntitlements" {
     BeforeAll {
-        # Use Pester Mocks for external dependencies so the function file can load and calls are intercepted
-        Mock -CommandName Get-MgContext -MockWith { } -Verifiable
-        Mock -CommandName Install-GTRequiredModule -MockWith { } -Verifiable
-        Mock -CommandName Get-MgBetaUser -MockWith { } -Verifiable
-        Mock -CommandName Remove-GTUserGroupMemberships -MockWith { } -Verifiable
-        Mock -CommandName Remove-GTUserGroupOwnerships -MockWith { } -Verifiable
-        Mock -CommandName Remove-GTUserLicenses -MockWith { } -Verifiable
-        Mock -CommandName Remove-GTUserServicePrincipalOwnerships -MockWith { } -Verifiable
-        Mock -CommandName Remove-GTUserEnterpriseAppOwnership -MockWith { } -Verifiable
-        Mock -CommandName Remove-GTUserAppRoleAssignments -MockWith { } -Verifiable
-        Mock -CommandName Remove-GTUserRoleAssignments -MockWith { } -Verifiable
-        Mock -CommandName Remove-GTPIMRoleEligibility -MockWith { } -Verifiable
-        Mock -CommandName Remove-GTUserAdministrativeUnitMemberships -MockWith { } -Verifiable
-        Mock -CommandName Remove-GTUserAccessPackageAssignments -MockWith { } -Verifiable
-        Mock -CommandName Remove-GTUserDelegatedPermissionGrants -MockWith { } -Verifiable
-        Mock -CommandName Write-PSFMessage -MockWith { } -Verifiable
-        
-        # Source the GTValidation script for UPN regex
+        function global:Install-GTRequiredModule { param([string[]]$ModuleNames, [string]$Scope, [switch]$AllowPrerelease) }
+        function global:Initialize-GTGraphConnection { param([string[]]$Scopes, [switch]$NewSession) return $true }
+        function global:Get-GTConnection { 
+            return [PSCustomObject]@{
+                Scopes = @('GroupMember.ReadWrite.All', 'Group.ReadWrite.All', 'Directory.ReadWrite.All', 'RoleManagement.ReadWrite.Directory', 'RoleEligibilitySchedule.ReadWrite.Directory', 'AdministrativeUnit.ReadWrite.All', 'EntitlementManagement.ReadWrite.All', 'DelegatedPermissionGrant.ReadWrite.All')
+            }
+        }
+        function global:Get-GTMissingScopes { param($RequiredScopes, $CurrentScopes) 
+            return @($RequiredScopes | Where-Object { $CurrentScopes -notcontains $_ })
+        }
+        function global:Test-GTGraphScopes { param([string[]]$RequiredScopes, [switch]$Reconnect, [switch]$Quiet) return $true }
+        function global:Write-PSFMessage { param($Level, $Message, $ErrorRecord) }
+        function global:Get-GTGraphErrorDetails { param($Exception, $ResourceType) return [PSCustomObject]@{ LogLevel = 'Error'; Reason = 'Mock Error'; ErrorMessage = 'Mock Error Message' } }
+        function global:Invoke-GTGraphRequest { param($Uri, $Method = 'GET', $Body, $Headers, $ContentType, [switch]$All, [int]$MaxRetries, [int]$RetryBaseDelaySeconds, $Token, [switch]$Raw, $ErrorAction)
+            return @{
+                id = "test-user-id"
+                userPrincipalName = "test@contoso.com"
+            }
+        }
+        function global:Remove-GTUserGroupMemberships { param($User, $OutputBase, $Results) }
+        function global:Remove-GTUserGroupOwnerships { param($User, $OutputBase, $Results) }
+        function global:Remove-GTUserLicenses { param($User, $OutputBase, $Results) }
+        function global:Remove-GTUserServicePrincipalOwnerships { param($User, $OutputBase, $Results) }
+        function global:Remove-GTUserEnterpriseAppOwnership { param($User, $OutputBase, $Results) }
+        function global:Remove-GTUserAppRoleAssignments { param($User, $OutputBase, $Results) }
+        function global:Remove-GTUserRoleAssignments { param($User, $OutputBase, $Results) }
+        function global:Remove-GTPIMRoleEligibilityInternal { param($User, $OutputBase, $Results) }
+        function global:Remove-GTUserAdministrativeUnitMemberships { param($User, $OutputBase, $Results) }
+        function global:Remove-GTUserAccessPackageAssignments { param($User, $OutputBase, $Results) }
+        function global:Remove-GTUserDelegatedPermissionGrants { param($User, $OutputBase, $Results) }
+
+        # Dot-source GTValidation for UPN regex
         . "$PSScriptRoot/../internal/functions/GTValidation.ps1"
-        
-        # Now source the function under test
+
+        # Dot-source the function under test
         . "$PSScriptRoot/../functions/Remove-GTUserEntitlements.ps1"
-        
-        # Mock the required modules and functions
-        Mock -CommandName "Get-MgContext" -MockWith { 
+    }
+
+    BeforeEach {
+        Mock -CommandName Get-GTConnection -MockWith {
             [PSCustomObject]@{
-                Scopes = @('GroupMember.ReadWrite.All', 'Group.ReadWrite.All', 'Directory.ReadWrite.All', 'RoleManagement.ReadWrite.Directory', 'AdministrativeUnit.ReadWrite.All', 'EntitlementManagement.ReadWrite.All', 'DelegatedPermissionGrant.ReadWrite.All')
+                Scopes = @('GroupMember.ReadWrite.All', 'Group.ReadWrite.All', 'Directory.ReadWrite.All', 'RoleManagement.ReadWrite.Directory', 'RoleEligibilitySchedule.ReadWrite.Directory', 'AdministrativeUnit.ReadWrite.All', 'EntitlementManagement.ReadWrite.All', 'DelegatedPermissionGrant.ReadWrite.All')
             }
         }
-        Mock -CommandName "Install-GTRequiredModule" -MockWith { }
-        Mock -CommandName "Get-MgBetaUser" -MockWith { 
-            [PSCustomObject]@{
-                Id                = "test-user-id"
-                UserPrincipalName = "test@contoso.com"
+        Mock -CommandName Invoke-GTGraphRequest -MockWith {
+            param($Uri, $Method)
+            return [PSCustomObject]@{
+                id                = "test-user-id"
+                userPrincipalName = "test@contoso.com"
             }
         }
-        Mock -CommandName "Remove-GTUserGroupMemberships" -MockWith { }
-        Mock -CommandName "Remove-GTUserGroupOwnerships" -MockWith { }
-        Mock -CommandName "Remove-GTUserLicenses" -MockWith { }
-        Mock -CommandName "Remove-GTUserServicePrincipalOwnerships" -MockWith { }
-        Mock -CommandName "Remove-GTUserEnterpriseAppOwnership" -MockWith { }
-        Mock -CommandName "Remove-GTUserAppRoleAssignments" -MockWith { }
-        Mock -CommandName "Remove-GTUserRoleAssignments" -MockWith { }
-        Mock -CommandName "Remove-GTPIMRoleEligibility" -MockWith { }
-        Mock -CommandName "Remove-GTUserAdministrativeUnitMemberships" -MockWith { }
-        Mock -CommandName "Remove-GTUserAccessPackageAssignments" -MockWith { }
-        Mock -CommandName "Remove-GTUserDelegatedPermissionGrants" -MockWith { }
+        Mock -CommandName Remove-GTUserGroupMemberships -MockWith { }
+        Mock -CommandName Remove-GTUserGroupOwnerships -MockWith { }
+        Mock -CommandName Remove-GTUserLicenses -MockWith { }
+        Mock -CommandName Remove-GTUserServicePrincipalOwnerships -MockWith { }
+        Mock -CommandName Remove-GTUserEnterpriseAppOwnership -MockWith { }
+        Mock -CommandName Remove-GTUserAppRoleAssignments -MockWith { }
+        Mock -CommandName Remove-GTUserRoleAssignments -MockWith { }
+        Mock -CommandName Remove-GTPIMRoleEligibilityInternal -MockWith { }
+        Mock -CommandName Remove-GTUserAdministrativeUnitMemberships -MockWith { }
+        Mock -CommandName Remove-GTUserAccessPackageAssignments -MockWith { }
+        Mock -CommandName Remove-GTUserDelegatedPermissionGrants -MockWith { }
     }
 
     Context "Parameter Validation" {
@@ -69,18 +78,13 @@ Describe "Remove-GTUserEntitlements" {
         }
 
         It "should accept valid UPN format" {
-            Mock -CommandName "Get-MgContext" -MockWith { 
-                [PSCustomObject]@{
-                    Scopes = @('GroupMember.ReadWrite.All', 'Group.ReadWrite.All', 'Directory.ReadWrite.All', 'RoleManagement.ReadWrite.Directory', 'RoleEligibilitySchedule.ReadWrite.Directory', 'AdministrativeUnit.ReadWrite.All', 'EntitlementManagement.ReadWrite.All', 'DelegatedPermissionGrant.ReadWrite.All')
-                }
-            }
             { Remove-GTUserEntitlements -UserUPNs "test@contoso.com" -removeAll -WhatIf } | Should -Not -Throw
         }
     }
 
     Context "Scope Validation" {
         It "should throw an error when required scopes are missing" {
-            Mock -CommandName "Get-MgContext" -MockWith { 
+            Mock -CommandName "Get-GTConnection" -MockWith { 
                 [PSCustomObject]@{
                     Scopes = @('User.Read')
                 }
@@ -89,7 +93,7 @@ Describe "Remove-GTUserEntitlements" {
         }
 
         It "should include RoleEligibilitySchedule.ReadWrite.Directory in required scopes" {
-            Mock -CommandName "Get-MgContext" -MockWith { 
+            Mock -CommandName "Get-GTConnection" -MockWith { 
                 [PSCustomObject]@{
                     Scopes = @('GroupMember.ReadWrite.All', 'Group.ReadWrite.All', 'Directory.ReadWrite.All', 'RoleManagement.ReadWrite.Directory', 'AdministrativeUnit.ReadWrite.All', 'EntitlementManagement.ReadWrite.All', 'DelegatedPermissionGrant.ReadWrite.All')
                 }
@@ -99,43 +103,22 @@ Describe "Remove-GTUserEntitlements" {
     }
 
     Context "PIM Role Eligibility Removal" {
-        It "should call Remove-GTPIMRoleEligibility when removePIMRoleEligibility is specified" {
-            Mock -CommandName "Get-MgContext" -MockWith { 
-                [PSCustomObject]@{
-                    Scopes = @('GroupMember.ReadWrite.All', 'Group.ReadWrite.All', 'Directory.ReadWrite.All', 'RoleManagement.ReadWrite.Directory', 'RoleEligibilitySchedule.ReadWrite.Directory', 'AdministrativeUnit.ReadWrite.All', 'EntitlementManagement.ReadWrite.All', 'DelegatedPermissionGrant.ReadWrite.All')
-                }
-            }
-            Mock -CommandName "Remove-GTPIMRoleEligibility" -MockWith { }
-            
+        It "should call Remove-GTPIMRoleEligibilityInternal when removePIMRoleEligibility is specified" {
             Remove-GTUserEntitlements -UserUPNs "test@contoso.com" -removePIMRoleEligibility -WhatIf
             
-            Should -Invoke -CommandName "Remove-GTPIMRoleEligibility" -Times 1
+            Should -Invoke -CommandName "Remove-GTPIMRoleEligibilityInternal" -Times 1
         }
 
-        It "should call Remove-GTPIMRoleEligibility when removeAll is specified" {
-            Mock -CommandName "Get-MgContext" -MockWith { 
-                [PSCustomObject]@{
-                    Scopes = @('GroupMember.ReadWrite.All', 'Group.ReadWrite.All', 'Directory.ReadWrite.All', 'RoleManagement.ReadWrite.Directory', 'RoleEligibilitySchedule.ReadWrite.Directory', 'AdministrativeUnit.ReadWrite.All', 'EntitlementManagement.ReadWrite.All', 'DelegatedPermissionGrant.ReadWrite.All')
-                }
-            }
-            Mock -CommandName "Remove-GTPIMRoleEligibility" -MockWith { }
-            
+        It "should call Remove-GTPIMRoleEligibilityInternal when removeAll is specified" {
             Remove-GTUserEntitlements -UserUPNs "test@contoso.com" -removeAll -WhatIf
             
-            Should -Invoke -CommandName "Remove-GTPIMRoleEligibility" -Times 1
+            Should -Invoke -CommandName "Remove-GTPIMRoleEligibilityInternal" -Times 1
         }
 
-        It "should not call Remove-GTPIMRoleEligibility when removePIMRoleEligibility is not specified" {
-            Mock -CommandName "Get-MgContext" -MockWith { 
-                [PSCustomObject]@{
-                    Scopes = @('GroupMember.ReadWrite.All', 'Group.ReadWrite.All', 'Directory.ReadWrite.All', 'RoleManagement.ReadWrite.Directory', 'RoleEligibilitySchedule.ReadWrite.Directory', 'AdministrativeUnit.ReadWrite.All', 'EntitlementManagement.ReadWrite.All', 'DelegatedPermissionGrant.ReadWrite.All')
-                }
-            }
-            Mock -CommandName "Remove-GTPIMRoleEligibility" -MockWith { }
-            
+        It "should not call Remove-GTPIMRoleEligibilityInternal when removePIMRoleEligibility is not specified" {
             Remove-GTUserEntitlements -UserUPNs "test@contoso.com" -removeGroups -WhatIf
             
-            Should -Invoke -CommandName "Remove-GTPIMRoleEligibility" -Times 0
+            Should -Invoke -CommandName "Remove-GTPIMRoleEligibilityInternal" -Times 0
         }
     }
 }

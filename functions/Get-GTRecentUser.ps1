@@ -46,9 +46,6 @@ function Get-GTRecentUser
 
     begin
     {
-        $modules = @('Microsoft.Graph.Authentication')
-        Install-GTRequiredModule -ModuleNames $modules -Verbose:$VerbosePreference
-
         # 1. Scopes Check (Gold Standard)
         # User.Read.All is required to read CreatedDateTime and filter users
         $requiredScopes = @('User.Read.All')
@@ -79,7 +76,7 @@ function Get-GTRecentUser
                 Write-PSFMessage -Level Verbose -Message "Querying Microsoft Graph for user: $UserPrincipalName"
                 
                 # Fetch single user
-                $resp = Invoke-MgGraphRequest -Method GET -Uri "v1.0/users/$UserPrincipalName?`$select=id,displayName,userPrincipalName,createdDateTime,accountEnabled,userType" -ErrorAction Stop
+                $resp = Invoke-GTGraphRequest -Method GET -Uri "v1.0/users/$($UserPrincipalName)?`$select=id,displayName,userPrincipalName,createdDateTime,accountEnabled,userType" -ErrorAction Stop
                 $users = @([PSCustomObject]@{ id = $resp.id; displayName = $resp.displayName; userPrincipalName = $resp.userPrincipalName; createdDateTime = $resp.createdDateTime; accountEnabled = $resp.accountEnabled; userType = $resp.userType })
             }
             else

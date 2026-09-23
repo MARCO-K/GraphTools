@@ -56,7 +56,7 @@ function Remove-GTUserGroupMemberships
             if ($PSCmdlet.ShouldProcess($Group.DisplayName, $action))
             {
                 Write-PSFMessage -Level Verbose -Message "Removing user $($User.UserPrincipalName) from group $($Group.displayName)"
-                Invoke-MgGraphRequest -Method DELETE -Uri "v1.0/groups/$($Group.id)/members/$($User.Id)/`$ref" -ErrorAction Stop
+                Invoke-GTGraphRequest -Method DELETE -Uri "v1.0/groups/$($Group.id)/members/$($User.Id)/`$ref" -ErrorAction Stop
                 $output['Status'] = 'Success'
             }
         }

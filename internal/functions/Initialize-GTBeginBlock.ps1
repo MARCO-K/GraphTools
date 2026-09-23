@@ -42,8 +42,8 @@ function Initialize-GTBeginBlock
     [CmdletBinding()]
     [OutputType([bool])]
     param(
-        [Parameter(Mandatory = $true)]
-        [string[]]$ModuleNames,
+        [Parameter(Mandatory = $false)]
+        [string[]]$ModuleNames = @(),
 
         [Parameter(Mandatory = $true)]
         [string[]]$RequiredScopes,
@@ -59,7 +59,10 @@ function Initialize-GTBeginBlock
         [string]$ConnectionErrorMessage = 'Failed to initialize session.'
     )
 
-    Install-GTRequiredModule -ModuleNames $ModuleNames -Verbose:$VerbosePreference
+    if ($ModuleNames -and $ModuleNames.Count -gt 0)
+    {
+        Install-GTRequiredModule -ModuleNames $ModuleNames -Verbose:$VerbosePreference
+    }
 
     if ($InitializeConnection)
     {

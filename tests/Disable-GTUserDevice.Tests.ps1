@@ -4,50 +4,56 @@ if (-not (Get-Command Install-GTRequiredModule -ErrorAction SilentlyContinue)) {
 if (-not (Get-Command Initialize-GTGraphConnection -ErrorAction SilentlyContinue)) { function Initialize-GTGraphConnection { param([string[]]$Scopes, [switch]$NewSession, [switch]$SkipConnect) return $true } }
 if (-not (Get-Command Test-GTGraphScopes -ErrorAction SilentlyContinue)) { function Test-GTGraphScopes { param($RequiredScopes, $Reconnect, $Quiet) return $true } }
 if (-not (Get-Command Write-PSFMessage -ErrorAction SilentlyContinue)) { function Write-PSFMessage { param($Level, $Message, $ErrorRecord) } }
-# Requires Pester 5.x
-# Place this file in the repository under: tests/Disable-GTUserDevice.Tests.ps1
+if (-not (Get-Command Get-UTCTime -ErrorAction SilentlyContinue)) { function Get-UTCTime { return [DateTime]::UtcNow } }
+if (-not (Get-Command Invoke-GTGraphRequest -ErrorAction SilentlyContinue)) { function Invoke-GTGraphRequest { param($Method, $Uri, $Body, $ContentType, $ErrorAction) } }
+if (-not (Get-Command Invoke-GTGraphPagedRequest -ErrorAction SilentlyContinue)) { function Invoke-GTGraphPagedRequest { param($Uri) return @() } }
 
 Describe "Disable-GTUserDevice" -Tag 'Unit' {
-    # Dot-source the function under test. Adjust path if your tests run from a different working directory.
     BeforeAll {
-        # Load the validation regex first (required by the function)
         $validationFile = Join-Path $PSScriptRoot '..' 'internal' 'functions' 'GTValidation.ps1'
-        if (Test-Path $validationFile)
-        {
-            . $validationFile
-        }
+        if (Test-Path $validationFile) { . $validationFile }
 
-        # Load the error handling helper function (required by Disable-GTUserDevice)
+        $guidHelper = Join-Path $PSScriptRoot '..' 'internal' 'functions' 'Test-GTGuid.ps1'
+        if (Test-Path $guidHelper) { . $guidHelper }
+
         $errorHelperFile = Join-Path $PSScriptRoot '..' 'internal' 'functions' 'Get-GTGraphErrorDetails.ps1'
-        if (Test-Path $errorHelperFile)
-        {
-            . $errorHelperFile
-        }
+        if (Test-Path $errorHelperFile) { . $errorHelperFile }
+
+        $utcHelper = Join-Path $PSScriptRoot '..' 'internal' 'functions' 'Get-UTCTime.ps1'
+        if (Test-Path $utcHelper) { . $utcHelper }
+
+        $installHelper = Join-Path $PSScriptRoot '..' 'internal' 'functions' 'Install-GTRequiredModule.ps1'
+        if (Test-Path $installHelper) { . $installHelper }
+
+        $initHelper = Join-Path $PSScriptRoot '..' 'internal' 'functions' 'Initialize-GTGraphConnection.ps1'
+        if (Test-Path $initHelper) { . $initHelper }
+
+        function Write-PSFMessage { param($Level, $Message, $ErrorRecord) }
+        function Install-GTRequiredModule { }
+        function Initialize-GTGraphConnection { return $true }
+        function Test-GTGraphScopes { return $true }
+        function Invoke-GTGraphRequest { param($Method, $Uri, $Body, $ContentType, $ErrorAction) }
+        function Invoke-GTGraphPagedRequest { param($Uri) return @() }
 
         $functionFile = Join-Path $PSScriptRoot '..' 'functions' 'Disable-GTUserDevice.ps1'
-        if (-not (Test-Path $functionFile))
-        {
-            Throw "Function file not found: $functionFile"
-        }
+        if (-not (Test-Path $functionFile)) { Throw "Function file not found: $functionFile" }
 
-        # Use Pester Mocks for external dependencies BEFORE loading the function
-        # These will be replaced or configured in BeforeEach and in individual tests
-        Mock -CommandName Write-PSFMessage -MockWith { param($Level, $Message, $ErrorRecord) } -Verifiable
-        Mock -CommandName Install-GTRequiredModule -MockWith { } -Verifiable
-        Mock -CommandName Initialize-GTGraphConnection -MockWith { return $true } -Verifiable
-        Mock -CommandName Get-MgUser -MockWith { param($UserId, $Property, $ErrorAction) } -Verifiable
-        Mock -CommandName Get-MgDevice -MockWith { param($All, $Filter, $ErrorAction) } -Verifiable
-        Mock -CommandName Update-MgDevice -MockWith { param($DeviceId, $AccountEnabled, $ErrorAction) } -Verifiable
-
-        # Dot-source the function under test after mocks are in place
         . $functionFile
     }
 
     BeforeEach {
-        # Ensure required external interactions are mocked so tests do not call real Graph modules.
         Mock -CommandName Install-GTRequiredModule -MockWith { }
         Mock -CommandName Initialize-GTGraphConnection -MockWith { return $true }
-        Mock -CommandName Write-PSFMessage -MockWith { param($Level, $Message) } # no-op
+        Mock -CommandName Test-GTGraphScopes -MockWith { return $true }
+        Mock -CommandName Write-PSFMessage -MockWith { }
+        Mock -CommandName Invoke-GTGraphRequest -MockWith {
+            param($Method, $Uri, $Body)
+            if ($Method -eq 'GET') {
+                return [PSCustomObject]@{ id = '12345678-1234-1234-1234-123456789abc' }
+            }
+            return $null
+        }
+        Mock -CommandName Invoke-GTGraphPagedRequest -MockWith { return @() }
     }
 
     Context "Parameter Validation" {
@@ -69,51 +75,50 @@ Describe "Disable-GTUserDevice" -Tag 'Unit' {
             $upn = 'alice@contoso.com'
             $userId = '12345678-1234-1234-1234-123456789abc'
 
-            # Mock user retrieval
-            Mock -CommandName Get-MgUser -MockWith {
-                [PSCustomObject]@{ Id = '12345678-1234-1234-1234-123456789abc' }
-            } -Verifiable
+            Mock -CommandName Invoke-GTGraphRequest -MockWith {
+                param($Method, $Uri, $Body)
+                if ($Method -eq 'GET') {
+                    return [PSCustomObject]@{ id = '12345678-1234-1234-1234-123456789abc' }
+                }
+                return $null
+            }
 
-            # Mock device retrieval with optimized query
-            Mock -CommandName Get-MgDevice -MockWith {
+            Mock -CommandName Invoke-GTGraphPagedRequest -MockWith {
                 @(
                     [PSCustomObject]@{
-                        Id             = "device-id-1"
-                        DisplayName    = "Test Device"
-                        AccountEnabled = $true
+                        id             = "device-id-1"
+                        displayName    = "Test Device"
+                        accountEnabled = $true
                     }
                 )
-            } -Verifiable
-
-            Mock -CommandName Update-MgDevice -MockWith { } -Verifiable
+            }
 
             $results = Disable-GTUserDevice -UPN $upn -Confirm:$false
 
-            # Validate that we received an array
             $results.GetType().Name | Should -Be 'Object[]'
             $results.Count | Should -Be 1
 
-            # Entry should have Status = 'Disabled'
             $results[0].Status | Should -Be 'Disabled'
             $results[0].User | Should -Be $upn
             $results[0].DeviceId | Should -Be "device-id-1"
             $results[0].DeviceName | Should -Be "Test Device"
 
-            # Ensure Update-MgDevice was called once
-            Assert-MockCalled -CommandName Update-MgDevice -Times 1
+            Should -Invoke -CommandName Invoke-GTGraphRequest -Times 1 -ParameterFilter { $Method -eq 'PATCH' }
         }
 
         It "handles users with no enabled devices" {
             $upn = 'nodevices@contoso.com'
             $userId = 'a1b2c3d4-e5f6-a7b8-c9d0-e1f2a3b4c5d6'
 
-            Mock -CommandName Get-MgUser -MockWith {
-                [PSCustomObject]@{ Id = 'a1b2c3d4-e5f6-a7b8-c9d0-e1f2a3b4c5d6' }
+            Mock -CommandName Invoke-GTGraphRequest -MockWith {
+                param($Method, $Uri)
+                if ($Method -eq 'GET') {
+                    return [PSCustomObject]@{ id = 'a1b2c3d4-e5f6-a7b8-c9d0-e1f2a3b4c5d6' }
+                }
+                return $null
             }
 
-            Mock -CommandName Get-MgDevice -MockWith {
-                @()
-            } -Verifiable
+            Mock -CommandName Invoke-GTGraphPagedRequest -MockWith { @() }
 
             $results = Disable-GTUserDevice -UPN $upn -Confirm:$false
 
@@ -123,54 +128,59 @@ Describe "Disable-GTUserDevice" -Tag 'Unit' {
             $results[0].Reason | Should -Match 'No enabled devices'
         }
 
-        It "honors -Force and invokes Update-MgDevice" {
+        It "honors -Force and invokes patch" {
             $upn = 'charlie@contoso.com'
             $userId = 'aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee'
 
-            Mock -CommandName Get-MgUser -MockWith {
-                [PSCustomObject]@{ Id = 'aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee' }
+            Mock -CommandName Invoke-GTGraphRequest -MockWith {
+                param($Method, $Uri)
+                if ($Method -eq 'GET') {
+                    return [PSCustomObject]@{ id = 'aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee' }
+                }
+                return $null
             }
 
-            Mock -CommandName Get-MgDevice -MockWith {
+            Mock -CommandName Invoke-GTGraphPagedRequest -MockWith {
                 @(
                     [PSCustomObject]@{
-                        Id             = "device-id-3"
-                        DisplayName    = "Test Device"
-                        AccountEnabled = $true
+                        id             = "device-id-3"
+                        displayName    = "Test Device"
+                        accountEnabled = $true
                     }
                 )
             }
-
-            Mock -CommandName Update-MgDevice -MockWith { } -Verifiable
 
             $results = Disable-GTUserDevice -UPN $upn -Force -Confirm:$false
 
             $results.Count | Should -Be 1
             $results[0].Status | Should -Be 'Disabled'
-            Assert-MockCalled -CommandName Update-MgDevice -Times 1
+            Should -Invoke -CommandName Invoke-GTGraphRequest -Times 1 -ParameterFilter { $Method -eq 'PATCH' }
         }
 
         It "returns Failed with HttpStatus 404 when Graph returns a not found error for device operation" {
             $upn = 'user@contoso.com'
             $userId = '11111111-2222-3333-4444-555555555555'
 
-            Mock -CommandName Get-MgUser -MockWith {
-                [PSCustomObject]@{ Id = '11111111-2222-3333-4444-555555555555' }
+            Mock -CommandName Invoke-GTGraphRequest -MockWith {
+                param($Method, $Uri)
+                if ($Method -eq 'GET') {
+                    return [PSCustomObject]@{ id = '11111111-2222-3333-4444-555555555555' }
+                }
+                if ($Method -eq 'PATCH') {
+                    throw [System.Exception]::new('404 Not Found - The device does not exist')
+                }
+                return $null
             }
 
-            Mock -CommandName Get-MgDevice -MockWith {
+            Mock -CommandName Invoke-GTGraphPagedRequest -MockWith {
                 @(
                     [PSCustomObject]@{
-                        Id             = "device-id-404"
-                        DisplayName    = "Test Device"
-                        AccountEnabled = $true
+                        id             = "device-id-404"
+                        displayName    = "Test Device"
+                        accountEnabled = $true
                     }
                 )
             }
-
-            Mock -CommandName Update-MgDevice -MockWith {
-                throw [System.Exception]::new('404 Not Found - The device does not exist')
-            } -Verifiable
 
             $results = Disable-GTUserDevice -UPN $upn -Confirm:$false
 
@@ -179,30 +189,32 @@ Describe "Disable-GTUserDevice" -Tag 'Unit' {
             $entry.Status | Should -Be 'Failed'
             $entry.HttpStatus | Should -Be 404
             $entry.Reason | Should -Match 'could not be processed'
-            Assert-MockCalled -CommandName Update-MgDevice -Times 1
         }
 
         It "returns Failed with HttpStatus 403 when Graph returns insufficient privileges error" {
             $upn = 'user@contoso.com'
             $userId = 'bbbbbbbb-cccc-dddd-eeee-ffffffffffff'
 
-            Mock -CommandName Get-MgUser -MockWith {
-                [PSCustomObject]@{ Id = 'bbbbbbbb-cccc-dddd-eeee-ffffffffffff' }
+            Mock -CommandName Invoke-GTGraphRequest -MockWith {
+                param($Method, $Uri)
+                if ($Method -eq 'GET') {
+                    return [PSCustomObject]@{ id = 'bbbbbbbb-cccc-dddd-eeee-ffffffffffff' }
+                }
+                if ($Method -eq 'PATCH') {
+                    throw [System.Exception]::new('403 Insufficient privileges to complete the operation')
+                }
+                return $null
             }
 
-            Mock -CommandName Get-MgDevice -MockWith {
+            Mock -CommandName Invoke-GTGraphPagedRequest -MockWith {
                 @(
                     [PSCustomObject]@{
-                        Id             = "device-id-403"
-                        DisplayName    = "Test Device"
-                        AccountEnabled = $true
+                        id             = "device-id-403"
+                        displayName    = "Test Device"
+                        accountEnabled = $true
                     }
                 )
             }
-
-            Mock -CommandName Update-MgDevice -MockWith {
-                throw [System.Exception]::new('403 Insufficient privileges to complete the operation')
-            } -Verifiable
 
             $results = Disable-GTUserDevice -UPN $upn -Confirm:$false
 
@@ -210,15 +222,18 @@ Describe "Disable-GTUserDevice" -Tag 'Unit' {
             $entry = $results[0]
             $entry.Status | Should -Be 'Failed'
             $entry.HttpStatus | Should -Be 403
-            Assert-MockCalled -CommandName Update-MgDevice -Times 1
         }
 
         It "returns Failed when user retrieval fails with 404" {
             $upn = 'doesnotexist@contoso.com'
 
-            Mock -CommandName Get-MgUser -MockWith {
-                throw [System.Exception]::new('404 Not Found - The user does not exist')
-            } -Verifiable
+            Mock -CommandName Invoke-GTGraphRequest -MockWith {
+                param($Method, $Uri)
+                if ($Method -eq 'GET') {
+                    throw [System.Exception]::new('404 Not Found - The user does not exist')
+                }
+                return $null
+            }
 
             $results = Disable-GTUserDevice -UPN $upn -Confirm:$false
 
@@ -227,40 +242,41 @@ Describe "Disable-GTUserDevice" -Tag 'Unit' {
             $entry.Status | Should -Be 'Failed'
             $entry.HttpStatus | Should -Be 404
             $entry.Reason | Should -Match 'could not be processed'
-            Assert-MockCalled -CommandName Get-MgUser -Times 1
         }
 
         It "processes multiple devices for a single user" {
             $upn = 'multidevice@contoso.com'
             $userId = 'fedcba98-7654-3210-fedc-ba9876543210'
 
-            Mock -CommandName Get-MgUser -MockWith {
-                [PSCustomObject]@{ Id = 'fedcba98-7654-3210-fedc-ba9876543210' }
+            Mock -CommandName Invoke-GTGraphRequest -MockWith {
+                param($Method, $Uri)
+                if ($Method -eq 'GET') {
+                    return [PSCustomObject]@{ id = 'fedcba98-7654-3210-fedc-ba9876543210' }
+                }
+                return $null
             }
 
-            Mock -CommandName Get-MgDevice -MockWith {
+            Mock -CommandName Invoke-GTGraphPagedRequest -MockWith {
                 @(
                     [PSCustomObject]@{
-                        Id             = "device-1"
-                        DisplayName    = "Device device-1"
-                        AccountEnabled = $true
+                        id             = "device-1"
+                        displayName    = "Device device-1"
+                        accountEnabled = $true
                     },
                     [PSCustomObject]@{
-                        Id             = "device-2"
-                        DisplayName    = "Device device-2"
-                        AccountEnabled = $true
+                        id             = "device-2"
+                        displayName    = "Device device-2"
+                        accountEnabled = $true
                     }
                 )
             }
-
-            Mock -CommandName Update-MgDevice -MockWith { }
 
             $results = Disable-GTUserDevice -UPN $upn -Confirm:$false
 
             $results.Count | Should -Be 2
             $results[0].Status | Should -Be 'Disabled'
             $results[1].Status | Should -Be 'Disabled'
-            Assert-MockCalled -CommandName Update-MgDevice -Times 2
+            Should -Invoke -CommandName Invoke-GTGraphRequest -Times 2 -ParameterFilter { $Method -eq 'PATCH' }
         }
     }
 }

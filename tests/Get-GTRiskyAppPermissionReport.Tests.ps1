@@ -1,23 +1,13 @@
-## Provide lightweight stubs for common helpers in case they are missing during discovery
-if (-not (Get-Command Install-GTRequiredModule -ErrorAction SilentlyContinue)) { function Install-GTRequiredModule { param([string[]]$ModuleNames, [string]$Scope, [switch]$AllowPrerelease) } }
-if (-not (Get-Command Initialize-GTGraphConnection -ErrorAction SilentlyContinue)) { function Initialize-GTGraphConnection { param([string[]]$Scopes, [switch]$NewSession, [switch]$SkipConnect) return $true } }
-if (-not (Get-Command Test-GTGraphScopes -ErrorAction SilentlyContinue)) { function Test-GTGraphScopes { param([string[]]$RequiredScopes, [switch]$Reconnect, [switch]$Quiet) return $true } }
-if (-not (Get-Command Write-PSFMessage -ErrorAction SilentlyContinue)) { function Write-PSFMessage { param($Level, $Message, $ErrorRecord) } }
-if (-not (Get-Command Get-UTCTime -ErrorAction SilentlyContinue)) { function Get-UTCTime { return [DateTime]::UtcNow } }
-if (-not (Get-Command Invoke-GTGraphPagedRequest -ErrorAction SilentlyContinue)) { function Invoke-GTGraphPagedRequest { param($Uri, $Headers) return @() } }
-if (-not (Get-Command Invoke-MgGraphRequest -ErrorAction SilentlyContinue)) { function Invoke-MgGraphRequest { param($Method, $Uri, $ErrorAction) return $null } }
-if (-not (Get-Command Get-GTGraphErrorDetails -ErrorAction SilentlyContinue)) { function Get-GTGraphErrorDetails { param($Exception, $ResourceType) return [PSCustomObject]@{ LogLevel = 'Error'; Reason = 'Error'; ErrorMessage = 'Error' } } }
-
 Describe "Get-GTRiskyAppPermissionReport" {
     BeforeAll {
-        function Install-GTRequiredModule { param([string[]]$ModuleNames, [string]$Scope, [switch]$AllowPrerelease) }
-        function Initialize-GTGraphConnection { param([string[]]$Scopes, [switch]$NewSession, [switch]$SkipConnect) return $true }
-        function Test-GTGraphScopes { param([string[]]$RequiredScopes, [switch]$Reconnect, [switch]$Quiet) return $true }
-        function Write-PSFMessage { param($Level, $Message, $ErrorRecord) }
-        function Get-UTCTime { return [DateTime]::UtcNow }
-        function Invoke-GTGraphPagedRequest { param($Uri, $Headers) return @() }
-        function Invoke-MgGraphRequest { param($Method, $Uri, $ErrorAction) return $null }
-        function Get-GTGraphErrorDetails { param($Exception, $ResourceType) return [PSCustomObject]@{ LogLevel = 'Error'; Reason = 'Error'; ErrorMessage = 'Error' } }
+        function global:Install-GTRequiredModule { param([string[]]$ModuleNames, [string]$Scope, [switch]$AllowPrerelease) }
+        function global:Initialize-GTGraphConnection { param([string[]]$Scopes, [switch]$NewSession, [switch]$SkipConnect) return $true }
+        function global:Test-GTGraphScopes { param([string[]]$RequiredScopes, [switch]$Reconnect, [switch]$Quiet) return $true }
+        function global:Write-PSFMessage { param($Level, $Message, $ErrorRecord) }
+        function global:Get-UTCTime { return [DateTime]::UtcNow }
+        function global:Invoke-GTGraphPagedRequest { param($Uri, $Headers) return @() }
+        function global:Invoke-GTGraphRequest { param($Method, $Uri, $Body, $ContentType, $ErrorAction, [switch]$All) return $null }
+        function global:Get-GTGraphErrorDetails { param($Exception, $ResourceType) return [PSCustomObject]@{ LogLevel = 'Error'; Reason = 'Error'; ErrorMessage = 'Error' } }
 
         $helperPath = "$PSScriptRoot/../internal/functions/Get-GTPermissionDefinition.ps1"
         if (Test-Path $helperPath) { . $helperPath } else { Throw "Helper not found: $helperPath" }
@@ -28,7 +18,7 @@ Describe "Get-GTRiskyAppPermissionReport" {
 
     Context "Parameter Validation" {
         It "should accept pipeline input for AppId" {
-            Mock -CommandName "Invoke-MgGraphRequest" -MockWith {
+            Mock -CommandName "Invoke-GTGraphRequest" -MockWith {
                 param($Method, $Uri, $ErrorAction)
                 return [PSCustomObject]@{ value = @([PSCustomObject]@{ id = "graph-sp-id"; appRoles = @() }) }
             }
@@ -52,7 +42,7 @@ Describe "Get-GTRiskyAppPermissionReport" {
 
     Context "Microsoft Graph Resolution" {
         It "should cache Microsoft Graph app roles" {
-            Mock -CommandName "Invoke-MgGraphRequest" -MockWith {
+            Mock -CommandName "Invoke-GTGraphRequest" -MockWith {
                 param($Method, $Uri, $ErrorAction)
                 if ($Uri -like "*00000003-0000-0000-c000-000000000000*") {
                     return [PSCustomObject]@{
@@ -78,7 +68,7 @@ Describe "Get-GTRiskyAppPermissionReport" {
 
     Context "App-Only Permissions Analysis" {
         BeforeEach {
-            Mock -CommandName "Invoke-MgGraphRequest" -MockWith {
+            Mock -CommandName "Invoke-GTGraphRequest" -MockWith {
                 param($Method, $Uri, $ErrorAction)
                 if ($Uri -like "*00000003-0000-0000-c000-000000000000*") {
                     return [PSCustomObject]@{
@@ -143,7 +133,7 @@ Describe "Get-GTRiskyAppPermissionReport" {
 
     Context "Delegated Permissions Analysis" {
         BeforeEach {
-            Mock -CommandName "Invoke-MgGraphRequest" -MockWith {
+            Mock -CommandName "Invoke-GTGraphRequest" -MockWith {
                 param($Method, $Uri, $ErrorAction)
                 if ($Uri -like "*00000003-0000-0000-c000-000000000000*") {
                     return [PSCustomObject]@{
@@ -232,7 +222,7 @@ Describe "Get-GTRiskyAppPermissionReport" {
 
     Context "DevX Metadata Integration" {
         It "should resolve privilege level and admin consent from catalog" {
-            Mock -CommandName "Invoke-MgGraphRequest" -MockWith {
+            Mock -CommandName "Invoke-GTGraphRequest" -MockWith {
                 param($Method, $Uri, $ErrorAction)
                 if ($Uri -like "*00000003-0000-0000-c000-000000000000*") {
                     return [PSCustomObject]@{
@@ -290,7 +280,7 @@ Describe "Get-GTRiskyAppPermissionReport" {
             } | ConvertTo-Json -Depth 5 | Set-Content -Path $tempFixture -Encoding UTF8
 
             try {
-                Mock -CommandName "Invoke-MgGraphRequest" -MockWith {
+                Mock -CommandName "Invoke-GTGraphRequest" -MockWith {
                     param($Method, $Uri, $ErrorAction)
                     if ($Uri -like "*00000003-0000-0000-c000-000000000000*") {
                         return [PSCustomObject]@{
@@ -340,7 +330,7 @@ Describe "Get-GTRiskyAppPermissionReport" {
         }
 
         It "should support filtering by MinPrivilegeLevel" {
-            Mock -CommandName "Invoke-MgGraphRequest" -MockWith {
+            Mock -CommandName "Invoke-GTGraphRequest" -MockWith {
                 param($Method, $Uri, $ErrorAction)
                 if ($Uri -like "*00000003-0000-0000-c000-000000000000*") {
                     return [PSCustomObject]@{
@@ -388,7 +378,7 @@ Describe "Get-GTRiskyAppPermissionReport" {
 
     Context "Custom Risk Definitions" {
         It "should accept custom high-risk scopes" {
-            Mock -CommandName "Invoke-MgGraphRequest" -MockWith {
+            Mock -CommandName "Invoke-GTGraphRequest" -MockWith {
                 param($Method, $Uri, $ErrorAction)
                 if ($Uri -like "*00000003-0000-0000-c000-000000000000*") {
                     return [PSCustomObject]@{
@@ -434,7 +424,7 @@ Describe "Get-GTRiskyAppPermissionReport" {
 
     Context "Enhanced Risk Analysis & Extraction Features" {
         It "should map and report resource-specific application permissions (RSC)" {
-            Mock -CommandName "Invoke-MgGraphRequest" -MockWith {
+            Mock -CommandName "Invoke-GTGraphRequest" -MockWith {
                 param($Method, $Uri, $ErrorAction)
                 if ($Uri -like "*00000003-0000-0000-c000-000000000000*") {
                     return [PSCustomObject]@{
@@ -480,7 +470,7 @@ Describe "Get-GTRiskyAppPermissionReport" {
         }
 
         It "should detect Tier-0 curated threat vectors with Critical score 10" {
-            Mock -CommandName "Invoke-MgGraphRequest" -MockWith {
+            Mock -CommandName "Invoke-GTGraphRequest" -MockWith {
                 param($Method, $Uri, $ErrorAction)
                 if ($Uri -like "*00000003-0000-0000-c000-000000000000*") {
                     return [PSCustomObject]@{
@@ -525,7 +515,7 @@ Describe "Get-GTRiskyAppPermissionReport" {
         }
 
         It "should apply privilege ceiling when delegated consent is user-specific" {
-            Mock -CommandName "Invoke-MgGraphRequest" -MockWith {
+            Mock -CommandName "Invoke-GTGraphRequest" -MockWith {
                 param($Method, $Uri, $ErrorAction)
                 if ($Uri -like "*00000003-0000-0000-c000-000000000000*") {
                     return [PSCustomObject]@{
@@ -572,7 +562,7 @@ Describe "Get-GTRiskyAppPermissionReport" {
         }
 
         It "should infer High risk for unmapped *.Manage.All scope via regex heuristics" {
-            Mock -CommandName "Invoke-MgGraphRequest" -MockWith {
+            Mock -CommandName "Invoke-GTGraphRequest" -MockWith {
                 param($Method, $Uri, $ErrorAction)
                 if ($Uri -like "*00000003-0000-0000-c000-000000000000*") {
                     return [PSCustomObject]@{
@@ -616,7 +606,7 @@ Describe "Get-GTRiskyAppPermissionReport" {
 
         It "should scope tenant-wide delegated grant queries to Microsoft Graph resourceId" {
             $capturedGrantUri = $null
-            Mock -CommandName "Invoke-MgGraphRequest" -MockWith {
+            Mock -CommandName "Invoke-GTGraphRequest" -MockWith {
                 param($Method, $Uri, $ErrorAction)
                 if ($Uri -like "*00000003-0000-0000-c000-000000000000*") {
                     return [PSCustomObject]@{
@@ -641,13 +631,13 @@ Describe "Get-GTRiskyAppPermissionReport" {
 
     Context "Error Handling" {
         It "should handle Graph API errors gracefully" {
-            Mock -CommandName "Invoke-MgGraphRequest" -MockWith { throw "Graph API Error" }
+            Mock -CommandName "Invoke-GTGraphRequest" -MockWith { throw "Graph API Error" }
 
             { Get-GTRiskyAppPermissionReport } | Should -Throw
         }
 
         It "should handle empty results gracefully" {
-            Mock -CommandName "Invoke-MgGraphRequest" -MockWith {
+            Mock -CommandName "Invoke-GTGraphRequest" -MockWith {
                 param($Method, $Uri, $ErrorAction)
                 return [PSCustomObject]@{ value = @([PSCustomObject]@{ id = "graph-sp-id"; appRoles = @() }) }
             }

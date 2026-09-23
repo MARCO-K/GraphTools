@@ -47,10 +47,6 @@ function Get-GTServicePrincipalReport
         $appIdList = [System.Collections.Generic.List[string]]::new()
         $displayNameList = [System.Collections.Generic.List[string]]::new()
 
-        # Module Management
-        $requiredModules = @('Microsoft.Graph.Authentication')
-        Install-GTRequiredModule -ModuleNames $requiredModules -Verbose:$VerbosePreference
-
         # 1. Scopes Definition
         $requiredScopes = [System.Collections.Generic.List[string]]::new()
         $requiredScopes.Add('Application.Read.All')
@@ -103,7 +99,7 @@ function Get-GTServicePrincipalReport
             }
 
             # --- Build Properties & Expand ---
-            $properties = [System.Collections.Generic.List[string]]::new(@('id', 'appId', 'displayName', 'servicePrincipalType', 'accountEnabled'))
+            $properties = [System.Collections.Generic.List[string]]::new([string[]]@('id', 'appId', 'displayName', 'servicePrincipalType', 'accountEnabled'))
             $expand = [System.Collections.Generic.List[string]]::new()
 
             if ($IncludeSignInActivity) { $properties.Add('signInActivity') }

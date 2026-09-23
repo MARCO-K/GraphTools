@@ -14,7 +14,7 @@ function Remove-GTUserAdministrativeUnitMemberships
     .PARAMETER Results
         Results collection to add output to
     .EXAMPLE
-        $user = Get-MgBetaUser -UserId 'user@contoso.com'
+        $user = Invoke-GTGraphRequest -Uri 'v1.0/users/user@contoso.com'
         $outputBase = @{ UserPrincipalName = $user.UserPrincipalName }
         $results = [System.Collections.Generic.List[PSObject]]::new()
         Remove-GTUserAdministrativeUnitMemberships -User $user -OutputBase $outputBase -Results $results
@@ -61,7 +61,7 @@ function Remove-GTUserAdministrativeUnitMemberships
                     if ($PSCmdlet.ShouldProcess($adminUnit.displayName, $action))
                     {
                         Write-PSFMessage -Level Verbose -Message "Removing user $($User.UserPrincipalName) from administrative unit $($adminUnit.displayName)"
-                        Invoke-MgGraphRequest -Method DELETE -Uri "v1.0/directory/administrativeUnits/$($adminUnit.id)/members/$($User.Id)/`$ref" -ErrorAction Stop
+                        Invoke-GTGraphRequest -Method DELETE -Uri "v1.0/directory/administrativeUnits/$($adminUnit.id)/members/$($User.Id)/`$ref" -ErrorAction Stop
                         $output['Status'] = 'Success'
                     }
                 }

@@ -10,7 +10,6 @@
     this function gets all enabled devices directly with a single filtered query per user, reducing
     API calls from 1+N to just 2 per user (1 for user ID, 1 for filtered devices).
     
-    Requires Microsoft.Graph.Authentication, Microsoft.Graph.Users, and Microsoft.Graph.Identity.DirectoryManagement modules.
     It validates UPN format and manages Microsoft Graph connection automatically.
 
     This cmdlet supports -WhatIf and -Confirm via ShouldProcess (SupportsShouldProcess = $true).
@@ -89,10 +88,6 @@ Function Disable-GTUserDevice
         # Prepare a collection for results. We'll emit a single array in End().
         $results = New-Object System.Collections.ArrayList
 
-        # Module Management
-        $modules = ('Microsoft.Graph.Authentication')
-        Install-GTRequiredModule -ModuleNames $modules -Verbose
-
         # Graph Connection Handling
         $connectionResult = Initialize-GTGraphConnection -Scopes 'Directory.AccessAsUser.All' -NewSession:$NewSession
         if (-not $connectionResult)
@@ -112,7 +107,7 @@ Function Disable-GTUserDevice
             {
                 # Performance Optimization: Get user ID first, then query devices directly with filter
                 # This reduces API calls from 1+N to just 2 per user (1 for user ID, 1 for all enabled devices)
-                $userResp = Invoke-MgGraphRequest -Method GET -Uri "v1.0/users/$User?`$select=id" -ErrorAction Stop
+                $userResp = Invoke-GTGraphRequest -Method GET -Uri "v1.0/users/$($User)?`$select=id" -ErrorAction Stop
                 $userId = $userResp.id
 
                 # Validate that userId is a GUID to prevent OData injection
@@ -149,7 +144,7 @@ Function Disable-GTUserDevice
 
                         if ($PSCmdlet.ShouldProcess($target, $action))
                         {
-                            Invoke-MgGraphRequest -Method PATCH -Uri "v1.0/devices/$($device.id)" -Body @{ accountEnabled = $false } -ContentType 'application/json' -ErrorAction Stop
+                            $null = Invoke-GTGraphRequest -Method PATCH -Uri "v1.0/devices/$($device.id)" -Body @{ accountEnabled = $false } -ContentType 'application/json' -ErrorAction Stop
                             Write-PSFMessage -Level Verbose -Message "$User - Disable Device Action - Device disabled: $($device.displayName) (ID: $($device.id))"
 
                             $result = [PSCustomObject]@{

@@ -5,15 +5,15 @@ function Invoke-GTGraphPagedRequest
     Executes a paged Microsoft Graph request and aggregates all items.
 
     .DESCRIPTION
-    Calls Invoke-MgGraphRequest starting from the supplied URI and follows
-    @odata.nextLink until exhausted. Supports both Graph envelope responses
-    (with value) and enumerable payloads.
+    Delegates to the zero-dependency Invoke-GTGraphRequest with the -All switch,
+    following @odata.nextLink until all items are accumulated. Provides 100% backward
+    compatibility for existing GraphTools cmdlets.
 
     .PARAMETER Uri
-    Initial relative Microsoft Graph URI.
+    Initial relative or absolute Microsoft Graph URI.
 
     .PARAMETER Headers
-    Optional hashtable of HTTP headers passed to Invoke-MgGraphRequest (e.g. @{ ConsistencyLevel = 'eventual' }).
+    Optional hashtable of HTTP headers passed to the request (e.g. @{ ConsistencyLevel = 'eventual' }).
 
     .OUTPUTS
     System.Object[]
@@ -27,52 +27,5 @@ function Invoke-GTGraphPagedRequest
         [hashtable]$Headers
     )
 
-    $results = [System.Collections.Generic.List[object]]::new()
-    $nextUri = $Uri
-
-    while (-not [string]::IsNullOrWhiteSpace($nextUri))
-    {
-        $requestParams = @{
-            Method      = 'GET'
-            Uri         = $nextUri
-            ErrorAction = 'Stop'
-        }
-        if ($Headers)
-        {
-            $requestParams.Headers = $Headers
-        }
-
-        $response = Invoke-MgGraphRequest @requestParams
-
-        if ($response -and ($response.PSObject.Properties.Name -contains 'value'))
-        {
-            if ($null -ne $response.value)
-            {
-                foreach ($item in $response.value)
-                {
-                    [void]$results.Add($item)
-                }
-            }
-        }
-        elseif ($response -is [System.Collections.IEnumerable] -and -not ($response -is [string]))
-        {
-            foreach ($item in $response)
-            {
-                [void]$results.Add($item)
-            }
-        }
-
-        $nextUri = $null
-        if ($response -and ($response.PSObject.Properties.Name -contains '@odata.nextLink'))
-        {
-            $nextUri = [string]$response.'@odata.nextLink'
-        }
-
-        if (-not [string]::IsNullOrWhiteSpace($nextUri) -and $nextUri.StartsWith('https://graph.microsoft.com', [System.StringComparison]::OrdinalIgnoreCase))
-        {
-            $nextUri = $nextUri.Substring('https://graph.microsoft.com'.Length)
-        }
-    }
-
-    return $results.ToArray()
+    return (Invoke-GTGraphRequest -Uri $Uri -Headers $Headers -All)
 }

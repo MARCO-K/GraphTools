@@ -8,7 +8,7 @@
 -   **Primary Language**: PowerShell (87 `.ps1` files in this repository snapshot)
 -   **Module Type**: PowerShell Script Module (.psm1 with .psd1 manifest)
 -   **Target Platforms**: PowerShell 5.0+ and PowerShell 7+
--   **Main Dependencies**: PSFramework (≥1.9.270), Microsoft.Graph.Beta.Reports (≥2.25.0), Microsoft Graph SDK modules
+-   **Main Dependencies**: PSFramework (≥1.9.270). Zero Microsoft Graph SDK dependencies (100% native REST engine).
 
 ## Project Structure
 
@@ -65,13 +65,11 @@ GraphTools/
 
 ### Prerequisites
 
-In constrained sandbox environments, internet access to PSGallery may be unavailable. The module requires:
+The module requires:
 
 -   PSFramework (≥1.9.270)
--   Microsoft.Graph.Beta.Reports (≥2.25.0)
--   Various Microsoft.Graph.\* modules (loaded on-demand by functions)
 
-These dependencies are declared in `GraphTools.psd1`. If they are unavailable in your environment, Graph cmdlets can fail at runtime.
+GraphTools features a **zero-dependency REST engine** with native RFC 7523 token handling and direct REST invocation (`Invoke-GTGraphRequest`), requiring **zero** external Microsoft Graph SDK modules.
 
 ### Module Loading
 
@@ -156,9 +154,6 @@ All functions MUST follow these conventions:
 
     ```powershell
     begin {
-        # Module installation
-        Install-GTRequiredModule -ModuleNames @('Module1', 'Module2')
-
         # Graph connection
         $connected = Initialize-GTGraphConnection -Scopes 'Required.Scope'
         if (-not $connected) { throw "Failed to connect" }
@@ -191,11 +186,12 @@ All functions MUST follow these conventions:
 
 **Graph API Access Pattern (Required):**
 
-- Prefer `Invoke-MgGraphRequest` for Graph data retrieval and mutations.
+- Prefer `Invoke-GTGraphRequest` for Graph data retrieval and mutations.
+- Prefer `Invoke-GTGraphPagedRequest` for paged collections (or `Invoke-GTGraphRequest -All`).
+- Prefer `Invoke-GTGraphBatch` for batching multiple requests (up to 20 per chunk with automated 429/503 retry).
 - Prefer `v1.0` Graph endpoints by default.
 - Use `beta` endpoints only when the required property or endpoint is unavailable in `v1.0`.
 - When using `beta`, add a short inline justification comment and keep scope usage minimal.
-- Implement explicit paging handling when using `Invoke-MgGraphRequest` (`@odata.nextLink`).
 
 **UPN Validation**: All user parameters must validate against the regex defined in `internal/functions/GTValidation.ps1`:
 
@@ -203,13 +199,6 @@ All functions MUST follow these conventions:
 $script:GTValidationRegex = @{
     UPN = '^[^@\s]+@[^@\s]+\.[^@\s]+$'
 }
-```
-
-**Module Dependencies**: Functions handle their own module installation:
-
-```powershell
-$modules = ('Microsoft.Graph.Authentication')
-Install-GTRequiredModule -ModuleNames $modules
 ```
 
 **Graph Connection**: Always initialize Graph connection with required scopes:
@@ -245,7 +234,7 @@ end {
 When creating tests for new functions:
 
 1. **Source the function**: `. "$PSScriptRoot/../functions/YourFunction.ps1"`
-2. **Mock Microsoft Graph requests**: Prefer mocking `Invoke-MgGraphRequest` and assert request URI/filter behavior
+2. **Mock Microsoft Graph requests**: Prefer mocking `Invoke-GTGraphRequest` or `Invoke-GTGraphPagedRequest` and assert request URI/filter behavior
 3. **Test parameter validation**: Ensure invalid UPNs throw errors
 4. **Test pipeline input**: Verify single and multiple values from pipeline
 5. **Test switch parameters**: Verify filtering and behavior changes
@@ -258,7 +247,6 @@ Example test structure:
 
 Describe "YourFunction" {
     BeforeAll {
-        Mock Install-GTRequiredModule { }
         Mock Initialize-GTGraphConnection { $true }
     }
 

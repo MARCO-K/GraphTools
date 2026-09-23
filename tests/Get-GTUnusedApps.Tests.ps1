@@ -1,13 +1,22 @@
 Describe "Get-GTUnusedApps" {
     BeforeAll {
-        $functionPath = "$PSScriptRoot/../functions/Get-GTUnusedApps.ps1"
-        # Use Pester Mocks before dot-sourcing so the function file can load and calls are intercepted
+        function global:Install-GTRequiredModule {}
+        function global:Initialize-GTGraphConnection { return $true }
+        function global:Test-GTGraphScopes { return $true }
+        function global:Write-PSFMessage {}
+        function global:Get-GTGraphErrorDetails { param($Exception) return @{ LogLevel = 'Error'; Reason = 'Error' } }
+        function global:Invoke-GTGraphPagedRequest { param($Uri, $Headers) return @() }
+
+        . "$PSScriptRoot/../internal/functions/Get-UTCTime.ps1"
+        . "$PSScriptRoot/../internal/functions/Format-ODataDateTime.ps1"
+
         Mock -CommandName Install-GTRequiredModule -MockWith { } -Verifiable
         Mock -CommandName Initialize-GTGraphConnection -MockWith { return $true } -Verifiable
+        Mock -CommandName Test-GTGraphScopes -MockWith { return $true } -Verifiable
 
+        $functionPath = "$PSScriptRoot/../functions/Get-GTUnusedApps.ps1"
         if (Test-Path $functionPath)
         {
-            # Dot-source the function under test
             . $functionPath
         }
         else
@@ -18,7 +27,7 @@ Describe "Get-GTUnusedApps" {
 
     Context "Functionality" {
         It "should identify unused apps correctly" {
-            $lastSignIn = (Get-Date).AddDays(-100)
+            $lastSignIn = (Get-Date).ToUniversalTime().AddDays(-100).ToString('o')
             $mockSPs = @(
                 [PSCustomObject]@{
                     Id             = "1"
@@ -29,7 +38,7 @@ Describe "Get-GTUnusedApps" {
                     }
                 }
             )
-            Mock -CommandName "Get-MgBetaServicePrincipal" -MockWith { return $mockSPs }
+            Mock -CommandName "Invoke-GTGraphPagedRequest" -MockWith { return $mockSPs }
 
             $results = Get-GTUnusedApps -DaysSinceLastSignIn 90
             $results.Count | Should -Be 1
@@ -45,7 +54,7 @@ Describe "Get-GTUnusedApps" {
                     SignInActivity = $null
                 }
             )
-            Mock -CommandName "Get-MgBetaServicePrincipal" -MockWith { return $mockSPs }
+            Mock -CommandName "Invoke-GTGraphPagedRequest" -MockWith { return $mockSPs }
 
             $results = Get-GTUnusedApps -DaysSinceLastSignIn 90 -IncludeNeverUsed
             $results.Count | Should -Be 1

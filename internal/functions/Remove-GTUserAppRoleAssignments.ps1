@@ -58,7 +58,7 @@ function Remove-GTUserAppRoleAssignments
                     if ($PSCmdlet.ShouldProcess($_.ResourceDisplayName, $action))
                     {
                         Write-PSFMessage -Level Verbose -Message "Removing user $($User.UserPrincipalName) from AppRoleAssignments $($_.resourceDisplayName)"
-                        Invoke-MgGraphRequest -Method DELETE -Uri "v1.0/users/$($User.Id)/appRoleAssignments/$($_.id)" -ErrorAction Stop
+                        Invoke-GTGraphRequest -Method DELETE -Uri "v1.0/users/$($User.Id)/appRoleAssignments/$($_.id)" -ErrorAction Stop
                         $output['Status'] = 'Success'
                     }
                 }

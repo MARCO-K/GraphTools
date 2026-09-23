@@ -39,9 +39,6 @@ function Get-GTOrphanedServicePrincipal
 
     begin
     {
-        $modules = @('Microsoft.Graph.Authentication')
-        Install-GTRequiredModule -ModuleNames $modules -Verbose:$VerbosePreference
-
         # 1. Scopes Check (Gold Standard)
         # Directory.Read.All is needed to read owner status (User/SP accountEnabled)
         $requiredScopes = @('Application.Read.All', 'Directory.Read.All')
@@ -102,7 +99,7 @@ function Get-GTOrphanedServicePrincipal
                     {
                         $isEnabled = $null
                         
-                        # Invoke-MgGraphRequest returns hashtables; access accountEnabled directly
+                        # Access accountEnabled directly
                         if ($null -ne $owner.accountEnabled)
                         {
                             $isEnabled = $owner.accountEnabled

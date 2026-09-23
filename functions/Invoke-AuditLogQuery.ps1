@@ -139,10 +139,6 @@ function Invoke-AuditLogQuery
 
     begin
     {
-        # Module Management
-        $modules = ('Microsoft.Graph.Authentication')
-        Install-GTRequiredModule -ModuleNames $modules
-
         # Validate date range
         if ($StartDays -gt 30) {
             Write-Warning "The maximum value for StartDays is 30. Please select a smaller value."
@@ -158,7 +154,7 @@ function Invoke-AuditLogQuery
         if ($NewSession)
         {
             Write-PSFMessage -Level 'Verbose' -Message 'Closing existing Microsoft Graph session.'
-            Disconnect-MgGraph -ErrorAction SilentlyContinue
+            Disconnect-GTGraph
         }
 
         $session = Test-GTGraphScopes -RequiredScopes $RequiredScopes -Reconnect -Quiet
@@ -167,9 +163,6 @@ function Invoke-AuditLogQuery
             throw "Graph connection failed: Required scopes not available"
         }
         Write-PSFMessage -Level 'Verbose' -Message 'Connected to Microsoft Graph and required scopes are available.'
-
-        # Configure request context
-        Set-MgRequestContext -MaxRetry 10 -RetryDelay 15
     }
 
     process
@@ -197,7 +190,7 @@ function Invoke-AuditLogQuery
             # ----------------------------------
             Write-PSFMessage -Level Verbose -Message "Submitting audit query..."
             Write-PSFMessage -Level Verbose -Message "Query parameters: $($queryParams | ConvertTo-Json)"
-            $auditJob = Invoke-MgGraphRequest -Uri 'https://graph.microsoft.com/beta/security/auditLog/queries/' `
+            $auditJob = Invoke-GTGraphRequest -Uri 'https://graph.microsoft.com/beta/security/auditLog/queries/' `
                 -Method POST `
                 -Body ($queryParams | ConvertTo-Json)
 
@@ -209,7 +202,7 @@ function Invoke-AuditLogQuery
 
             do
             {
-                $response = Invoke-MgGraphRequest -Uri $uri -Method GET
+                $response = Invoke-GTGraphRequest -Uri $uri -Method GET
                 $status = $response.status
 
                 Write-PSFMessage -Level Verbose -Message "Query status: $status (Attempt $attempt)"
@@ -234,7 +227,7 @@ function Invoke-AuditLogQuery
 
             do
             {
-                $response = Invoke-MgGraphRequest -Uri $resultsUri -Method GET
+                $response = Invoke-GTGraphRequest -Uri $resultsUri -Method GET
                 $records.AddRange($response.value)
                 $resultsUri = $response.'@odata.nextLink'
 
@@ -263,7 +256,7 @@ function Invoke-AuditLogQuery
             if ($Delete)
             {
                 Write-PSFMessage -Level Verbose -Message "Cleaning up audit query..."
-                Invoke-MgGraphRequest -Uri $uri -Method DELETE | Out-Null
+                Invoke-GTGraphRequest -Uri $uri -Method DELETE | Out-Null
             }
 
             # Output results

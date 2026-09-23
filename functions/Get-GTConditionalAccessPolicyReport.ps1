@@ -6,9 +6,7 @@
     This function connects to Microsoft Graph to fetch all Conditional Access policies
     (enabled, disabled, and report-only) and extracts detailed configuration settings
     for each policy. It provides a structured output suitable for analysis and review.
-
-    Requires the Microsoft.Graph.Identity.SignIns module.
-
+ 
 .OUTPUTS
     System.Management.Automation.PSCustomObject
     Outputs a custom object for each Conditional Access policy found, containing detailed
@@ -36,9 +34,6 @@ function Get-GTConditionalAccessPolicyReport
     param ()
 
     Write-Verbose "Starting Conditional Access policy report generation."
-
-    # Module Management
-    Install-GTRequiredModule -ModuleNames @('Microsoft.Graph.Authentication') -Verbose
 
     # Graph Connection
     if (-not (Initialize-GTGraphConnection -Scopes @('Policy.Read.All')))

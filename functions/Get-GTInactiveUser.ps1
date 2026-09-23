@@ -46,7 +46,6 @@ function Get-GTInactiveUser
     Finds users inactive for over 3 months, excluding Global Administrator members.
 
     .NOTES
-        - Requires Microsoft Graph PowerShell SDK module: Microsoft.Graph.Authentication
         - Required Graph scopes: User.Read.All and AuditLog.Read.All (AuditLog.Read.All is required to populate sign-in activity)
             Add Directory.Read.All when using -ExcludeGlobalAdministrators.
     - DaysInactive is returned as an integer number of days (floor of total days) when a last sign-in timestamp exists.
@@ -75,7 +74,7 @@ function Get-GTInactiveUser
 
     begin
     {
-        $modules = ('Microsoft.Graph.Authentication')
+        $modules = @()
         $requiredScopes = @('User.Read.All', 'AuditLog.Read.All')
         if ($ExcludeGlobalAdministrators)
         {
@@ -116,7 +115,7 @@ function Get-GTInactiveUser
                 $globalAdminTemplateId = '62e90394-69f5-4237-9190-012177145e10'
                 $encodedRoleFilter = [System.Uri]::EscapeDataString("roleTemplateId eq '$globalAdminTemplateId'")
                 $directoryRoleUri = "/v1.0/directoryRoles?`$filter=$encodedRoleFilter"
-                $directoryRoleResponse = Invoke-MgGraphRequest -Method GET -Uri $directoryRoleUri -ErrorAction Stop
+                $directoryRoleResponse = Invoke-GTGraphRequest -Method GET -Uri $directoryRoleUri -ErrorAction Stop
                 $globalAdminRole = $null
                 if ($directoryRoleResponse -and $directoryRoleResponse.value)
                 {
@@ -126,7 +125,7 @@ function Get-GTInactiveUser
                 if ($globalAdminRole -and $globalAdminRole.id)
                 {
                     $membersUri = "/v1.0/directoryRoles/$($globalAdminRole.id)/members?`$select=id,userPrincipalName"
-                    $membersResponse = Invoke-MgGraphRequest -Method GET -Uri $membersUri -ErrorAction Stop
+                    $membersResponse = Invoke-GTGraphRequest -Method GET -Uri $membersUri -ErrorAction Stop
                     $roleMembers = if ($membersResponse -and $membersResponse.value) { $membersResponse.value } else { @() }
                     foreach ($member in $roleMembers)
                     {

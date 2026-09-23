@@ -1,25 +1,16 @@
-## Provide lightweight stubs for common helpers in case they are missing during discovery
-if (-not (Get-Command Install-GTRequiredModule -ErrorAction SilentlyContinue)) { function Install-GTRequiredModule { param([string[]]$ModuleNames, [string]$Scope, [switch]$AllowPrerelease) } }
-if (-not (Get-Command Initialize-GTGraphConnection -ErrorAction SilentlyContinue)) { function Initialize-GTGraphConnection { param([string[]]$Scopes, [switch]$NewSession, [switch]$SkipConnect) return $true } }
-if (-not (Get-Command Test-GTGraphScopes -ErrorAction SilentlyContinue)) { function Test-GTGraphScopes { param([string[]]$RequiredScopes, [switch]$Reconnect, [switch]$Quiet) return $true } }
-if (-not (Get-Command Write-PSFMessage -ErrorAction SilentlyContinue)) { function Write-PSFMessage { param($Level, $Message, $ErrorRecord) } }
-
-## (Function will be dot-sourced in BeforeAll to allow Pester mocks to register first)
-
 Describe "Get-GTRecentUser" {
     BeforeAll {
-        # Define the validation regex used by the function
-        $script:GTValidationRegex = @{
-            UPN = '^[^@\s]+@[^@\s]+\.[^@\s]+$'
-        }
+        $validationFile = Join-Path $PSScriptRoot '..' 'internal' 'functions' 'GTValidation.ps1'
+        if (Test-Path $validationFile) { . $validationFile }
 
         # Define stubs for dependencies to ensure Mock works
-        function Install-GTRequiredModule {}
-        function Initialize-GTGraphConnection { return $true }
-        function Test-GTGraphScopes { return $true }
-        function Write-PSFMessage {}
-        function Get-GTGraphErrorDetails {}
-        function Get-MgUser {}
+        function global:Install-GTRequiredModule {}
+        function global:Initialize-GTGraphConnection { return $true }
+        function global:Test-GTGraphScopes { return $true }
+        function global:Write-PSFMessage {}
+        function global:Get-GTGraphErrorDetails {}
+        function global:Invoke-GTGraphRequest { param($Method, $Uri, $Body, $ContentType, $ErrorAction, [switch]$All) return $null }
+        function global:Invoke-GTGraphPagedRequest { param($Uri, $Headers) return @() }
 
         # Use Pester Mocks for dependencies
         Mock -CommandName Install-GTRequiredModule -MockWith {} -Verifiable
@@ -27,8 +18,6 @@ Describe "Get-GTRecentUser" {
         Mock -CommandName Test-GTGraphScopes -MockWith { return $true } -Verifiable
         Mock -CommandName Write-PSFMessage -MockWith {} -Verifiable
         Mock -CommandName Get-GTGraphErrorDetails -MockWith {} -Verifiable
-        Mock -CommandName Get-MgUser -MockWith {} -Verifiable
-        Mock -CommandName Get-Module -MockWith { return [PSCustomObject]@{ Name = 'Microsoft.Graph.Users' } } -ParameterFilter { $Name -eq 'Microsoft.Graph.Users' -and $ListAvailable }
 
         $functionPath = "$PSScriptRoot/../functions/Get-GTRecentUser.ps1"
         if (Test-Path $functionPath) { . $functionPath } else { Throw "Function file not found: $functionPath" }

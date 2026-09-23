@@ -63,11 +63,7 @@ function Get-GTLicenseCostReport
         # 1. Initialize Collection
         $report = [System.Collections.Generic.List[PSCustomObject]]::new()
 
-        # 2. Module Check
-        $modules = @('Microsoft.Graph.Authentication')
-        Install-GTRequiredModule -ModuleNames $modules -Verbose:$VerbosePreference
-
-        # 3. Scopes Check
+        # 2. Scopes Check
         $requiredScopes = @('Organization.Read.All', 'User.Read.All', 'AuditLog.Read.All')
         
         if (-not (Test-GTGraphScopes -RequiredScopes $requiredScopes -Reconnect -Quiet))
@@ -175,7 +171,7 @@ function Get-GTLicenseCostReport
             $nextSkuUri = "/v1.0/subscribedSkus?`$select=skuId,skuPartNumber,prepaidUnits,consumedUnits&`$top=999"
             while (-not [string]::IsNullOrWhiteSpace($nextSkuUri))
             {
-                $skuResponse = Invoke-MgGraphRequest -Method GET -Uri $nextSkuUri -ErrorAction Stop
+                $skuResponse = Invoke-GTGraphRequest -Method GET -Uri $nextSkuUri -ErrorAction Stop
                 if ($skuResponse -and $skuResponse.value)
                 {
                     foreach ($skuItem in $skuResponse.value)
@@ -210,7 +206,7 @@ function Get-GTLicenseCostReport
             $inactiveCount = 0
             while (-not [string]::IsNullOrWhiteSpace($nextUserUri))
             {
-                $userResponse = Invoke-MgGraphRequest -Method GET -Uri $nextUserUri -Headers @{ ConsistencyLevel = 'eventual' } -ErrorAction Stop
+                $userResponse = Invoke-GTGraphRequest -Method GET -Uri $nextUserUri -Headers @{ ConsistencyLevel = 'eventual' } -ErrorAction Stop
                 if ($userResponse -and $userResponse.value)
                 {
                     foreach ($inactiveUser in $userResponse.value)

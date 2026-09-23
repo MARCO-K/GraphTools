@@ -70,9 +70,6 @@ function Get-MFAReport
         if ($AdminsOnly -and $UsersWithoutMFA) {
             throw "You cannot use -AdminsOnly and -UsersWithoutMFA together."
         }
-        # Module Management
-        $modules = ('Microsoft.Graph.Authentication')
-        Install-GTRequiredModule -ModuleNames $modules -Verbose
 
         # Graph Connection Handling
         $graphConnected = Initialize-GTGraphConnection -Scopes $Scope -NewSession:$NewSession
@@ -101,7 +98,7 @@ function Get-MFAReport
             $baseUri = 'beta/reports/authenticationMethodsUserRegistrationDetails'
             if ($UPNList.Count -gt 0) {
                 $filterString = "userPrincipalName in ('" + ($UPNList -join "','") + "')"
-                $report = Invoke-GTGraphPagedRequest -Uri "$baseUri?`$filter=$([Uri]::EscapeDataString($filterString))"
+                $report = Invoke-GTGraphPagedRequest -Uri "$($baseUri)?`$filter=$([Uri]::EscapeDataString($filterString))"
             } else {
                 $report = Invoke-GTGraphPagedRequest -Uri $baseUri
             }

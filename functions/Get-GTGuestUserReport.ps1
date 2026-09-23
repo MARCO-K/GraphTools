@@ -22,7 +22,6 @@ function Get-GTGuestUserReport
     Returns all guest users who have not yet accepted their invitation.
     
         .NOTES
-            Requires the Microsoft Graph PowerShell SDK module: Microsoft.Graph.Authentication
             Required Graph scopes:
                 - User.Read.All
                 - AuditLog.Read.All (to populate signInActivity/LastSignInDateTime)
@@ -37,7 +36,7 @@ function Get-GTGuestUserReport
 
     begin
     {
-        $modules = @('Microsoft.Graph.Authentication')
+        $modules = @()
         $requiredScopes = @('User.Read.All', 'AuditLog.Read.All')
 
         if (-not (Initialize-GTBeginBlock -ModuleNames $modules -RequiredScopes $requiredScopes -ValidateScopes -ScopeValidationErrorMessage "Failed to acquire required permissions ($($requiredScopes -join ', ')). Aborting."))

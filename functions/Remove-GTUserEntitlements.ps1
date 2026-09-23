@@ -81,22 +81,23 @@ function Remove-GTUserEntitlements {
 
         # check for required scopes
         $RequiredScopes = @('GroupMember.ReadWrite.All', 'Group.ReadWrite.All', 'Directory.ReadWrite.All', 'RoleManagement.ReadWrite.Directory', 'RoleEligibilitySchedule.ReadWrite.Directory', 'AdministrativeUnit.ReadWrite.All', 'EntitlementManagement.ReadWrite.All', 'DelegatedPermissionGrant.ReadWrite.All')
-        $missingScopes = $RequiredScopes | Where-Object { $_ -notin (Get-MgContext).Scopes }
-        if ($missingScopes) {
-            throw "Required scopes are missing: $($missingScopes -join ', ')"
+        $conn = Get-GTConnection
+        $currentScopes = if ($conn.Scopes) { $conn.Scopes } elseif ($conn.Scope) { $conn.Scope -split ' ' } else { @() }
+        $hasDefaultScope = ($currentScopes -contains 'https://graph.microsoft.com/.default') -or ($currentScopes -contains '.default')
+        if (-not $hasDefaultScope)
+        {
+            $missingScopes = Get-GTMissingScopes -RequiredScopes $RequiredScopes -CurrentScopes $currentScopes
+            if ($missingScopes) {
+                throw "Required scopes are missing: $($missingScopes -join ', ')"
+            }
         }
-        else { Write-PSFMessage -Level Verbose -Message "All required scopes are present" }
-
-        # install required modules
-        $requiremodules = @('Microsoft.Graph.Authentication')
-        Install-GTRequiredModule -ModuleNames $requiremodules
-
+        Write-PSFMessage -Level Verbose -Message "All required scopes are present"
     }
 
     process {
         foreach ($UPN in $UserUPNs) {
             try {
-                $userResp = Invoke-MgGraphRequest -Method GET -Uri "v1.0/users/$UPN?`$select=id,userPrincipalName" -ErrorAction Stop
+                $userResp = Invoke-GTGraphRequest -Method GET -Uri "v1.0/users/$($UPN)?`$select=id,userPrincipalName" -ErrorAction Stop
                 $User = [PSCustomObject]@{ Id = $userResp.id; UserPrincipalName = $userResp.userPrincipalName }
                 $outputBase = @{
                     UPN       = $UPN

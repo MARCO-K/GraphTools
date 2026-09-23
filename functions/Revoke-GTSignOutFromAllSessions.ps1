@@ -36,10 +36,6 @@ function Revoke-GTSignOutFromAllSessions
     )
 
     Begin {
-        # Module Management
-        $modules = @('Microsoft.Graph.Authentication')
-        Install-GTRequiredModule -ModuleNames $modules -Verbose
-
         # Graph Connection Handling
         if (-not (Initialize-GTGraphConnection -Scopes 'User.ReadWrite.All' -NewSession:$NewSession)) {
             throw "Failed to establish Microsoft Graph connection"
@@ -48,9 +44,9 @@ function Revoke-GTSignOutFromAllSessions
     Process {
         try
         {
-            $userResp = Invoke-MgGraphRequest -Method GET -Uri "v1.0/users/$UPN?`$select=id" -ErrorAction Stop
+            $userResp = Invoke-GTGraphRequest -Method GET -Uri "v1.0/users/$($UPN)?`$select=id" -ErrorAction Stop
             if ($userResp) {
-                Invoke-MgGraphRequest -Method POST -Uri "v1.0/users/$($userResp.id)/revokeSignInSessions" -ErrorAction Stop
+                Invoke-GTGraphRequest -Method POST -Uri "v1.0/users/$($userResp.id)/revokeSignInSessions" -ErrorAction Stop
                 Write-PSFMessage -Level Verbose -Message "$($UPN) - Sign out from all sessions action - User signed out"
             } else {
                 Write-PSFMessage -Level Warning -Message "$($UPN) - User not found."

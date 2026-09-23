@@ -38,9 +38,6 @@ function Get-GTUnusedApps
 
     begin
     {
-        $modules = @('Microsoft.Graph.Authentication')
-        Install-GTRequiredModule -ModuleNames $modules -Verbose:$VerbosePreference
-
         # 1. Scopes Check (Gold Standard)
         # Application.Read.All is required to list SPs. AuditLog.Read.All is required for signInActivity.
         $requiredScopes = @('Application.Read.All', 'AuditLog.Read.All')

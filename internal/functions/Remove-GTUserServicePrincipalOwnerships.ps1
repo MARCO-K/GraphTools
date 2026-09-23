@@ -62,7 +62,7 @@ function Remove-GTUserServicePrincipalOwnerships
                 if ($PSCmdlet.ShouldProcess($sp.displayName, $action))
                 {
                     Write-PSFMessage -Level Verbose -Message "Removing user $($User.UserPrincipalName) from service principal $($sp.displayName)"
-                    Invoke-MgGraphRequest -Method DELETE -Uri "v1.0/servicePrincipals/$($sp.id)/owners/$($User.Id)/`$ref" -ErrorAction Stop
+                    Invoke-GTGraphRequest -Method DELETE -Uri "v1.0/servicePrincipals/$($sp.id)/owners/$($User.Id)/`$ref" -ErrorAction Stop
                     $output['Status'] = 'Success'
                 }
             }

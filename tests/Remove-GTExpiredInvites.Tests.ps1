@@ -1,38 +1,35 @@
 Describe "Remove-GTExpiredInvites" {
     BeforeAll {
-        $functionPath = "$PSScriptRoot/../functions/Remove-GTExpiredInvites.ps1"
-        # Use Pester Mocks before dot-sourcing so the function file can load and calls are intercepted
-        Mock -CommandName Install-GTRequiredModule -MockWith { } -Verifiable
-        Mock -CommandName Initialize-GTGraphConnection -MockWith { return $true } -Verifiable
-        # Mock the sibling function
-        Mock -CommandName Get-GTGuestUserReport -MockWith { 
-            return @(
-                [PSCustomObject]@{
-                    Id                = "1"
-                    DisplayName       = "ExpiredUser"
-                    UserPrincipalName = "expired@test.com"
-                }
-            )
-        } -Verifiable
+        function global:Install-GTRequiredModule { param([string[]]$ModuleNames, [string]$Scope, [switch]$AllowPrerelease) }
+        function global:Initialize-GTGraphConnection { param([string[]]$Scopes, [switch]$NewSession) return $true }
+        function global:Write-PSFMessage { param($Level, $Message, $ErrorRecord) }
+        function global:Stop-PSFFunction { param($Message, $ErrorRecord, [switch]$EnableException) throw $Message }
+        function global:Get-GTGuestUserReport { param([switch]$PendingOnly, [int]$DaysSinceCreation) }
+        function global:Invoke-GTGraphRequest { param($Uri, $Method = 'GET', $Body, $Headers, $ContentType, [switch]$All, [int]$MaxRetries, [int]$RetryBaseDelaySeconds, $Token, [switch]$Raw, $ErrorAction) return @{} }
 
-        if (Test-Path $functionPath)
-        {
-            # Dot-source the function under test
-            . $functionPath
-        }
-        else
-        {
-            Write-Error "Function file not found at $functionPath"
-        }
+        . "$PSScriptRoot/../functions/Remove-GTExpiredInvites.ps1"
     }
 
     Context "Execution" {
-        It "should call Remove-MgUser for expired users when Force is specified" {
-            Mock -CommandName "Remove-MgUser" -MockWith { }
-            
+        BeforeEach {
+            Mock -CommandName Get-GTGuestUserReport -MockWith { 
+                return @(
+                    [PSCustomObject]@{
+                        Id                = "1"
+                        DisplayName       = "ExpiredUser"
+                        UserPrincipalName = "expired@test.com"
+                    }
+                )
+            }
+            Mock -CommandName Invoke-GTGraphRequest -MockWith { }
+        }
+
+        It "should call Invoke-GTGraphRequest DELETE for expired users when Force is specified" {
             Remove-GTExpiredInvites -DaysOlderThan 30 -Force
 
-            Assert-MockCalled -CommandName "Remove-MgUser" -Times 1 -ParameterFilter { $UserId -eq "1" }
+            Assert-MockCalled -CommandName "Invoke-GTGraphRequest" -Times 1 -ParameterFilter {
+                $Method -eq "DELETE" -and $Uri -eq "v1.0/users/1"
+            }
         }
     }
 }

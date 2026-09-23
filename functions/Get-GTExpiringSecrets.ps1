@@ -33,9 +33,6 @@ function Get-GTExpiringSecrets
 
     begin
     {
-        $modules = @('Microsoft.Graph.Authentication')
-        Install-GTRequiredModule -ModuleNames $modules -Verbose
-
         $requiredScopes = @('Application.Read.All')
         if (-not (Test-GTGraphScopes -RequiredScopes $requiredScopes -Reconnect -Quiet))
         {

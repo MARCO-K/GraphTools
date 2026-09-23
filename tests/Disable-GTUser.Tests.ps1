@@ -1,28 +1,17 @@
 Describe "Disable-GTUser" {
     
     BeforeAll {
-        # 1. Load the Function
-        $functionPath = Join-Path $PSScriptRoot "..\functions\Disable-GTUser.ps1"
-        if (-not (Test-Path $functionPath)) { Throw "CRITICAL: Could not find $functionPath" }
-        . $functionPath
+        # 1. Load Dependencies
+        $validationFile = Join-Path $PSScriptRoot '..' 'internal' 'functions' 'GTValidation.ps1'
+        if (Test-Path $validationFile) { . $validationFile }
 
-        # 2. Mock Dependencies
-        $script:GTValidationRegex = @{ UPN = '^[^@\s]+@[^@\s]+\.[^@\s]+$' }
-
-        # Mock Helpers - Ensure they return NOTHING (void) unless specified
-        function Install-GTRequiredModule { }
-        function Initialize-GTGraphConnection { return $true }
-        function Test-GTGraphScopes { return $true }
-        
         # Provide lightweight stubs for common helpers in case they are missing during discovery
         if (-not (Get-Command Install-GTRequiredModule -ErrorAction SilentlyContinue)) { function Install-GTRequiredModule { param([string[]]$ModuleNames, [string]$Scope, [switch]$AllowPrerelease) } }
         if (-not (Get-Command Initialize-GTGraphConnection -ErrorAction SilentlyContinue)) { function Initialize-GTGraphConnection { param([string[]]$Scopes, [switch]$NewSession, [switch]$SkipConnect) return $true } }
         if (-not (Get-Command Test-GTGraphScopes -ErrorAction SilentlyContinue)) { function Test-GTGraphScopes { param([string[]]$RequiredScopes, [switch]$Reconnect, [switch]$Quiet) return $true } }
         if (-not (Get-Command Write-PSFMessage -ErrorAction SilentlyContinue)) { function Write-PSFMessage { param($Level, $Message, $ErrorRecord) } }
         if (-not (Get-Command Get-UTCTime -ErrorAction SilentlyContinue)) { function Get-UTCTime { return [DateTime]::UtcNow } }
-
-        # Mock Logging to prevent pollution of the output stream
-        function Write-PSFMessage { param([string]$Level, [string]$Message) }
+        if (-not (Get-Command Invoke-GTGraphRequest -ErrorAction SilentlyContinue)) { function Invoke-GTGraphRequest { param($Method, $Uri, $Body, $ContentType, $ErrorAction, [switch]$All) return $null } }
 
         # Mock Error Helper
         function Get-GTGraphErrorDetails
@@ -35,6 +24,11 @@ Describe "Disable-GTUser" {
                 ErrorMessage = "Resource not found"
             } 
         }
+
+        # 2. Load the Function
+        $functionPath = Join-Path $PSScriptRoot "..\functions\Disable-GTUser.ps1"
+        if (-not (Test-Path $functionPath)) { Throw "CRITICAL: Could not find $functionPath" }
+        . $functionPath
     }
 
     Context "Input Handling" {
@@ -54,7 +48,7 @@ Describe "Disable-GTUser" {
         }
 
         It "accepts a valid UPN via parameter" {
-            Mock -CommandName Invoke-MgGraphRequest -MockWith { }
+            Mock -CommandName Invoke-GTGraphRequest -MockWith { }
             
             $results = Disable-GTUser -UPN "test@contoso.com" -Force
             
@@ -64,8 +58,8 @@ Describe "Disable-GTUser" {
     }
 
     Context "Execution Logic" {
-        It "calls Invoke-MgGraphRequest with correct arguments" {
-            Mock -CommandName Invoke-MgGraphRequest -MockWith { } -Verifiable -ParameterFilter {
+        It "calls Invoke-GTGraphRequest with correct arguments" {
+            Mock -CommandName Invoke-GTGraphRequest -MockWith { } -Verifiable -ParameterFilter {
                 $Method -eq 'PATCH' -and
                 $Uri -eq 'v1.0/users/user@contoso.com' -and
                 $Body.accountEnabled -eq $false -and
@@ -74,42 +68,42 @@ Describe "Disable-GTUser" {
 
             $null = Disable-GTUser -UPN 'user@contoso.com' -Force
 
-            Should -Invoke -CommandName Invoke-MgGraphRequest -Times 1
+            Should -Invoke -CommandName Invoke-GTGraphRequest -Times 1
         }
 
         It "outputs a 'Disabled' status object on success" {
-            Mock -CommandName Invoke-MgGraphRequest -MockWith { }
+            Mock -CommandName Invoke-GTGraphRequest -MockWith { }
 
             $results = Disable-GTUser -UPN 'user@contoso.com' -Force
 
-            # FIXED: Property name is 'User', not 'UserPrincipalName'
+            # Property name is 'User', not 'UserPrincipalName'
             $results.User | Should -Be 'user@contoso.com'
-            # FIXED: Status is 'Disabled' in your code (not 'Success')
+            # Status is 'Disabled' in your code (not 'Success')
             $results.Status | Should -Be 'Disabled'
         }
     }
 
     Context "Error Handling" {
         It "handles Graph API errors gracefully (e.g. 404)" {
-            Mock -CommandName Update-MgBetaUser -MockWith { 
+            Mock -CommandName Invoke-GTGraphRequest -MockWith { 
                 throw [System.Exception]::new("Resource not found") 
             }
 
             $results = Disable-GTUser -UPN 'missing@contoso.com' -Force
 
             $results.Status | Should -Be 'Failed'
-            # FIXED: Property name is 'Reason', not 'Message'
+            # Property name is 'Reason', not 'Message'
             $results.Reason | Should -Be "User not found (404)."
         }
     }
 
     Context "Safety Checks" {
         It "skips execution if WhatIf is used" {
-            Mock -CommandName Update-MgBetaUser -MockWith { } 
+            Mock -CommandName Invoke-GTGraphRequest -MockWith { } 
 
             $results = Disable-GTUser -UPN 'user@contoso.com' -WhatIf
 
-            Should -Invoke -CommandName Update-MgBetaUser -Times 0
+            Should -Invoke -CommandName Invoke-GTGraphRequest -Times 0
             $results.Status | Should -Be 'Skipped'
         }
     }

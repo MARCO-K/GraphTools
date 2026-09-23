@@ -10,38 +10,44 @@ GraphTools is built as a PowerShell script module with a clean, modular architec
 GraphTools/
 ├── GraphTools.psd1          # Module manifest with dependency management
 ├── GraphTools.psm1          # Module loader with automatic function discovery
-├── functions/               # Public cmdlets (15 functions)
+├── functions/               # Public cmdlets (Connect-GTGraph, Get-GTUser, etc.)
 ├── internal/
-│   └── functions/          # Private helpers (22 functions)
-├── tests/                   # Pester test suite (15 test files)
+│   └── functions/          # Private helpers (Invoke-GTGraphRequest, Get-GTCachedGraphToken, etc.)
+├── tests/                   # Pester test suite (40 test files)
 ├── docs/                    # Comprehensive documentation
+├── data/                    # Offline metadata catalogs (DevX permissions fixture)
 └── en-us/                   # Localization and help files
 ```
 
 ### PowerShell Standards Compliance
 
-- **PowerShell Version Support**: 5.1+ and 7.0+
-- **Cmdlet Naming**: Approved verbs with `GT` prefix (`Get-GTUser`, `Disable-GTUser`)
+- **PowerShell Version Support**: 5.1+ and 7.0+ (strictly verified across engines)
+- **Cmdlet Naming**: Approved verbs with `GT` prefix (`Get-GTUser`, `Connect-GTGraph`, `Disable-GTUser`)
 - **Parameter Binding**: Full `[CmdletBinding()]` support with pipeline input
 - **Comment-Based Help**: Complete help documentation for all public functions
-- **Error Handling**: Structured error responses with HTTP status codes
+- **Error Handling**: Centralized error responses via `Get-GTGraphErrorDetails`
+- **Output Contracts**: Pure `[PSCustomObject]` pipeline emission
 
 ## 🔧 Core Technical Features
 
-### Microsoft Graph API Integration
+### Zero-Dependency Microsoft Graph REST Engine
 
-**Multi-Endpoint Support**:
+GraphTools has completely eliminated external runtime dependencies on the `Microsoft.Graph.*` SDK, executing all operations through native .NET and PowerShell REST primitives:
 
-- **Stable API**: Production-ready endpoints (`v1.0`)
-- **Beta API**: Preview features (`beta`) for advanced capabilities
-- **Automatic Fallback**: Graceful degradation when beta features unavailable
+**Authentication & Token Management**:
 
-**Authentication & Authorization**:
+- **RFC 7523 Certificate Flow**: Signs RS256 JWT client assertions using native .NET cryptography (`RSACertificateExtensions`) directly from `Cert:\LocalMachine\My` or `Cert:\CurrentUser\My` (hardware/DPAPI protected).
+- **Client Secret Credentials**: Native client credentials token acquisition.
+- **In-Memory Token Caching**: Sliding 5-minute expiration buffer (`$script:GTTokenCache`) prevents token endpoint rate limits (HTTP 429) and provides 0ms token acquisition for cache hits.
+- **Unified Connection Cmdlets**: `Connect-GTGraph`, `Disconnect-GTGraph`, `Get-GTConnection`.
 
-- **Delegated Permissions**: Interactive user authentication
-- **Application Permissions**: Unattended service operations
-- **Scope Management**: Automatic scope validation and connection handling
-- **Session Management**: `NewSession` parameter for connection refresh
+**Central REST Execution (`Invoke-GTGraphRequest`)**:
+
+- **Multi-Endpoint Support**: Seamless execution against production (`v1.0`) and preview (`beta`) endpoints.
+- **Automatic Pagination**: `@odata.nextLink` traversal with `-All`, accumulating results efficiently using `List[object]`.
+- **Throttling & Retry Engine**: Catches HTTP `429` and `503`, parses `Retry-After` headers, and executes exponential backoff with jitter.
+- **JSON Batching (`Invoke-GTGraphBatch`)**: Combines up to 20 subrequests into a single `POST /$batch` roundtrip, with automatic chunking for arbitrary request volumes.
+- **Detailed Architecture Specification**: See [[Zero-Dependency-REST-Architecture]] and [[Connect-GTGraph]].
 
 ### Advanced Parameter Design
 
@@ -169,41 +175,39 @@ $RiskEngine = @{
 
 ```powershell
 begin {
-    # Module installation and connection setup
-    Install-GTRequiredModule -ModuleNames $modules
-    Initialize-GTGraphConnection -Scopes $requiredScopes
+    # Session verification & REST invoker preparation
+    $connection = Get-GTConnection
+    if (-not $connection -or -not $connection.Connected) {
+        Connect-GTGraph
+    }
 }
 process {
-    # Process each pipeline item
-    foreach ($item in $InputParameter) { ... }
+    # Direct REST invocation with automatic bearer injection, paging, and retry
+    Invoke-GTGraphPagedRequest -Endpoint "users/$($_.Id)/transitiveMemberOf"
 }
 end {
-    # Final processing and output
-    return $results
+    # Pipeline cleanup and emission of pure [PSCustomObject] records
 }
 ```
 
 **Memory-Efficient Processing**:
 
-- **Streaming Input**: No requirement to load all data at once
-- **Lazy Evaluation**: Results generated as needed
-- **Resource Cleanup**: Automatic disposal of large datasets
+- **Streaming Input**: Seamless pipeline binding (`ValueFromPipeline`, `ValueFromPipelineByPropertyName`)
+- **Lazy Evaluation & Paging**: `@odata.nextLink` traversal with memory-optimized collection (`System.Collections.Generic.List[object]`)
+- **Correlated Batching**: `Invoke-GTGraphBatch` enables up to 20 subrequests per single HTTP roundtrip
 
-### Module Auto-Management
+### Zero-Dependency Lifecycle Management
 
-**Dependency Resolution**:
+**Elimination of External SDKs**:
 
-```powershell
-# Automatic module installation
-$modules = @('Microsoft.Graph.Beta.Applications', 'Microsoft.Graph.Users')
-Install-GTRequiredModule -ModuleNames $modules -Verbose:$VerbosePreference
-```
+- **Zero Runtime Dependencies**: No gigabytes of external `Microsoft.Graph.*` modules or multi-minute module installation overhead in CI/CD or cloud runbooks.
+- **Pure .NET Crypto & REST**: In-memory token acquisition and REST invocation powered entirely by PowerShell primitives and .NET Standard cryptographic libraries.
 
-**Connection Lifecycle**:
+**Connection & Session Reuse**:
 
-- **Automatic Connection**: Functions establish Graph connections as needed
-- **Scope Validation**: Required permissions verified before operations
-- **Session Reuse**: Connection pooling for multiple operations
+- **Sliding In-Memory Cache**: Active bearer tokens are cached in-memory with a 5-minute pre-expiry buffer (`$script:GTTokenCache`), preventing redundant authentication calls.
+- **Automatic Token Refresh**: Transparently re-authenticates upon expiry without user or script intervention.
+- **Enterprise Identity Ready**: Supports Entra ID App Registrations with certificate thumbprints, raw certificates, client secrets, and existing bearer tokens.
 
 ## 📈 Advanced Analytics Features
 
@@ -261,7 +265,7 @@ Install-GTRequiredModule -ModuleNames $modules -Verbose:$VerbosePreference
 ```powershell
 Describe "Get-GTRiskyAppPermissionReport" {
     BeforeAll {
-        Mock Get-MgContext { @{ Scopes = @('AppRoleAssignment.Read.All') } }
+        Mock Get-GTConnection { [PSCustomObject]@{ Connected = $true; TenantId = 'fa8b2a79-cd59-468b-a25d-a6fef0b4dad1' } }
         . "$PSScriptRoot/../functions/Get-GTRiskyAppPermissionReport.ps1"
     }
 
@@ -314,16 +318,16 @@ Describe "Get-GTRiskyAppPermissionReport" {
 **Changelog Structure**:
 
 ```markdown
-## [0.17.0] - 2025-11-21
+## [0.20.0] - 2026-09-21
 
 ### Added
-- New function with comprehensive description
+- Zero-dependency native REST engine replacing external Microsoft.Graph SDK
 
 ### Changed
-- Updated existing functionality
+- Standardized error handling and token lifecycle
 
 ### Fixed
-- Bug fixes and improvements
+- Throttling retry and nextLink pagination edge cases
 ```
 
 ## 🚀 Performance Characteristics
@@ -362,9 +366,9 @@ Describe "Get-GTRiskyAppPermissionReport" {
 
 **Module Compatibility**:
 
+- **Zero-Dependency Architecture**: No external `Microsoft.Graph.*` SDK modules required; operates via native REST engine
 - **PSFramework**: Logging and messaging infrastructure
-- **Microsoft Graph SDK**: Official PowerShell modules for Graph API
-- **Pester**: Testing framework integration
+- **Pester 5**: Comprehensive test automation suite (300+ integration and unit tests)
 
 **Pipeline Integration**:
 

@@ -1,17 +1,14 @@
 Describe "Get-GTLicenseCostReport" {
     BeforeAll {
         # Define stub helper functions used by the module
-        function Install-GTRequiredModule { param([string[]]$ModuleNames, [string]$Scope, [switch]$AllowPrerelease) }
-        function Initialize-GTGraphConnection { param([string[]]$Scopes, [switch]$NewSession) return $true }
-        function Test-GTGraphScopes { param([string[]]$RequiredScopes, [switch]$Reconnect, [switch]$Quiet) return $true }
-        function Write-PSFMessage { param($Level, $Message, $ErrorRecord) }
-        function Get-GTGraphErrorDetails { param($Exception, $ResourceType) return @{ LogLevel = 'Error'; Reason = $Exception.Message; ErrorMessage = $Exception.Message } }
+        function global:Install-GTRequiredModule { param([string[]]$ModuleNames, [string]$Scope, [switch]$AllowPrerelease) }
+        function global:Initialize-GTGraphConnection { param([string[]]$Scopes, [switch]$NewSession) return $true }
+        function global:Test-GTGraphScopes { param([string[]]$RequiredScopes, [switch]$Reconnect, [switch]$Quiet) return $true }
+        function global:Write-PSFMessage { param($Level, $Message, $ErrorRecord) }
+        function global:Get-GTGraphErrorDetails { param($Exception, $ResourceType) return @{ LogLevel = 'Error'; Reason = $Exception.Message; ErrorMessage = $Exception.Message } }
+        function global:Invoke-GTGraphRequest { param($Method, $Uri, $Headers, $ErrorAction, [switch]$All) }
 
-        # Provide minimal stub implementation for Graph requests so dot-sourcing
-        # the function does not throw CommandNotFoundException in this environment.
-        function Invoke-MgGraphRequest { param($Method, $Uri, $Headers, $ErrorAction) }
         # Provide a UTC time helper used by the function under test
-        # Use the module's internal UTC helper for consistency
         . "$PSScriptRoot/../internal/functions/Get-UTCTime.ps1"
 
         # Dot-source the function under test AFTER stubs
@@ -51,8 +48,8 @@ Describe "Get-GTLicenseCostReport" {
     }
 
     BeforeEach {
-        Mock -CommandName "Invoke-MgGraphRequest" -MockWith {
-            param($Method, $Uri, $Headers, $ErrorAction)
+        Mock -CommandName "Invoke-GTGraphRequest" -MockWith {
+            param($Method, $Uri, $Headers, $ErrorAction, [switch]$All)
             if ($Uri -match '/v1.0/subscribedSkus') {
                 return [PSCustomObject]@{ value = $script:mockSkus }
             }

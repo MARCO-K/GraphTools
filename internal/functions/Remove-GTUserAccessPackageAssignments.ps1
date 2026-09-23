@@ -50,7 +50,7 @@ function Remove-GTUserAccessPackageAssignments
         # Get all access package assignments for the user with delivered state
         # Using filter with target/objectId for precise user matching
         $filter = "state eq 'Delivered' and target/objectId eq '$($User.Id)'"
-        $assignments = Get-MgBetaEntitlementManagementAssignment -Filter $filter -ExpandProperty target,accessPackage -All -ErrorAction Stop
+        $assignments = Invoke-GTGraphPagedRequest -Uri "beta/identityGovernance/entitlementManagement/assignments?`$filter=$([Uri]::EscapeDataString($filter))&`$expand=target,accessPackage"
 
         if ($assignments)
         {
@@ -84,7 +84,7 @@ function Remove-GTUserAccessPackageAssignments
                             }
                         }
 
-                        New-MgBetaEntitlementManagementAssignmentRequest -BodyParameter $params -ErrorAction Stop
+                        Invoke-GTGraphRequest -Method POST -Uri "beta/identityGovernance/entitlementManagement/assignmentRequests" -Body $params -ErrorAction Stop
                         $output['Status'] = 'Success'
 
                         Write-PSFMessage -Level Verbose -Message "Successfully created removal request for access package '$accessPackageName'"

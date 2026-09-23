@@ -64,7 +64,7 @@ function Remove-GTUserRoleAssignments
                     if ($PSCmdlet.ShouldProcess($roleAssignment.roleDefinition.displayName, $action))
                     {
                         Write-PSFMessage -Level Verbose -Message "Removing role assignment $($roleAssignment.roleDefinition.displayName) from user $($User.UserPrincipalName)"
-                        Invoke-MgGraphRequest -Method DELETE -Uri "beta/roleManagement/directory/roleAssignments/$($roleAssignment.id)" -ErrorAction Stop
+                        Invoke-GTGraphRequest -Method DELETE -Uri "beta/roleManagement/directory/roleAssignments/$($roleAssignment.id)" -ErrorAction Stop
                         $output['Status'] = 'Success'
                     }
                 }

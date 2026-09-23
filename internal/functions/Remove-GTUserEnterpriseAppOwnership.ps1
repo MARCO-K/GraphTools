@@ -106,7 +106,7 @@ function Remove-GTUserEnterpriseAppOwnership
                 if ($PSCmdlet.ShouldProcess($app.displayName, $action))
                 {
                     Write-PSFMessage -Level Verbose -Message "Removing user $($User.UserPrincipalName) from App Registration ownership: $($app.displayName)"
-                    Invoke-MgGraphRequest -Method DELETE -Uri "v1.0/applications/$($app.id)/owners/$($User.Id)/`$ref" -ErrorAction Stop
+                    Invoke-GTGraphRequest -Method DELETE -Uri "v1.0/applications/$($app.id)/owners/$($User.Id)/`$ref" -ErrorAction Stop
                     $output['Status'] = 'Success'
                 }
             }
@@ -164,7 +164,7 @@ function Remove-GTUserEnterpriseAppOwnership
                 if ($PSCmdlet.ShouldProcess($sp.displayName, $action))
                 {
                     Write-PSFMessage -Level Verbose -Message "Removing user $($User.UserPrincipalName) from Enterprise Application ownership: $($sp.displayName)"
-                    Invoke-MgGraphRequest -Method DELETE -Uri "v1.0/servicePrincipals/$($sp.id)/owners/$($User.Id)/`$ref" -ErrorAction Stop
+                    Invoke-GTGraphRequest -Method DELETE -Uri "v1.0/servicePrincipals/$($sp.id)/owners/$($User.Id)/`$ref" -ErrorAction Stop
                     $output['Status'] = 'Success'
                 }
             }
