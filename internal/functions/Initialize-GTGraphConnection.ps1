@@ -46,11 +46,31 @@ function Initialize-GTGraphConnection
 
     try
     {
-        # Close existing session if requested
+        # Refresh session token if requested
         if ($NewSession)
         {
-            Write-PSFMessage -Level Verbose -Message 'Closing existing Microsoft Graph session.'
-            Disconnect-GTGraph
+            Write-PSFMessage -Level Verbose -Message 'NewSession requested: refreshing Microsoft Graph token.'
+            $script:GTTokenCache = @{
+                AccessToken = $null
+                ExpiresAt   = [DateTime]::MinValue
+                TenantId    = $null
+                ClientId    = $null
+                Scope       = $null
+                AuthType    = $null
+            }
+
+            if ($script:GTConnectionConfig)
+            {
+                try
+                {
+                    $null = Get-GTCachedGraphToken -ForceRefresh -ErrorAction Stop
+                }
+                catch
+                {
+                    Write-PSFMessage -Level Warning -Message "Failed to refresh token for new session: $_"
+                    return $false
+                }
+            }
         }
 
         $now = [DateTime]::UtcNow

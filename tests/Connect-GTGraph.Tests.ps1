@@ -116,4 +116,50 @@ Describe "Connect-GTGraph, Disconnect-GTGraph & Get-GTConnection" -Tag 'Unit' {
             $result | Should -Be $true
         }
     }
+
+    Context "Initialize-GTGraphConnection -NewSession" {
+        BeforeAll {
+            $initFile = Join-Path -Path $PSScriptRoot -ChildPath '..\internal\functions\Initialize-GTGraphConnection.ps1'
+            if (Test-Path $initFile) { . $initFile }
+        }
+
+        It "refreshes token and preserves connection config when NewSession is specified" {
+            $script:GTConnectionConfig = @{
+                TenantId     = 'test-tenant'
+                ClientId     = 'test-client'
+                ClientSecret = 'test-secret'
+                Scope        = 'https://graph.microsoft.com/.default'
+            }
+            $script:GTTokenCache = @{
+                AccessToken = 'old-token'
+                ExpiresAt   = [DateTime]::UtcNow.AddHours(1)
+            }
+
+            Mock -CommandName Invoke-RestMethod -MockWith {
+                @{
+                    access_token = 'new-refreshed-token'
+                    expires_in   = 3600
+                }
+            }
+
+            $result = Initialize-GTGraphConnection -NewSession
+
+            $result | Should -Be $true
+            $script:GTConnectionConfig | Should -Not -BeNullOrEmpty
+            $script:GTTokenCache.AccessToken | Should -Be 'new-refreshed-token'
+        }
+
+        It "returns false when NewSession is specified without connection configuration" {
+            $script:GTConnectionConfig = $null
+            $script:GTTokenCache = @{
+                AccessToken = 'orphan-token'
+                ExpiresAt   = [DateTime]::UtcNow.AddHours(1)
+            }
+
+            $result = Initialize-GTGraphConnection -NewSession
+
+            $result | Should -Be $false
+            $script:GTTokenCache.AccessToken | Should -BeNullOrEmpty
+        }
+    }
 }

@@ -18,6 +18,7 @@ function Remove-GTPIMRoleEligibility
         Base output object for logging
     .PARAMETER Results
         Results collection to add output to
+    .EXAMPLE
         $user = Invoke-GTGraphRequest -Uri 'v1.0/users/user@contoso.com'
         $outputBase = @{ UserPrincipalName = $user.UserPrincipalName }
         $results = [System.Collections.Generic.List[PSObject]]::new()
