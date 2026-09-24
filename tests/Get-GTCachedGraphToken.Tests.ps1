@@ -2,6 +2,9 @@ if (-not (Get-Command Write-PSFMessage -ErrorAction SilentlyContinue)) { functio
 
 Describe "Get-GTCachedGraphToken" -Tag 'Unit' {
     BeforeAll {
+        $claimsFile = Join-Path -Path $PSScriptRoot -ChildPath '..\internal\functions\Get-GTTokenClaims.ps1'
+        if (Test-Path $claimsFile) { . $claimsFile }
+
         $functionFile = Join-Path -Path $PSScriptRoot -ChildPath '..\internal\functions\Get-GTCachedGraphToken.ps1'
         if (-not (Test-Path $functionFile)) { Throw "Function file not found: $functionFile" }
         . $functionFile

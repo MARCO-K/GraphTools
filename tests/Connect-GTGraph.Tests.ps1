@@ -2,6 +2,9 @@ if (-not (Get-Command Write-PSFMessage -ErrorAction SilentlyContinue)) { functio
 
 Describe "Connect-GTGraph, Disconnect-GTGraph & Get-GTConnection" -Tag 'Unit' {
     BeforeAll {
+        $claimsFile = Join-Path -Path $PSScriptRoot -ChildPath '..\internal\functions\Get-GTTokenClaims.ps1'
+        if (Test-Path $claimsFile) { . $claimsFile }
+
         $tokenFile = Join-Path -Path $PSScriptRoot -ChildPath '..\internal\functions\Get-GTCachedGraphToken.ps1'
         if (Test-Path $tokenFile) { . $tokenFile }
 

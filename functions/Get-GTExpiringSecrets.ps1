@@ -28,13 +28,21 @@ function Get-GTExpiringSecrets
         [int]$DaysUntilExpiry,
 
         [ValidateSet('All', 'Applications', 'ServicePrincipals')]
-        [string]$Scope = 'All'
+        [string]$Scope = 'All',
+
+        [switch]$NewSession
     )
 
     begin
     {
         $requiredScopes = @('Application.Read.All')
-        if (-not (Test-GTGraphScopes -RequiredScopes $requiredScopes -Reconnect -Quiet))
+        if (-not (Initialize-GTGraphConnection -Scopes $requiredScopes -NewSession:$NewSession))
+        {
+            Write-Error "Failed to initialize session."
+            return
+        }
+
+        if (-not (Test-GTGraphScopes -RequiredScopes $requiredScopes -Quiet))
         {
             Write-Error "Failed to acquire required permissions ($($requiredScopes -join ', ')). Aborting."
             return

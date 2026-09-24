@@ -39,13 +39,14 @@ function Test-GTGraphScopes
         return $false
     }
 
-    $currentPermissions = if ($conn.Scopes) { $conn.Scopes } elseif ($conn.Scope) { $conn.Scope -split ' ' } else { @() }
+    $currentPermissions = @(if ($conn.Scopes) { $conn.Scopes } elseif ($conn.Scope) { $conn.Scope -split ' ' } else { @() })
 
-    # If App-only (.default), all consented app roles are available
-    $hasDefaultScope = ($currentPermissions -contains 'https://graph.microsoft.com/.default') -or ($currentPermissions -contains '.default')
-    if ($hasDefaultScope)
+    # If token claims could not be decoded and current permissions only contain .default,
+    # assume consented app roles under .default are available
+    $isDefaultOnly = ($currentPermissions.Count -eq 1 -and ($currentPermissions[0] -eq 'https://graph.microsoft.com/.default' -or $currentPermissions[0] -eq '.default'))
+    if ($isDefaultOnly)
     {
-        if (-not $Quiet) { Write-Verbose "All required permissions present (.default scope)" }
+        if (-not $Quiet) { Write-Verbose "Token claims not inspectable; assuming required permissions are present under .default scope" }
         return $true
     }
 
@@ -54,59 +55,18 @@ function Test-GTGraphScopes
 
     if ($missing.Count -gt 0)
     {
-        if (-not $Quiet)
+        if ($Reconnect)
         {
-            Write-Warning "Missing scopes: $($missing -join ', ')"
+            Write-PSFMessage -Level Verbose -Message 'Dynamic scope renegotiation is not supported for client credentials (App-only) authentication. Permissions must be assigned to the Application registration in Microsoft Entra ID.'
         }
 
-        if ($Reconnect -and $script:GTConnectionConfig)
+        if (-not $Quiet)
         {
-            try
-            {
-                # Combine current scopes with all required scopes for reconnect
-                $allScopes = ($currentPermissions + $RequiredScopes) | Select-Object -Unique
-                $connectParams = @{
-                    Scope = ($allScopes -join ' ')
-                }
-                if ($script:GTConnectionConfig.TenantId) { $connectParams['TenantId'] = $script:GTConnectionConfig.TenantId }
-                if ($script:GTConnectionConfig.ClientId) { $connectParams['ClientId'] = $script:GTConnectionConfig.ClientId }
-                if ($script:GTConnectionConfig.Thumbprint) { $connectParams['Thumbprint'] = $script:GTConnectionConfig.Thumbprint }
-                if ($script:GTConnectionConfig.Certificate) { $connectParams['Certificate'] = $script:GTConnectionConfig.Certificate }
-                if ($script:GTConnectionConfig.ClientSecret) { $connectParams['ClientSecret'] = $script:GTConnectionConfig.ClientSecret }
-
-                $null = Connect-GTGraph @connectParams -ErrorAction Stop
-
-                $newConn = Get-GTConnection
-                if (-not $newConn.Connected)
-                {
-                    if (-not $Quiet) { Write-Error "Reconnection succeeded but connection validation failed" }
-                    return $false
-                }
-
-                $newPermissions = if ($newConn.Scopes) { $newConn.Scopes } elseif ($newConn.Scope) { $newConn.Scope -split ' ' } else { @() }
-                $stillMissing = Get-GTMissingScopes -RequiredScopes $RequiredScopes -CurrentScopes $newPermissions
-
-                if ($stillMissing.Count -gt 0)
-                {
-                    if (-not $Quiet)
-                    {
-                        Write-Warning "Reconnection completed but some scopes were not granted: $($stillMissing -join ', ')"
-                    }
-                    return $false
-                }
-
-                if (-not $Quiet) { Write-Verbose "Successfully reconnected with all required permissions" }
-                return $true
-            }
-            catch
-            {
-                if (-not $Quiet) { Write-Error "Reconnection failed: $_" }
-                return $false
-            }
+            Write-Warning "Active Microsoft Graph session is missing required permissions: $($missing -join ', '). Available permissions: $($currentPermissions -join ', '). Required permissions must be assigned to the Application registration in Microsoft Entra ID."
         }
         return $false
     }
 
-    if (-not $Quiet) { Write-Verbose "All required permissions present" }
+    if (-not $Quiet) { Write-Verbose "All required permissions present: $($RequiredScopes -join ', ')" }
     return $true
 }

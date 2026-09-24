@@ -53,17 +53,17 @@ function Get-GTServicePrincipalReport
         if ($ExpandOwners) { $requiredScopes.Add('Directory.Read.All') }
         if ($IncludeSignInActivity) { $requiredScopes.Add('AuditLog.Read.All') }
 
-        # 2. Scopes Check (Gold Standard)
-        if (-not (Test-GTGraphScopes -RequiredScopes $requiredScopes -Reconnect -Quiet))
-        {
-            Write-Error "Failed to acquire required permissions ($($requiredScopes -join ', ')). Aborting."
-            return
-        }
-
-        # 3. Connection Initialization
+        # 2. Connection Initialization
         if (-not (Initialize-GTGraphConnection -Scopes $requiredScopes -NewSession:$NewSession))
         {
             Write-Error "Failed to initialize session."
+            return
+        }
+
+        # 3. Scopes Validation
+        if (-not (Test-GTGraphScopes -RequiredScopes $requiredScopes -Quiet))
+        {
+            Write-Error "Failed to acquire required permissions ($($requiredScopes -join ', ')). Aborting."
             return
         }
     }

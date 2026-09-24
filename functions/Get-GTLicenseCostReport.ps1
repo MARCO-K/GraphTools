@@ -63,19 +63,18 @@ function Get-GTLicenseCostReport
         # 1. Initialize Collection
         $report = [System.Collections.Generic.List[PSCustomObject]]::new()
 
-        # 2. Scopes Check
+        # 2. Connection Initialization
         $requiredScopes = @('Organization.Read.All', 'User.Read.All', 'AuditLog.Read.All')
-        
-        if (-not (Test-GTGraphScopes -RequiredScopes $requiredScopes -Reconnect -Quiet))
-        {
-            Write-Error "Failed to acquire required permissions ($($requiredScopes -join ', ')). Aborting."
-            return
-        }
-
-        # 4. Connection Initialization
         if (-not (Initialize-GTGraphConnection -Scopes $requiredScopes -NewSession:$NewSession))
         {
             Write-Error "Failed to initialize session."
+            return
+        }
+
+        # 3. Scopes Validation
+        if (-not (Test-GTGraphScopes -RequiredScopes $requiredScopes -Quiet))
+        {
+            Write-Error "Failed to acquire required permissions ($($requiredScopes -join ', ')). Aborting."
             return
         }
 

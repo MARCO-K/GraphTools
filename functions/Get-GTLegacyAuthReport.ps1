@@ -83,17 +83,17 @@ function Get-GTLegacyAuthReport
         $targetApps  = [System.Collections.Generic.List[string]]::new()
         $targetIPs   = [System.Collections.Generic.List[string]]::new()
 
-        # 2. Scopes Check
+        # 2. Connection Initialization
         $requiredScopes = @('AuditLog.Read.All')
-        if (-not (Test-GTGraphScopes -RequiredScopes $requiredScopes -Reconnect -Quiet))
-        {
-            throw "Failed to acquire required permissions ($($requiredScopes -join ', ')). Aborting."
-        }
-
-        # 3. Connection Initialization
         if (-not (Initialize-GTGraphConnection -Scopes $requiredScopes -NewSession:$NewSession))
         {
             throw "Failed to initialize session."
+        }
+
+        # 3. Scopes Validation
+        if (-not (Test-GTGraphScopes -RequiredScopes $requiredScopes -Quiet))
+        {
+            throw "Failed to acquire required permissions ($($requiredScopes -join ', ')). Aborting."
         }
 
         # 4. Define Protocol Lists

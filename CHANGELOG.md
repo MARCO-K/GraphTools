@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.21.0] - 2026-09-24
+
 ### Added
 
 - **Resilient Batch Subrequest Throttling & Error Handling (`Invoke-GTGraphBatch`)**:
@@ -16,6 +18,27 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Handles dropped subrequests with structured `MissingBatchResponse` diagnostics.
   - Preserves original subrequest sequence in the aggregated output array.
   - Added Pester unit tests covering subrequest 429 retries, retries exhaustion, and permanent error handling.
+- **JWT Claim Decoding & Permission Introspection (`Get-GTTokenClaims`)**:
+  - Implemented `Get-GTTokenClaims` internal helper to decode base64url JWT access token payloads without external dependencies across Windows PowerShell 5.1 and PowerShell 7+.
+  - `Get-GTCachedGraphToken` now automatically decodes token claims on acquisition, populating granted `Roles` (`roles` claim) and `Permissions` (`roles` or `scp` claim) in `$script:GTTokenCache`.
+  - `Get-GTConnection` now returns real granted `Scopes` and `Roles` from decoded JWT claims, providing true visibility into active App-only and delegated token permissions.
+  - Added unit test suite `tests/Get-GTTokenClaims.Tests.ps1`.
+
+### Changed
+
+- **Harmonized Scope Validation & Connection Gatekeeping (`Test-GTGraphScopes`, `Initialize-GTGraphConnection`)**:
+  - Refactored `Test-GTGraphScopes` to validate required scopes against real decoded token claims instead of bypassing validation on `.default`.
+  - Added graceful fallback in `Test-GTGraphScopes` when claims cannot be inspected and only `.default` is present.
+  - Deprecated dynamic runtime scope renegotiation via `-Reconnect` in `Test-GTGraphScopes`, reflecting the RFC 6749 / Entra ID client credentials standard where application permissions are determined by App Registration roles rather than negotiated per call.
+  - `Initialize-GTGraphConnection` now delegates scope checking directly to `Test-GTGraphScopes` as the single source of truth.
+  - Harmonized all 17 public reporting and containment cmdlets to follow the canonical execution sequence: connection initialization first, followed by scope validation (without invalid `-Reconnect`).
+  - Added `-NewSession` parameter support across `Disable-GTUser`, `Get-GTExpiringSecrets`, `Get-GTInactiveDevices`, `Remove-GTPIMRoleEligibility`, `Remove-GTUserEntitlements`, and `Get-GTConditionalAccessPolicyReport`.
+
+### Fixed
+
+- **`Invoke-AuditLogQuery`**: Corrected parameter typo `RequieredScopes` -> `RequiredScopes` while maintaining `RequieredScopes` as an alias for backward compatibility; replaced unsafe session disconnect in begin block with standard `Initialize-GTGraphConnection`.
+- **`Disable-GTUserDevice`**: Updated required scope check from legacy delegated `Directory.AccessAsUser.All` to REST application permission `Device.ReadWrite.All`.
+- **`Remove-GTUserEntitlements`**: Replaced inlined `.default` bypass check with unified `Initialize-GTGraphConnection` and `Test-GTGraphScopes`.
 
 ## [0.20.0] - 2026-09-21
 

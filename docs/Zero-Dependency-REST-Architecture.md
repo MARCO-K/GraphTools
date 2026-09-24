@@ -145,13 +145,13 @@ sequenceDiagram
 ## 5. Core Engine Components
 
 ### A. Token Manager ([`Get-GTCachedGraphToken.ps1`](../internal/functions/Get-GTCachedGraphToken.ps1))
-* **In-Memory Cache:** `$script:GTTokenCache` maintains the active `AccessToken`, `ExpiresAt`, `TenantId`, `ClientId`, and `AuthType`.
+* **In-Memory Cache:** `$script:GTTokenCache` maintains the active `AccessToken`, `ExpiresAt`, `TenantId`, `ClientId`, `AuthType`, `Claims`, `Roles`, and `Permissions`.
+* **Token Introspection & Claims Extraction ([`Get-GTTokenClaims.ps1`](../internal/functions/Get-GTTokenClaims.ps1)):** Automatically decodes base64url JWT access token payloads to extract granted `roles` (App-Only application permissions) and `scp` (Delegated scopes), storing them in the cache and surfacing them via [`Get-GTConnection`](../functions/Get-GTConnection.ps1) for strict client-side permission validation.
 * **Sliding Refresh Buffer (`$BufferMinutes = 5`):** Standard Entra tokens expire after 60 minutes (3599 seconds). When remaining validity drops below 5 minutes, a fresh token is requested proactively to avoid in-flight request expiration.
 * **Authentication Fallbacks:**
   1. RFC 7523 Certificate thumbprint or direct `X509Certificate2` object.
   2. Client Secret credentials.
   3. Direct Bearer token passthrough.
-  4. Automatic adoption of active interactive SDK sessions if present in the runspace.
 
 ### B. Central REST Invoker ([`Invoke-GTGraphRequest.ps1`](../internal/functions/Invoke-GTGraphRequest.ps1))
 * **URI Normalization:** Transparently accepts relative endpoints (`v1.0/users`, `beta/servicePrincipals`) and resolves them to fully qualified URIs.

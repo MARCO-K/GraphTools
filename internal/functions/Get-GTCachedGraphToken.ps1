@@ -106,12 +106,104 @@ function Get-GTCachedGraphToken
         [switch]$ForceRefresh
     )
 
+    function Set-GTTokenCacheEntry
+    {
+        param(
+            [string]$Token,
+            [DateTime]$ExpiresAt,
+            [string]$TenantId,
+            [string]$ClientId,
+            [string]$Scope,
+            [string]$AuthType
+        )
+
+        $claims = if (Get-Command Get-GTTokenClaims -ErrorAction SilentlyContinue)
+        {
+            Get-GTTokenClaims -Token $Token
+        }
+        else
+        {
+            $claimsFile = Join-Path $PSScriptRoot 'Get-GTTokenClaims.ps1'
+            if (Test-Path $claimsFile)
+            {
+                . $claimsFile
+                Get-GTTokenClaims -Token $Token
+            }
+            else
+            {
+                $null
+            }
+        }
+        $permissions = [System.Collections.Generic.List[string]]::new()
+        $roles = @()
+
+        if ($claims)
+        {
+            if ($claims.PSObject.Properties['roles'] -and $claims.roles)
+            {
+                $roles = [string[]]$claims.roles
+                foreach ($r in $roles) { $permissions.Add($r) }
+            }
+            if ($claims.PSObject.Properties['scp'] -and $claims.scp)
+            {
+                foreach ($s in ($claims.scp -split '\s+'))
+                {
+                    if (-not [string]::IsNullOrWhiteSpace($s) -and -not $permissions.Contains($s))
+                    {
+                        $permissions.Add($s)
+                    }
+                }
+            }
+            if (-not $TenantId -and $claims.PSObject.Properties['tid'])
+            {
+                $TenantId = [string]$claims.tid
+            }
+            if (-not $ClientId)
+            {
+                if ($claims.PSObject.Properties['appid']) { $ClientId = [string]$claims.appid }
+                elseif ($claims.PSObject.Properties['azp']) { $ClientId = [string]$claims.azp }
+            }
+            if ($claims.PSObject.Properties['exp'] -and $claims.exp)
+            {
+                try
+                {
+                    $ExpiresAt = [DateTimeOffset]::FromUnixTimeSeconds([int64]$claims.exp).UtcDateTime
+                }
+                catch
+                {
+                    # Retain calculated ExpiresAt on conversion error
+                }
+            }
+        }
+
+        if ($permissions.Count -eq 0 -and $Scope)
+        {
+            foreach ($s in ($Scope -split '\s+'))
+            {
+                if (-not [string]::IsNullOrWhiteSpace($s)) { $permissions.Add($s) }
+            }
+        }
+
+        $script:GTTokenCache.AccessToken = $Token
+        $script:GTTokenCache.ExpiresAt   = $ExpiresAt
+        $script:GTTokenCache.TenantId    = $TenantId
+        $script:GTTokenCache.ClientId    = $ClientId
+        $script:GTTokenCache.Scope       = $Scope
+        $script:GTTokenCache.AuthType    = $AuthType
+        $script:GTTokenCache.Claims      = $claims
+        $script:GTTokenCache.Roles       = $roles
+        $script:GTTokenCache.Permissions = [string[]]$permissions
+    }
+
     # 1. Direct token assignment
     if ($PSCmdlet.ParameterSetName -eq 'DirectToken')
     {
-        $script:GTTokenCache.AccessToken = $AccessToken
-        $script:GTTokenCache.ExpiresAt   = [DateTime]::UtcNow.AddHours(1)
-        $script:GTTokenCache.AuthType    = 'DirectToken'
+        Set-GTTokenCacheEntry -Token $AccessToken `
+                              -ExpiresAt ([DateTime]::UtcNow.AddHours(1)) `
+                              -TenantId $TenantId `
+                              -ClientId $ClientId `
+                              -Scope $Scope `
+                              -AuthType 'DirectToken'
         return $AccessToken
     }
 
@@ -263,12 +355,12 @@ function Get-GTCachedGraphToken
         }
 
         # Store in cache
-        $script:GTTokenCache.AccessToken = $response.access_token
-        $script:GTTokenCache.ExpiresAt   = [DateTime]::UtcNow.AddSeconds([int]$response.expires_in)
-        $script:GTTokenCache.TenantId    = $TenantId
-        $script:GTTokenCache.ClientId    = $ClientId
-        $script:GTTokenCache.Scope       = $Scope
-        $script:GTTokenCache.AuthType    = $authType
+        Set-GTTokenCacheEntry -Token $response.access_token `
+                              -ExpiresAt ([DateTime]::UtcNow.AddSeconds([int]$response.expires_in)) `
+                              -TenantId $TenantId `
+                              -ClientId $ClientId `
+                              -Scope $Scope `
+                              -AuthType $authType
 
         Write-PSFMessage -Level Verbose -Message "Acquired new Microsoft Graph token ($authType). Expires at $($script:GTTokenCache.ExpiresAt.ToString('u'))."
         return $script:GTTokenCache.AccessToken

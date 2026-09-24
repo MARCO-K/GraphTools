@@ -89,10 +89,17 @@ Function Disable-GTUserDevice
         $results = New-Object System.Collections.ArrayList
 
         # Graph Connection Handling
-        $connectionResult = Initialize-GTGraphConnection -Scopes 'Directory.AccessAsUser.All' -NewSession:$NewSession
+        $requiredScopes = @('Device.ReadWrite.All')
+        $connectionResult = Initialize-GTGraphConnection -Scopes $requiredScopes -NewSession:$NewSession
         if (-not $connectionResult)
         {
             Write-PSFMessage -Level Error -Message "Failed to initialize Microsoft Graph connection. Aborting device disable operation."
+            return
+        }
+
+        if (-not (Test-GTGraphScopes -RequiredScopes $requiredScopes -Quiet))
+        {
+            Write-Error "Failed to acquire required permissions ($($requiredScopes -join ', ')). Aborting."
             return
         }
     }

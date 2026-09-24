@@ -25,11 +25,13 @@ function Remove-GTExpiredInvites {
         [Parameter(Mandatory = $true)]
         [int]$DaysOlderThan,
 
-        [switch]$Force
+        [switch]$Force,
+
+        [switch]$NewSession
     )
 
     begin {
-        if (-not (Initialize-GTGraphConnection -Scopes 'User.ReadWrite.All')) {
+        if (-not (Initialize-GTGraphConnection -Scopes 'User.ReadWrite.All' -NewSession:$NewSession)) {
             Write-Error "Failed to initialize Microsoft Graph connection."
             return
         }

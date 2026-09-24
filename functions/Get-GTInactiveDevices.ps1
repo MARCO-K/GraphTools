@@ -36,14 +36,21 @@ function Get-GTInactiveDevices
 
         [string]$DeviceType,
 
-        [switch]$IncludeDisabled
+        [switch]$IncludeDisabled,
+
+        [switch]$NewSession
     )
 
     begin
     {
-        # 1. Scopes Check
         $requiredScopes = @('Device.Read.All')
-        if (-not (Test-GTGraphScopes -RequiredScopes $requiredScopes -Reconnect -Quiet))
+        if (-not (Initialize-GTGraphConnection -Scopes $requiredScopes -NewSession:$NewSession))
+        {
+            Write-Error "Failed to initialize session."
+            return
+        }
+
+        if (-not (Test-GTGraphScopes -RequiredScopes $requiredScopes -Quiet))
         {
             Write-Error "Failed to acquire required permissions ($($requiredScopes -join ', ')). Aborting."
             return

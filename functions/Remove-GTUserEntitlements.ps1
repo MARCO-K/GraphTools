@@ -73,23 +73,27 @@ function Remove-GTUserEntitlements {
         [switch]$removeAdministrativeUnitMemberships,
         [switch]$removeAccessPackageAssignments,
         [switch]$removeDelegatedPermissionGrants,
-        [switch]$removeAll
+        [switch]$removeAll,
+        [switch]$NewSession
     )
 
     begin {
         $results = [System.Collections.Generic.List[PSObject]]::new()
 
-        # check for required scopes
+        # 1. Connection Initialization
         $RequiredScopes = @('GroupMember.ReadWrite.All', 'Group.ReadWrite.All', 'Directory.ReadWrite.All', 'RoleManagement.ReadWrite.Directory', 'RoleEligibilitySchedule.ReadWrite.Directory', 'AdministrativeUnit.ReadWrite.All', 'EntitlementManagement.ReadWrite.All', 'DelegatedPermissionGrant.ReadWrite.All')
-        $conn = Get-GTConnection
-        $currentScopes = if ($conn.Scopes) { $conn.Scopes } elseif ($conn.Scope) { $conn.Scope -split ' ' } else { @() }
-        $hasDefaultScope = ($currentScopes -contains 'https://graph.microsoft.com/.default') -or ($currentScopes -contains '.default')
-        if (-not $hasDefaultScope)
+        if (-not (Initialize-GTGraphConnection -Scopes $RequiredScopes -NewSession:$NewSession))
         {
-            $missingScopes = Get-GTMissingScopes -RequiredScopes $RequiredScopes -CurrentScopes $currentScopes
-            if ($missingScopes) {
-                throw "Required scopes are missing: $($missingScopes -join ', ')"
-            }
+            throw "Failed to initialize Microsoft Graph session."
+        }
+
+        # 2. Scope Validation
+        $conn = Get-GTConnection
+        $currentScopes = if ($conn.Scopes) { [string[]]$conn.Scopes } elseif ($conn.Scope) { $conn.Scope -split ' ' } else { @() }
+        $missingScopes = Get-GTMissingScopes -RequiredScopes $RequiredScopes -CurrentScopes $currentScopes
+        if ($missingScopes -and $missingScopes.Count -gt 0)
+        {
+            throw "Required scopes are missing: $($missingScopes -join ', ')"
         }
         Write-PSFMessage -Level Verbose -Message "All required scopes are present"
     }

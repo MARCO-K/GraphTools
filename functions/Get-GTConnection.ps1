@@ -29,7 +29,27 @@ function Get-GTConnection
     $scope    = if ($script:GTConnectionConfig) { $script:GTConnectionConfig.Scope } elseif ($script:GTTokenCache) { $script:GTTokenCache.Scope } else { $null }
     $expires  = if ($script:GTTokenCache) { $script:GTTokenCache.ExpiresAt } else { $null }
 
-    $scopesList = if ($scope) { @($scope -split ' ') } else { @() }
+    $permissions = if ($script:GTTokenCache -and $script:GTTokenCache.Permissions -and $script:GTTokenCache.Permissions.Count -gt 0)
+    {
+        [string[]]$script:GTTokenCache.Permissions
+    }
+    elseif ($scope)
+    {
+        @($scope -split ' ')
+    }
+    else
+    {
+        @()
+    }
+
+    $roles = if ($script:GTTokenCache -and $script:GTTokenCache.Roles)
+    {
+        [string[]]$script:GTTokenCache.Roles
+    }
+    else
+    {
+        @()
+    }
 
     [PSCustomObject]@{
         PSTypeName = 'GraphTools.ConnectionStatus'
@@ -38,7 +58,8 @@ function Get-GTConnection
         ClientId   = $clientId
         AuthType   = $authType
         Scope      = $scope
-        Scopes     = $scopesList
+        Scopes     = $permissions
+        Roles      = $roles
         ExpiresAt  = $expires
         TimeUtc    = $now.ToString('o')
     }

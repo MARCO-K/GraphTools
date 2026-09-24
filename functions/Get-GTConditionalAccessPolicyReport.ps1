@@ -31,14 +31,23 @@ function Get-GTConditionalAccessPolicyReport
 {
     [CmdletBinding()]
     [OutputType([PSCustomObject])]
-    param ()
+    param (
+        [switch]$NewSession
+    )
 
     Write-Verbose "Starting Conditional Access policy report generation."
 
     # Graph Connection
-    if (-not (Initialize-GTGraphConnection -Scopes @('Policy.Read.All')))
+    $requiredScopes = @('Policy.Read.All')
+    if (-not (Initialize-GTGraphConnection -Scopes $requiredScopes -NewSession:$NewSession))
     {
         Write-Error "Failed to connect to Microsoft Graph."
+        return
+    }
+
+    if (-not (Test-GTGraphScopes -RequiredScopes $requiredScopes -Quiet))
+    {
+        Write-Error "Failed to acquire required permissions ($($requiredScopes -join ', ')). Aborting."
         return
     }
 
