@@ -39,6 +39,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **`Invoke-AuditLogQuery`**: Corrected parameter typo `RequieredScopes` -> `RequiredScopes` while maintaining `RequieredScopes` as an alias for backward compatibility; replaced unsafe session disconnect in begin block with standard `Initialize-GTGraphConnection`.
 - **`Disable-GTUserDevice`**: Updated required scope check from legacy delegated `Directory.AccessAsUser.All` to REST application permission `Device.ReadWrite.All`.
 - **`Remove-GTUserEntitlements`**: Replaced inlined `.default` bypass check with unified `Initialize-GTGraphConnection` and `Test-GTGraphScopes`.
+- **`Get-GTTokenClaims`**: Sanitized catch block error logging to output only the exception message, eliminating potential exposure of token payload or claim strings in verbose logs.
+- **Cmdlet Documentation**: Documented `.PARAMETER NewSession` in comment-based help across 13 public cmdlets to ensure full discoverability via `Get-Help`.
 
 ## [0.20.0] - 2026-09-21
 
