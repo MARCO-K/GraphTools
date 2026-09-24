@@ -27,6 +27,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Beta Endpoint Discipline (`Invoke-AuditLogQuery`)**:
   - Added explicit architectural justification comments to all Microsoft Graph `/beta/` endpoint calls (`/beta/security/auditLog/queries/`), ensuring full compliance with beta endpoint standards.
 
+### Fixed
+
+- **URL-Encoding for User Principal Names (`Disable-GTUser`)**:
+  - Applied `[System.Uri]::EscapeDataString` to UPN paths across both single and batch execution flows, properly escaping characters such as `#` (e.g. for guest accounts with `#EXT#`) to prevent URI truncation.
+- **Resilient Batch Exception Handling (`Disable-GTUser`)**:
+  - Wrapped `Invoke-GTGraphBatch` in try/catch to ensure all pending users receive structured `Failed` result objects rather than terminating the cmdlet if batch invocation throws.
+- **Enriched Link Validation Assertion (`tests/Documentation.Tests.ps1`)**:
+  - Added `-Because` failure details displaying all broken relative links directly in the Pester assertion output for actionable CI logs.
+
 ## [0.21.0] - 2026-09-24
 
 ### Added

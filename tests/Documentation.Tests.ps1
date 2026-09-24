@@ -25,6 +25,7 @@ Describe "Documentation Integrity" -Tag 'Unit' {
             }
         }
 
-        $brokenLinks.Count | Should -Be 0
+        $failureDetails = if ($brokenLinks.Count -gt 0) { "Found broken relative link(s):`n" + ($brokenLinks -join "`n") } else { '' }
+        $brokenLinks.Count | Should -Be 0 -Because $failureDetails
     }
 }
