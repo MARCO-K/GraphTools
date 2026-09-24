@@ -52,6 +52,7 @@ Function Disable-GTUser
     {
         # Prepare a collection for results. We'll emit a single array in End().
         $results = New-Object System.Collections.ArrayList
+        $approvedUsers = [System.Collections.Generic.List[string]]::new()
 
         # Graph Connection & Scope Handling
         $requiredScopes = @('User.ReadWrite.All')
@@ -77,48 +78,55 @@ Function Disable-GTUser
             $action = "Disable user account (set AccountEnabled to False)"
             $timeUtc = (Get-UTCTime).ToString('o')
 
+            if ($Force -or $PSCmdlet.ShouldProcess($target, $action))
+            {
+                [void]$approvedUsers.Add($User)
+            }
+            else
+            {
+                # When -WhatIf or user declines via -Confirm
+                Write-PSFMessage -Level Verbose -Message "$User - Disable User Action - Skipped (WhatIf/Confirmed=false)"
+
+                $result = [PSCustomObject]@{
+                    User             = $User
+                    Status           = 'Skipped'
+                    TimeUtc          = $timeUtc
+                    HttpStatus       = $null
+                    Reason           = 'Operation skipped (WhatIf/confirmation declined)'
+                    ExceptionMessage = ''
+                }
+                [void]$results.Add($result)
+            }
+        }
+    }
+
+    end
+    {
+        if ($approvedUsers.Count -eq 1)
+        {
+            $User = $approvedUsers[0]
+            $encodedUser = [System.Uri]::EscapeDataString($User)
+            $timeUtc = (Get-UTCTime).ToString('o')
             try
             {
-                if ($Force -or $PSCmdlet.ShouldProcess($target, $action))
-                {
-                    Invoke-GTGraphRequest -Method PATCH -Uri ("v1.0/users/{0}" -f $User) -Body @{ accountEnabled = $false } -ContentType 'application/json' -ErrorAction Stop
-                    Write-PSFMessage -Level Verbose -Message "$User - Disable User Action - User Disabled"
+                Invoke-GTGraphRequest -Method PATCH -Uri ("v1.0/users/{0}" -f $encodedUser) -Body @{ accountEnabled = $false } -ContentType 'application/json' -ErrorAction Stop
+                Write-PSFMessage -Level Verbose -Message "$User - Disable User Action - User Disabled"
 
-                    $result = [PSCustomObject]@{
-                        User             = $User
-                        Status           = 'Disabled'
-                        TimeUtc          = $timeUtc
-                        HttpStatus       = 200
-                        Reason           = 'User disabled successfully'
-                        ExceptionMessage = ''
-                    }
-                    [void]$results.Add($result)
+                $result = [PSCustomObject]@{
+                    User             = $User
+                    Status           = 'Disabled'
+                    TimeUtc          = $timeUtc
+                    HttpStatus       = 200
+                    Reason           = 'User disabled successfully'
+                    ExceptionMessage = ''
                 }
-                else
-                {
-                    # When -WhatIf or user declines via -Confirm
-                    Write-PSFMessage -Level Verbose -Message "$User - Disable User Action - Skipped (WhatIf/Confirmed=false)"
-
-                    $result = [PSCustomObject]@{
-                        User             = $User
-                        Status           = 'Skipped'
-                        TimeUtc          = $timeUtc
-                        HttpStatus       = $null
-                        Reason           = 'Operation skipped (WhatIf/confirmation declined)'
-                        ExceptionMessage = ''
-                    }
-                    [void]$results.Add($result)
-                }
+                [void]$results.Add($result)
             }
             catch
             {
-                # Use centralized error helper
                 $err = Get-GTGraphErrorDetails -Exception $_.Exception -ResourceType 'user'
-                
-                # Log to console/file using PSFramework
                 Write-PSFMessage -Level $err.LogLevel -Message "$User - Disable User Action - $($err.Reason)"
-                
-                # Add failure object to results
+
                 $result = [PSCustomObject]@{
                     User             = $User
                     Status           = 'Failed'
@@ -130,10 +138,103 @@ Function Disable-GTUser
                 [void]$results.Add($result)
             }
         }
-    }
+        elseif ($approvedUsers.Count -gt 1)
+        {
+            $batchRequests = @()
+            foreach ($User in $approvedUsers)
+            {
+                $batchRequests += @{
+                    id      = $User
+                    method  = 'PATCH'
+                    url     = "/users/$([System.Uri]::EscapeDataString($User))"
+                    body    = @{ accountEnabled = $false }
+                    headers = @{ 'Content-Type' = 'application/json' }
+                }
+            }
 
-    end
-    {
+            Write-PSFMessage -Level Verbose -Message "Disabling $($approvedUsers.Count) users via JSON batch processing..."
+            $batchResponses = $null
+            try
+            {
+                $batchResponses = Invoke-GTGraphBatch -Requests $batchRequests -ErrorAction Stop
+            }
+            catch
+            {
+                $err = Get-GTGraphErrorDetails -Exception $_.Exception -ResourceType 'user'
+                Write-PSFMessage -Level $err.LogLevel -Message "Batch request failed: $($err.Reason)"
+
+                foreach ($User in $approvedUsers)
+                {
+                    $result = [PSCustomObject]@{
+                        User             = $User
+                        Status           = 'Failed'
+                        TimeUtc          = (Get-UTCTime).ToString('o')
+                        HttpStatus       = $err.HttpStatus
+                        Reason           = $err.Reason
+                        ExceptionMessage = $err.ErrorMessage
+                    }
+                    [void]$results.Add($result)
+                }
+            }
+
+            if ($batchResponses)
+            {
+                $responseLookup = @{}
+                foreach ($resp in $batchResponses)
+                {
+                    $responseLookup[$resp.Id] = $resp
+                }
+
+                foreach ($User in $approvedUsers)
+                {
+                    $timeUtc = (Get-UTCTime).ToString('o')
+                    if ($responseLookup.ContainsKey($User))
+                    {
+                        $resp = $responseLookup[$User]
+                        if ($resp.Status -in 200, 204)
+                        {
+                            Write-PSFMessage -Level Verbose -Message "$User - Disable User Action - User Disabled"
+                            $result = [PSCustomObject]@{
+                                User             = $User
+                                Status           = 'Disabled'
+                                TimeUtc          = $timeUtc
+                                HttpStatus       = $resp.Status
+                                Reason           = 'User disabled successfully'
+                                ExceptionMessage = ''
+                            }
+                            [void]$results.Add($result)
+                        }
+                        else
+                        {
+                            $reason = if ($resp.Body -and $resp.Body.error -and $resp.Body.error.message) { $resp.Body.error.message } else { "Batch subrequest returned HTTP $($resp.Status)" }
+                            Write-PSFMessage -Level Warning -Message "$User - Disable User Action - Failed ($reason)"
+                            $result = [PSCustomObject]@{
+                                User             = $User
+                                Status           = 'Failed'
+                                TimeUtc          = $timeUtc
+                                HttpStatus       = $resp.Status
+                                Reason           = $reason
+                                ExceptionMessage = $reason
+                            }
+                            [void]$results.Add($result)
+                        }
+                    }
+                    else
+                    {
+                        $result = [PSCustomObject]@{
+                            User             = $User
+                            Status           = 'Failed'
+                            TimeUtc          = $timeUtc
+                            HttpStatus       = 500
+                            Reason           = 'No batch response received for user'
+                            ExceptionMessage = 'Missing batch subrequest response'
+                        }
+                        [void]$results.Add($result)
+                    }
+                }
+            }
+        }
+
         # Emit a single array of all results
         if ($results.Count -gt 0)
         {

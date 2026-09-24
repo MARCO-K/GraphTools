@@ -193,12 +193,12 @@ function Invoke-AuditLogQuery
             # ----------------------------------
             Write-PSFMessage -Level Verbose -Message "Submitting audit query..."
             Write-PSFMessage -Level Verbose -Message "Query parameters: $($queryParams | ConvertTo-Json)"
-            $auditJob = Invoke-GTGraphRequest -Uri 'https://graph.microsoft.com/beta/security/auditLog/queries/' `
-                -Method POST `
-                -Body ($queryParams | ConvertTo-Json)
+            # Beta endpoint justification: The Microsoft 365 Audit Log Query API (/security/auditLog/queries) is exclusively supported on Microsoft Graph /beta
+            $auditJob = Invoke-GTGraphRequest -Uri 'https://graph.microsoft.com/beta/security/auditLog/queries/' -Method POST -Body ($queryParams | ConvertTo-Json)
 
             # Region: Query Monitoring
             # ----------------------------------
+            # Beta endpoint justification: Query status polling is scoped under /beta/security/auditLog/queries/{id}
             $uri = ("/beta/security/auditLog/queries/{0}" -f $AuditJob.Id)
             $status = $null
             $attempt = 1
@@ -226,6 +226,7 @@ function Invoke-AuditLogQuery
             # ----------------------------------
             Write-PSFMessage -Level Verbose -Message "Collecting results..."
             $records = [System.Collections.Generic.List[object]]::new()
+            # Beta endpoint justification: Query result record streaming is hosted under /beta/security/auditLog/queries/{id}/records
             $resultsUri = "/beta/security/auditLog/queries/$($auditJob.Id)/records"
 
             do
