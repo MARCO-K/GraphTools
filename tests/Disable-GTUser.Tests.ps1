@@ -12,6 +12,9 @@ Describe "Disable-GTUser" {
         if (-not (Get-Command Write-PSFMessage -ErrorAction SilentlyContinue)) { function Write-PSFMessage { param($Level, $Message, $ErrorRecord) } }
         if (-not (Get-Command Get-UTCTime -ErrorAction SilentlyContinue)) { function Get-UTCTime { return [DateTime]::UtcNow } }
         if (-not (Get-Command Invoke-GTGraphRequest -ErrorAction SilentlyContinue)) { function Invoke-GTGraphRequest { param($Method, $Uri, $Body, $ContentType, $ErrorAction, [switch]$All) return $null } }
+        $batchFile = Join-Path $PSScriptRoot '..' 'internal' 'functions' 'Invoke-GTGraphBatch.ps1'
+        if (Test-Path $batchFile) { . $batchFile }
+        if (-not (Get-Command Invoke-GTGraphBatch -ErrorAction SilentlyContinue)) { function Invoke-GTGraphBatch { param($Requests) return @() } }
 
         # Mock Error Helper
         function Get-GTGraphErrorDetails
@@ -105,6 +108,26 @@ Describe "Disable-GTUser" {
 
             Should -Invoke -CommandName Invoke-GTGraphRequest -Times 0
             $results.Status | Should -Be 'Skipped'
+        }
+    }
+
+    Context "Batch Execution" {
+        It "executes bulk users via Invoke-GTGraphBatch" {
+            Mock -CommandName Invoke-GTGraphBatch -MockWith {
+                param($Requests)
+                return @(
+                    [PSCustomObject]@{ Id = 'user1@contoso.com'; Status = 204; Headers = @{}; Body = $null }
+                    [PSCustomObject]@{ Id = 'user2@contoso.com'; Status = 204; Headers = @{}; Body = $null }
+                )
+            }
+
+            $users = @('user1@contoso.com', 'user2@contoso.com')
+            $results = Disable-GTUser -UPN $users -Force
+
+            $results.Count | Should -Be 2
+            $results[0].Status | Should -Be 'Disabled'
+            $results[1].Status | Should -Be 'Disabled'
+            Should -Invoke -CommandName Invoke-GTGraphBatch -Times 1
         }
     }
 }

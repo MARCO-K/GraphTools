@@ -146,5 +146,36 @@ Describe "Invoke-GTGraphRequest" -Tag 'Unit' {
             $script:attemptCount | Should -Be 2
             $result.value[0].id | Should -Be 'retry-success'
         }
+
+        It "refreshes token on 401 Unauthorized and retries successfully" {
+            $script:attemptCount = 0
+            $script:refreshed = $false
+
+            Mock -CommandName Get-GTCachedGraphToken -MockWith {
+                param([switch]$ForceRefresh)
+                if ($ForceRefresh) {
+                    $script:refreshed = $true
+                    return 'refreshed-token-67890'
+                }
+                return 'initial-token-12345'
+            }
+
+            Mock -CommandName Invoke-RestMethod -MockWith {
+                $script:attemptCount++
+                if ($script:attemptCount -eq 1) {
+                    $mockResponse = [PSCustomObject]@{ StatusCode = 401 }
+                    $ex = [System.Exception]::new('Unauthorized')
+                    $ex | Add-Member -NotePropertyName 'Response' -NotePropertyValue $mockResponse -Force
+                    throw $ex
+                }
+                return @{ value = @( @{ id = 'token-refresh-success' } ) }
+            }
+
+            $result = Invoke-GTGraphRequest -Uri "v1.0/users" -MaxRetries 2
+
+            $script:attemptCount | Should -Be 2
+            $script:refreshed | Should -Be $true
+            $result.value[0].id | Should -Be 'token-refresh-success'
+        }
     }
 }

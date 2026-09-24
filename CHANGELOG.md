@@ -7,6 +7,26 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.22.0] - 2026-09-24
+
+### Added
+
+- **Automated Documentation Link Validation Test (`tests/Documentation.Tests.ps1`)**:
+  - Added Pester test to automatically verify relative markdown link integrity across all documentation files, preventing link rot in CI and review workflows.
+- **Mid-Pagination Token Refresh & 401 Recovery (`Invoke-GTGraphRequest`)**:
+  - Dynamically evaluates cached token expiration before requesting subsequent pages (`@odata.nextLink`) during multi-page queries (`-All`).
+  - Added automatic recovery on HTTP `401 Unauthorized`: if token expires or is invalidated mid-pagination, forces cache refresh via `Get-GTCachedGraphToken -ForceRefresh` and retries up to `$MaxRetries`.
+  - Added unit test in `tests/Invoke-GTGraphRequest.Tests.ps1` covering 401 recovery and token refresh.
+- **Bulk Batch Processing in `Disable-GTUser`**:
+  - Pipelined and multi-UPN inputs are now accumulated and processed in chunks of 20 via `Invoke-GTGraphBatch`, reducing HTTP roundtrips from O(N) to O(N/20) while retaining resilient subrequest throttling retries.
+  - Preserved single-call execution path for single-user invocations for optimal latency and full backward compatibility.
+  - Added batch execution unit tests in `tests/Disable-GTUser.Tests.ps1`.
+
+### Changed
+
+- **Beta Endpoint Discipline (`Invoke-AuditLogQuery`)**:
+  - Added explicit architectural justification comments to all Microsoft Graph `/beta/` endpoint calls (`/beta/security/auditLog/queries/`), ensuring full compliance with beta endpoint standards.
+
 ## [0.21.0] - 2026-09-24
 
 ### Added

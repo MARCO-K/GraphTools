@@ -181,6 +181,17 @@ function Invoke-GTGraphRequest
 
     do
     {
+        # Mid-pagination token renewal: refresh token if cached entry has reached the sliding expiration buffer
+        if ([string]::IsNullOrWhiteSpace($Token))
+        {
+            $freshToken = Get-GTCachedGraphToken
+            if ($freshToken -and $freshToken -ne $authToken)
+            {
+                $authToken = $freshToken
+                $requestHeaders['Authorization'] = "Bearer $authToken"
+            }
+        }
+
         $attempt = 0
         $requestSucceeded = $false
         $response = $null
@@ -218,6 +229,14 @@ function Invoke-GTGraphRequest
 
                     Write-PSFMessage -Level Warning -Message "HTTP $statusCode encountered calling '$currentUri'. Retrying after $retryAfter seconds (Attempt $($attempt + 1)/$MaxRetries)..."
                     Start-Sleep -Seconds $retryAfter
+                    $attempt++
+                }
+                elseif ($statusCode -eq 401 -and [string]::IsNullOrWhiteSpace($Token) -and $attempt -lt $MaxRetries)
+                {
+                    # Mid-pagination or expired token recovery: force token refresh and retry
+                    Write-PSFMessage -Level Warning -Message "HTTP 401 Unauthorized encountered calling '$currentUri'. Refreshing token and retrying (Attempt $($attempt + 1)/$MaxRetries)..."
+                    $authToken = Get-GTCachedGraphToken -ForceRefresh
+                    $requestHeaders['Authorization'] = "Bearer $authToken"
                     $attempt++
                 }
                 else
