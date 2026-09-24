@@ -15,6 +15,9 @@ function Remove-GTPIMRoleEligibility {
     .PARAMETER RoleDefinitionId
     Optional. The Object ID (GUID) of a specific role definition to remove.
     If not specified, ALL PIM assignments for the user will be removed.
+
+    .PARAMETER NewSession
+    If specified, creates a new Microsoft Graph session by disconnecting any existing session first.
     #>
     [CmdletBinding(SupportsShouldProcess)]
     [OutputType([PSCustomObject])]
@@ -23,20 +26,26 @@ function Remove-GTPIMRoleEligibility {
         [string]$UserId,
 
         [Parameter(Mandatory = $false)]
-        [string]$RoleDefinitionId
+        [string]$RoleDefinitionId,
+
+        [Parameter(Mandatory = $false)]
+        [switch]$NewSession
     )
 
     begin {
-        # 1. Scopes Check (CRITICAL FIX)
-        # PIM splits permissions between "Assignment" (Active) and "Eligibility" (Eligible).
-        # You must have BOTH ReadWrite permissions to clean up a user completely.
+        # 1. Connection Initialization
         $requiredScopes = @(
             'RoleAssignmentSchedule.ReadWrite.Directory', 
             'RoleEligibilitySchedule.ReadWrite.Directory',
             'User.Read' # For the self-protection check
         )
-        
-        if (-not (Test-GTGraphScopes -RequiredScopes $requiredScopes -Reconnect -Quiet)) {
+        if (-not (Initialize-GTGraphConnection -Scopes $requiredScopes -NewSession:$NewSession)) {
+            Write-Error "Failed to initialize session."
+            return
+        }
+
+        # 2. Scope Validation
+        if (-not (Test-GTGraphScopes -RequiredScopes $requiredScopes -Quiet)) {
             Write-Error "Failed to acquire required permissions ($($requiredScopes -join ', ')). Aborting."
             return
         }

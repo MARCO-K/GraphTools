@@ -44,19 +44,18 @@ function Get-GTAdminCountReport
 
     begin
     {
-        # 1. Scopes Check
+        # 1. Connection Initialization
         # RoleManagement.Read.Directory allows reading role definitions and assignments
         $requiredScopes = @('RoleManagement.Read.Directory', 'Directory.Read.All')
-        
-        if (-not (Test-GTGraphScopes -RequiredScopes $requiredScopes -Reconnect -Quiet))
-        {
-            throw "Failed to acquire required permissions ($($requiredScopes -join ', ')). Aborting."
-        }
-
-        # 2. Connection Initialization
         if (-not (Initialize-GTGraphConnection -Scopes $requiredScopes -NewSession:$NewSession))
         {
             throw "Failed to initialize session."
+        }
+
+        # 2. Scopes Validation
+        if (-not (Test-GTGraphScopes -RequiredScopes $requiredScopes -Quiet))
+        {
+            throw "Failed to acquire required permissions ($($requiredScopes -join ', ')). Aborting."
         }
 
         # 3. Define Risk Tiers

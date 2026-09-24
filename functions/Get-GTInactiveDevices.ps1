@@ -18,6 +18,9 @@ function Get-GTInactiveDevices
     .PARAMETER IncludeDisabled
     Switch to include devices that are already disabled. By default, only enabled devices are returned.
 
+    .PARAMETER NewSession
+    If specified, creates a new Microsoft Graph session by disconnecting any existing session first.
+
     .EXAMPLE
     Get-GTInactiveDevices -InactiveDays 90
     Finds all enabled devices inactive for more than 90 days.
@@ -36,14 +39,21 @@ function Get-GTInactiveDevices
 
         [string]$DeviceType,
 
-        [switch]$IncludeDisabled
+        [switch]$IncludeDisabled,
+
+        [switch]$NewSession
     )
 
     begin
     {
-        # 1. Scopes Check
         $requiredScopes = @('Device.Read.All')
-        if (-not (Test-GTGraphScopes -RequiredScopes $requiredScopes -Reconnect -Quiet))
+        if (-not (Initialize-GTGraphConnection -Scopes $requiredScopes -NewSession:$NewSession))
+        {
+            Write-Error "Failed to initialize session."
+            return
+        }
+
+        if (-not (Test-GTGraphScopes -RequiredScopes $requiredScopes -Quiet))
         {
             Write-Error "Failed to acquire required permissions ($($requiredScopes -join ', ')). Aborting."
             return

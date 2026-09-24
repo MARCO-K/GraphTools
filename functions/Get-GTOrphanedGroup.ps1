@@ -49,21 +49,18 @@ function Get-GTOrphanedGroup
 
     begin
     {
-        # 1. Scopes Check (Gold Standard)
+        # 1. Connection Initialization
         $requiredScopes = @('Group.Read.All', 'User.Read.All')
-        
-        # Use Test-GTGraphScopes for validation
-        if (-not (Test-GTGraphScopes -RequiredScopes $requiredScopes -Reconnect -Quiet))
-        {
-            Write-Error "Failed to acquire required permissions ($($requiredScopes -join ', ')). Aborting."
-            return
-        }
-
-        # 2. Connection Initialization (if forced new session)
-        # We call Initialize regardless, but pass NewSession if requested
         if (-not (Initialize-GTGraphConnection -Scopes $requiredScopes -NewSession:$NewSession))
         {
             Write-Error "Failed to initialize session."
+            return
+        }
+
+        # 2. Scopes Validation
+        if (-not (Test-GTGraphScopes -RequiredScopes $requiredScopes -Quiet))
+        {
+            Write-Error "Failed to acquire required permissions ($($requiredScopes -join ', ')). Aborting."
             return
         }
     }

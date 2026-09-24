@@ -16,6 +16,9 @@ function Get-GTExpiringSecrets
     .PARAMETER Scope
     Specifies whether to check 'Applications', 'ServicePrincipals', or 'All'. Default is 'All'.
 
+    .PARAMETER NewSession
+    If specified, creates a new Microsoft Graph session by disconnecting any existing session first.
+
     .EXAMPLE
     Get-GTExpiringSecrets -DaysUntilExpiry 30
     Finds all credentials expiring in the next 30 days.
@@ -28,13 +31,21 @@ function Get-GTExpiringSecrets
         [int]$DaysUntilExpiry,
 
         [ValidateSet('All', 'Applications', 'ServicePrincipals')]
-        [string]$Scope = 'All'
+        [string]$Scope = 'All',
+
+        [switch]$NewSession
     )
 
     begin
     {
         $requiredScopes = @('Application.Read.All')
-        if (-not (Test-GTGraphScopes -RequiredScopes $requiredScopes -Reconnect -Quiet))
+        if (-not (Initialize-GTGraphConnection -Scopes $requiredScopes -NewSession:$NewSession))
+        {
+            Write-Error "Failed to initialize session."
+            return
+        }
+
+        if (-not (Test-GTGraphScopes -RequiredScopes $requiredScopes -Quiet))
         {
             Write-Error "Failed to acquire required permissions ($($requiredScopes -join ', ')). Aborting."
             return

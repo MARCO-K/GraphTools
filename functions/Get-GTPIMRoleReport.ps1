@@ -19,6 +19,9 @@ function Get-GTPIMRoleReport
     .PARAMETER RoleName
     Optional. Filter the report for a specific role by its display name (e.g., 'Global Administrator').
 
+    .PARAMETER NewSession
+    If specified, creates a new Microsoft Graph session by disconnecting any existing session first.
+
     .EXAMPLE
     Get-GTPIMRoleReport -RoleName 'Global Administrator'
     Efficiently retrieves only Global Admins using server-side filtering.
@@ -45,19 +48,18 @@ function Get-GTPIMRoleReport
 
     begin
     {
-        # 1. Scope Check
+        # 1. Connection Initialization
         $requiredScopes = @('RoleManagement.Read.Directory', 'User.Read.All', 'Group.Read.All')
-        
-        if (-not (Test-GTGraphScopes -RequiredScopes $requiredScopes -Reconnect -Quiet))
-        {
-            Write-Error "Failed to acquire required permissions ($($requiredScopes -join ', ')). Aborting."
-            return
-        }
-
-        # 2. Connection Initialization
         if (-not (Initialize-GTGraphConnection -Scopes $requiredScopes -NewSession:$NewSession))
         {
             Write-Error "Failed to initialize session."
+            return
+        }
+
+        # 2. Scope Validation
+        if (-not (Test-GTGraphScopes -RequiredScopes $requiredScopes -Quiet))
+        {
+            Write-Error "Failed to acquire required permissions ($($requiredScopes -join ', ')). Aborting."
             return
         }
 

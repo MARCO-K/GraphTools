@@ -13,6 +13,9 @@ function Remove-GTExpiredInvites {
     .PARAMETER Force
     Bypasses the confirmation prompt.
 
+    .PARAMETER NewSession
+    If specified, creates a new Microsoft Graph session by disconnecting any existing session first.
+
     .EXAMPLE
     Remove-GTExpiredInvites -DaysOlderThan 90 -WhatIf
     Shows which users would be removed if they haven't accepted invites sent over 90 days ago.
@@ -25,11 +28,13 @@ function Remove-GTExpiredInvites {
         [Parameter(Mandatory = $true)]
         [int]$DaysOlderThan,
 
-        [switch]$Force
+        [switch]$Force,
+
+        [switch]$NewSession
     )
 
     begin {
-        if (-not (Initialize-GTGraphConnection -Scopes 'User.ReadWrite.All')) {
+        if (-not (Initialize-GTGraphConnection -Scopes 'User.ReadWrite.All' -NewSession:$NewSession)) {
             Write-Error "Failed to initialize Microsoft Graph connection."
             return
         }

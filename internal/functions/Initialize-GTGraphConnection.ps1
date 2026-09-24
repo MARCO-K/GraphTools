@@ -113,19 +113,10 @@ function Initialize-GTGraphConnection
 
         if ($Scopes)
         {
-            $conn = Get-GTConnection
-            $currentScopes = if ($conn.Scopes) { $conn.Scopes } elseif ($conn.Scope) { $conn.Scope -split ' ' } else { @() }
-
-            # If using .default (App-only or default consent), skip missing scope check
-            $hasDefaultScope = ($currentScopes -contains 'https://graph.microsoft.com/.default') -or ($currentScopes -contains '.default')
-            if (-not $hasDefaultScope -and $currentScopes.Count -gt 0)
+            if (-not (Test-GTGraphScopes -RequiredScopes $Scopes -Quiet))
             {
-                $missingScopes = Get-GTMissingScopes -RequiredScopes $Scopes -CurrentScopes $currentScopes
-                if ($missingScopes.Count -gt 0)
-                {
-                    Write-PSFMessage -Level Warning -Message "Existing Microsoft Graph context is missing required scopes: $($missingScopes -join ', ')"
-                    return $false
-                }
+                Write-PSFMessage -Level Warning -Message "Microsoft Graph session is missing required scopes: $($Scopes -join ', ')"
+                return $false
             }
         }
 

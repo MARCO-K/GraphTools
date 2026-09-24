@@ -18,6 +18,18 @@ function Get-GTServicePrincipalReport
     .PARAMETER DisplayName
     The display name of the service principal to retrieve.
 
+    .PARAMETER IncludeSignInActivity
+    Switch to include sign-in activity data (requires AuditLog.Read.All).
+
+    .PARAMETER IncludeCredentials
+    Switch to include credential/secret expiry information.
+
+    .PARAMETER ExpandOwners
+    Switch to expand and resolve owner display names and UPNs.
+
+    .PARAMETER NewSession
+    If specified, creates a new Microsoft Graph session by disconnecting any existing session first.
+
     .EXAMPLE
     Get-GTServicePrincipalReport -Verbose
     Retrieves a report for all Service Principals.
@@ -53,17 +65,17 @@ function Get-GTServicePrincipalReport
         if ($ExpandOwners) { $requiredScopes.Add('Directory.Read.All') }
         if ($IncludeSignInActivity) { $requiredScopes.Add('AuditLog.Read.All') }
 
-        # 2. Scopes Check (Gold Standard)
-        if (-not (Test-GTGraphScopes -RequiredScopes $requiredScopes -Reconnect -Quiet))
-        {
-            Write-Error "Failed to acquire required permissions ($($requiredScopes -join ', ')). Aborting."
-            return
-        }
-
-        # 3. Connection Initialization
+        # 2. Connection Initialization
         if (-not (Initialize-GTGraphConnection -Scopes $requiredScopes -NewSession:$NewSession))
         {
             Write-Error "Failed to initialize session."
+            return
+        }
+
+        # 3. Scopes Validation
+        if (-not (Test-GTGraphScopes -RequiredScopes $requiredScopes -Quiet))
+        {
+            Write-Error "Failed to acquire required permissions ($($requiredScopes -join ', ')). Aborting."
             return
         }
     }

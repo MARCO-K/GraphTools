@@ -33,6 +33,9 @@ function Get-GTInactiveUser
     Include Graph sign-in activity artifacts that have an Id and sign-in timestamps but no resolvable user profile fields.
     By default, these records are excluded to keep cleanup candidate output actionable.
 
+    .PARAMETER NewSession
+    If specified, creates a new Microsoft Graph session by disconnecting any existing session first.
+
     .EXAMPLE
     Get-GTInactiveUser -InactiveDaysOlderThan 90
     Finds users inactive for over 3 months (efficiently).

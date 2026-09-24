@@ -10,6 +10,9 @@ record types, user IDs, and IP addresses.
 .PARAMETER Scopes
 Required Microsoft Graph permissions. Defaults to all AuditLogsQuery permissions.
 
+.PARAMETER NewSession
+If specified, creates a new Microsoft Graph session by disconnecting any existing session first.
+
 .PARAMETER StartDays
 Number of days back to start the search. The maximum value is 30. Defaults to 7.
 
@@ -73,7 +76,8 @@ function Invoke-AuditLogQuery
     [CmdletBinding()]
     param(
         [Parameter(Mandatory = $false)]
-        [string[]]$RequieredScopes = @('AuditLogsQuery-CRM.Read.All', 'AuditLogsQuery-Endpoint.Read.All', 'AuditLogsQuery-Exchange.Read.All', 'AuditLogsQuery-OneDrive.Read.All', 'AuditLogsQuery-SharePoint.Read.All', 'AuditLogsQuery.Read.All'),
+        [Alias('RequieredScopes', 'Scope', 'Scopes')]
+        [string[]]$RequiredScopes = @('AuditLogsQuery-CRM.Read.All', 'AuditLogsQuery-Endpoint.Read.All', 'AuditLogsQuery-Exchange.Read.All', 'AuditLogsQuery-OneDrive.Read.All', 'AuditLogsQuery-SharePoint.Read.All', 'AuditLogsQuery.Read.All'),
 
         [Parameter(Mandatory = $false)]
         [switch]$NewSession,
@@ -151,13 +155,12 @@ function Invoke-AuditLogQuery
 
 
         # Connect to Microsoft Graph
-        if ($NewSession)
+        if (-not (Initialize-GTGraphConnection -Scopes $RequiredScopes -NewSession:$NewSession))
         {
-            Write-PSFMessage -Level 'Verbose' -Message 'Closing existing Microsoft Graph session.'
-            Disconnect-GTGraph
+            throw "Graph connection failed: Could not initialize session."
         }
 
-        $session = Test-GTGraphScopes -RequiredScopes $RequiredScopes -Reconnect -Quiet
+        $session = Test-GTGraphScopes -RequiredScopes $RequiredScopes -Quiet
         if (-not $session)
         {
             throw "Graph connection failed: Required scopes not available"

@@ -17,6 +17,9 @@ function Get-GTRecentUser
     The User Principal Name (UPN) of the user to retrieve.
     Aliases: UPN, UserName, UPNName
 
+    .PARAMETER NewSession
+    If specified, creates a new Microsoft Graph session by disconnecting any existing session first.
+
     .EXAMPLE
     Get-GTRecentUser -HoursAgo 72
     Retrieves users created in the last 3 days.
@@ -46,20 +49,19 @@ function Get-GTRecentUser
 
     begin
     {
-        # 1. Scopes Check (Gold Standard)
+        # 1. Connection Initialization
         # User.Read.All is required to read CreatedDateTime and filter users
         $requiredScopes = @('User.Read.All')
-        
-        if (-not (Test-GTGraphScopes -RequiredScopes $requiredScopes -Reconnect -Quiet))
-        {
-            Write-Error "Failed to acquire required permissions ($($requiredScopes -join ', ')). Aborting."
-            return
-        }
-
-        # 2. Connection Initialization
         if (-not (Initialize-GTGraphConnection -Scopes $requiredScopes -NewSession:$NewSession))
         {
             Write-Error "Failed to initialize session."
+            return
+        }
+
+        # 2. Scopes Validation
+        if (-not (Test-GTGraphScopes -RequiredScopes $requiredScopes -Quiet))
+        {
+            Write-Error "Failed to acquire required permissions ($($requiredScopes -join ', ')). Aborting."
             return
         }
     }

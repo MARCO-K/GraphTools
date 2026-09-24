@@ -15,6 +15,9 @@
 .PARAMETER Force
     Suppresses confirmation prompts and forces the disable operation. Use with caution in automation.
 
+.PARAMETER NewSession
+    If specified, creates a new Microsoft Graph session by disconnecting any existing session first.
+
 .OUTPUTS
     System.Object[]
     Returns a single array (emitted once in End) of PSCustomObjects, one per processed UPN.
@@ -39,7 +42,10 @@ Function Disable-GTUser
         [string[]]$UPN,
 
         [Parameter()]
-        [switch]$Force
+        [switch]$Force,
+
+        [Parameter()]
+        [switch]$NewSession
     )
 
     begin
@@ -49,10 +55,13 @@ Function Disable-GTUser
 
         # Graph Connection & Scope Handling
         $requiredScopes = @('User.ReadWrite.All')
-        
-        # CRITICAL FIX: Capture the boolean result in an 'if' statement.
-        # Do not let Test-GTGraphScopes output directly to the pipeline.
-        if (-not (Test-GTGraphScopes -RequiredScopes $requiredScopes -Reconnect -Quiet))
+        if (-not (Initialize-GTGraphConnection -Scopes $requiredScopes -NewSession:$NewSession))
+        {
+            Write-Error "Failed to initialize session."
+            return
+        }
+
+        if (-not (Test-GTGraphScopes -RequiredScopes $requiredScopes -Quiet))
         {
             Write-Error "Failed to acquire required permissions ($($requiredScopes -join ', ')). Aborting."
             return
