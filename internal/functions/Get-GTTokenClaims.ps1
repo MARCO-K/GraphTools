@@ -49,7 +49,7 @@ function Get-GTTokenClaims
     }
     catch
     {
-        Write-PSFMessage -Level Verbose -Message "Failed to decode JWT claims: $_"
+        Write-PSFMessage -Level Verbose -Message "Failed to decode JWT claims: $($_.Exception.Message)"
         return $null
     }
 }

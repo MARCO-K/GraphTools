@@ -5,14 +5,13 @@ function Test-GTGraphScopes
     Validates Microsoft Graph authentication context and required permissions
 
     .DESCRIPTION
-    Checks if the current session has the required Graph API permissions/scopes
-    and optionally reconnects with missing permissions
+    Checks if the current session has the required Graph API permissions/scopes.
 
     .PARAMETER RequiredScopes
     Array of required permission strings (scopes or app roles)
 
     .PARAMETER Reconnect
-    Attempt automatic reconnection when missing permissions
+    [Deprecated] Retained for backwards compatibility. Dynamic scope renegotiation at runtime is not supported.
 
     .PARAMETER Quiet
     Suppress all output and return boolean only
@@ -21,7 +20,7 @@ function Test-GTGraphScopes
     Test-GraphScopes -RequiredScopes "User.Read.All","Group.ReadWrite.All"
 
     .EXAMPLE
-    Test-GraphScopes -RequiredScopes "Directory.Read.All" -Reconnect -Quiet
+    Test-GraphScopes -RequiredScopes "Directory.Read.All" -Quiet
     #>
     [CmdletBinding()]
     param(
@@ -57,12 +56,12 @@ function Test-GTGraphScopes
     {
         if ($Reconnect)
         {
-            Write-PSFMessage -Level Verbose -Message 'Dynamic scope renegotiation is not supported for client credentials (App-only) authentication. Permissions must be assigned to the Application registration in Microsoft Entra ID.'
+            Write-PSFMessage -Level Verbose -Message 'The -Reconnect parameter is deprecated and has no effect. Dynamic scope renegotiation at runtime is not supported; required permissions must be granted to the Application registration in Microsoft Entra ID.'
         }
 
         if (-not $Quiet)
         {
-            Write-Warning "Active Microsoft Graph session is missing required permissions: $($missing -join ', '). Available permissions: $($currentPermissions -join ', '). Required permissions must be assigned to the Application registration in Microsoft Entra ID."
+            Write-Warning "Active Microsoft Graph session is missing required permissions: $($missing -join ', '). Available permissions: $($currentPermissions -join ', '). Required permissions must be granted to the Application registration in Microsoft Entra ID."
         }
         return $false
     }

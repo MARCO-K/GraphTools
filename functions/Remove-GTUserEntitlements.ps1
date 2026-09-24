@@ -43,6 +43,8 @@
     Remove all delegated permission grants (OAuth2 permissions) granted to applications on behalf of the user
 .PARAMETER removeAll
     Remove all types of entitlements
+.PARAMETER NewSession
+    If specified, creates a new Microsoft Graph session by disconnecting any existing session first.
 .EXAMPLE
     Remove-GTUserEntitlements -UserUPNs 'user1@contoso.com' -removeAll
 

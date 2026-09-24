@@ -6,7 +6,9 @@
     This function connects to Microsoft Graph to fetch all Conditional Access policies
     (enabled, disabled, and report-only) and extracts detailed configuration settings
     for each policy. It provides a structured output suitable for analysis and review.
- 
+.PARAMETER NewSession
+    If specified, creates a new Microsoft Graph session by disconnecting any existing session first.
+
 .OUTPUTS
     System.Management.Automation.PSCustomObject
     Outputs a custom object for each Conditional Access policy found, containing detailed

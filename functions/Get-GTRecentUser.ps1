@@ -17,6 +17,9 @@ function Get-GTRecentUser
     The User Principal Name (UPN) of the user to retrieve.
     Aliases: UPN, UserName, UPNName
 
+    .PARAMETER NewSession
+    If specified, creates a new Microsoft Graph session by disconnecting any existing session first.
+
     .EXAMPLE
     Get-GTRecentUser -HoursAgo 72
     Retrieves users created in the last 3 days.

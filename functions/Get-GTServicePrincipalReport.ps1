@@ -18,6 +18,18 @@ function Get-GTServicePrincipalReport
     .PARAMETER DisplayName
     The display name of the service principal to retrieve.
 
+    .PARAMETER IncludeSignInActivity
+    Switch to include sign-in activity data (requires AuditLog.Read.All).
+
+    .PARAMETER IncludeCredentials
+    Switch to include credential/secret expiry information.
+
+    .PARAMETER ExpandOwners
+    Switch to expand and resolve owner display names and UPNs.
+
+    .PARAMETER NewSession
+    If specified, creates a new Microsoft Graph session by disconnecting any existing session first.
+
     .EXAMPLE
     Get-GTServicePrincipalReport -Verbose
     Retrieves a report for all Service Principals.

@@ -18,6 +18,9 @@ function Get-GTInactiveDevices
     .PARAMETER IncludeDisabled
     Switch to include devices that are already disabled. By default, only enabled devices are returned.
 
+    .PARAMETER NewSession
+    If specified, creates a new Microsoft Graph session by disconnecting any existing session first.
+
     .EXAMPLE
     Get-GTInactiveDevices -InactiveDays 90
     Finds all enabled devices inactive for more than 90 days.

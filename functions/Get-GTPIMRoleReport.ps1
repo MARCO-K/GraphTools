@@ -19,6 +19,9 @@ function Get-GTPIMRoleReport
     .PARAMETER RoleName
     Optional. Filter the report for a specific role by its display name (e.g., 'Global Administrator').
 
+    .PARAMETER NewSession
+    If specified, creates a new Microsoft Graph session by disconnecting any existing session first.
+
     .EXAMPLE
     Get-GTPIMRoleReport -RoleName 'Global Administrator'
     Efficiently retrieves only Global Admins using server-side filtering.

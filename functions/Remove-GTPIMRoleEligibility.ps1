@@ -15,6 +15,9 @@ function Remove-GTPIMRoleEligibility {
     .PARAMETER RoleDefinitionId
     Optional. The Object ID (GUID) of a specific role definition to remove.
     If not specified, ALL PIM assignments for the user will be removed.
+
+    .PARAMETER NewSession
+    If specified, creates a new Microsoft Graph session by disconnecting any existing session first.
     #>
     [CmdletBinding(SupportsShouldProcess)]
     [OutputType([PSCustomObject])]

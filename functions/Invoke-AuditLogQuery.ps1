@@ -10,6 +10,9 @@ record types, user IDs, and IP addresses.
 .PARAMETER Scopes
 Required Microsoft Graph permissions. Defaults to all AuditLogsQuery permissions.
 
+.PARAMETER NewSession
+If specified, creates a new Microsoft Graph session by disconnecting any existing session first.
+
 .PARAMETER StartDays
 Number of days back to start the search. The maximum value is 30. Defaults to 7.
 

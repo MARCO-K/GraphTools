@@ -15,6 +15,9 @@
 .PARAMETER Force
     Suppresses confirmation prompts and forces the disable operation. Use with caution in automation.
 
+.PARAMETER NewSession
+    If specified, creates a new Microsoft Graph session by disconnecting any existing session first.
+
 .OUTPUTS
     System.Object[]
     Returns a single array (emitted once in End) of PSCustomObjects, one per processed UPN.

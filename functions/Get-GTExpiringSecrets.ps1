@@ -16,6 +16,9 @@ function Get-GTExpiringSecrets
     .PARAMETER Scope
     Specifies whether to check 'Applications', 'ServicePrincipals', or 'All'. Default is 'All'.
 
+    .PARAMETER NewSession
+    If specified, creates a new Microsoft Graph session by disconnecting any existing session first.
+
     .EXAMPLE
     Get-GTExpiringSecrets -DaysUntilExpiry 30
     Finds all credentials expiring in the next 30 days.

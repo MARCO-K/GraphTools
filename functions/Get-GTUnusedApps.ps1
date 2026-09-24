@@ -18,6 +18,9 @@ function Get-GTUnusedApps
     Switch to include apps that have never had a recorded sign-in.
     WARNING: Using this switch forces a full download of all Service Principals.
 
+    .PARAMETER NewSession
+    If specified, creates a new Microsoft Graph session by disconnecting any existing session first.
+
     .EXAMPLE
     Get-GTUnusedApps -DaysSinceLastSignIn 90
     Fast. Finds apps inactive for more than 90 days.
