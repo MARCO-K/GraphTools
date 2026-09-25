@@ -51,6 +51,8 @@ Describe "Connect-GTGraph, Disconnect-GTGraph & Get-GTConnection" -Tag 'Unit' {
             $conn | Should -Not -BeNullOrEmpty
             $conn.Connected | Should -Be $true
             $conn.AuthType | Should -Be 'DirectToken'
+            $conn.TenantId | Should -BeNullOrEmpty
+            $conn.ClientId | Should -BeNullOrEmpty
         }
 
         It "authenticates via [System.Security.SecureString] ClientSecret" {
@@ -82,6 +84,8 @@ Describe "Connect-GTGraph, Disconnect-GTGraph & Get-GTConnection" -Tag 'Unit' {
 
             $conn.Connected | Should -Be $true
             $conn.AuthType | Should -Be 'Identity'
+            $conn.TenantId | Should -BeNullOrEmpty
+            $conn.ClientId | Should -BeNullOrEmpty
             $script:GTConnectionConfig.AuthType | Should -Be 'Identity'
         }
 

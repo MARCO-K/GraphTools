@@ -94,6 +94,29 @@ Describe "Authentication Flows & Helpers" -Tag 'Unit' {
             $script:capturedUri | Should -Match 'http://127\.0\.0\.1:41741/MSI/token/'
         }
 
+        It "queries classic App Service endpoint when MSI_ENDPOINT and MSI_SECRET are present" {
+            $env:MSI_ENDPOINT = 'http://127.0.0.1:41741/MSI/token/'
+            $env:MSI_SECRET   = 'test-msi-secret'
+
+            $script:capturedHeaders = $null
+            $script:capturedUri = $null
+
+            Mock -CommandName Invoke-RestMethod -MockWith {
+                $script:capturedHeaders = $Headers
+                $script:capturedUri = $Uri
+                [PSCustomObject]@{
+                    access_token = 'classic-appservice-token'
+                    expires_in   = 1800
+                }
+            }
+
+            $token = Get-GTManagedIdentityToken
+
+            $token.AccessToken | Should -Be 'classic-appservice-token'
+            $script:capturedHeaders['secret'] | Should -Be 'test-msi-secret'
+            $script:capturedUri | Should -Match 'api-version=2017-09-01'
+        }
+
         It "appends client_id parameter for User-Assigned identity with ClientId type" {
             $script:capturedUri = $null
 

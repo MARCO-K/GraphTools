@@ -40,8 +40,8 @@ function Get-GTManagedIdentityToken
     elseif ($env:MSI_ENDPOINT -and $env:MSI_SECRET)
     {
         $endpoint = $env:MSI_ENDPOINT
-        $headers = @{ 'X-IDENTITY-HEADER' = $env:MSI_SECRET }
-        $apiVersion = '2019-08-01'
+        $headers = @{ 'secret' = $env:MSI_SECRET }
+        $apiVersion = '2017-09-01'
     }
     else
     {

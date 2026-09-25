@@ -266,8 +266,8 @@ function Connect-GTGraph
 
         # Store global configuration
         $script:GTConnectionConfig = @{
-            TenantId     = $TenantId
-            ClientId     = $ClientId
+            TenantId     = if ($AccessToken) { $null } else { $TenantId }
+            ClientId     = if ($AccessToken) { $null } else { $ClientId }
             Thumbprint   = $Thumbprint
             Certificate  = $Certificate
             ClientSecret = $ClientSecret
@@ -311,8 +311,8 @@ function Connect-GTGraph
 
     $summary = [PSCustomObject]@{
         PSTypeName           = 'GraphTools.Connection'
-        TenantId             = if ($script:GTConnectionConfig -and $script:GTConnectionConfig.TenantId) { $script:GTConnectionConfig.TenantId } else { $TenantId }
-        ClientId             = if ($script:GTConnectionConfig -and $script:GTConnectionConfig.ClientId) { $script:GTConnectionConfig.ClientId } else { $ClientId }
+        TenantId             = if ($script:GTConnectionConfig -and $script:GTConnectionConfig.TenantId) { $script:GTConnectionConfig.TenantId } elseif ($script:GTTokenCache -and $script:GTTokenCache.TenantId) { $script:GTTokenCache.TenantId } else { $null }
+        ClientId             = if ($script:GTConnectionConfig -and $script:GTConnectionConfig.ClientId) { $script:GTConnectionConfig.ClientId } elseif ($script:GTTokenCache -and $script:GTTokenCache.ClientId) { $script:GTTokenCache.ClientId } else { $null }
         AuthType             = $authType
         Scope                = $Scope
         ExpiresAt            = if ($script:GTTokenCache) { $script:GTTokenCache.ExpiresAt } else { $null }
