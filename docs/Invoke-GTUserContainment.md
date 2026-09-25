@@ -33,6 +33,12 @@ It coordinates the 5-step containment lifecycle:
 ### Default Behavior
 By default, standard safe containment executes steps 1 through 4. Step 5 (`StripEntitlements`) is destructive and is only executed when `-StripEntitlements` or `-FullContainment` is explicitly requested.
 
+## REQUIRED PERMISSIONS
+The cmdlet dynamically resolves and verifies permissions based on requested actions:
+- **Standard Safe Containment** (default): `User.ReadWrite.All`, `Device.ReadWrite.All`
+- **Selective Containment**: Only scopes corresponding to the selected action flags
+- **Entitlement Stripping** (`-StripEntitlements` / `-FullContainment`): Adds `GroupMember.ReadWrite.All`, `Group.ReadWrite.All`, `Directory.ReadWrite.All`, `RoleManagement.ReadWrite.Directory`, `RoleEligibilitySchedule.ReadWrite.Directory`, `AdministrativeUnit.ReadWrite.All`, `EntitlementManagement.ReadWrite.All`, `DelegatedPermissionGrant.ReadWrite.All`
+
 ## PARAMETERS
 
 ### -UPN
@@ -140,9 +146,9 @@ Invoke-GTUserContainment -UPN 'user@contoso.com' -WhatIf
 Displays planned containment actions without executing them against Microsoft Graph.
 
 ## RELATED LINKS
-- [Revoke-GTSignOutFromAllSessions](file:///C:/tools/personal/git/GraphTools/functions/Revoke-GTSignOutFromAllSessions.ps1)
-- [Disable-GTUser](file:///C:/tools/personal/git/GraphTools/functions/Disable-GTUser.ps1)
-- [Reset-GTUserPassword](file:///C:/tools/personal/git/GraphTools/functions/Reset-GTUserPassword.ps1)
-- [Disable-GTUserDevice](file:///C:/tools/personal/git/GraphTools/functions/Disable-GTUserDevice.ps1)
-- [Remove-GTUserEntitlements](file:///C:/tools/personal/git/GraphTools/functions/Remove-GTUserEntitlements.ps1)
+- [`Revoke-GTSignOutFromAllSessions`](../functions/Revoke-GTSignOutFromAllSessions.ps1)
+- [`Disable-GTUser`](../functions/Disable-GTUser.ps1)
+- [`Reset-GTUserPassword`](../functions/Reset-GTUserPassword.ps1)
+- [`Disable-GTUserDevice`](../functions/Disable-GTUserDevice.ps1)
+- [`Remove-GTUserEntitlements`](../functions/Remove-GTUserEntitlements.ps1)
 - [User Security Response Guide](User-Security-Response.md)

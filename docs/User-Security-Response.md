@@ -23,7 +23,7 @@ Executes rapid security containment workflows for compromised user accounts with
 
 **Purpose**: Runs the full or standard containment playbook in a single command, returning structured forensic results.
 
-**Required Permissions**: `User.ReadWrite.All`, `Directory.AccessAsUser.All` (plus role scopes if using `-StripEntitlements`)
+**Required Permissions**: `User.ReadWrite.All`, `Device.ReadWrite.All` (plus role scopes if using `-StripEntitlements`)
 
 **Example**:
 
@@ -83,7 +83,7 @@ Disables all devices registered to a user in Microsoft Entra ID.
 
 **Purpose**: Prevents access from all devices registered to the user account, adding an additional layer of security.
 
-**Required Permissions**: `Directory.AccessAsUser.All`
+**Required Permissions**: `Device.ReadWrite.All`
 
 **Example**:
 

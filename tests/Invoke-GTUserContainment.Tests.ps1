@@ -225,5 +225,27 @@ Describe "Invoke-GTUserContainment" {
 
             $errOutput | Should -Not -BeNullOrEmpty
         }
+
+        It "requests Device.ReadWrite.All for device containment instead of Directory.AccessAsUser.All" {
+            Mock -CommandName "Initialize-GTGraphConnection" -MockWith { return $true }
+            Mock -CommandName "Test-GTGraphScopes" -MockWith { return $true }
+            Mock -CommandName "Revoke-GTSignOutFromAllSessions" -MockWith { }
+            Mock -CommandName "Disable-GTUser" -MockWith { return @([PSCustomObject]@{ User = 'scopecheck@contoso.com'; Status = 'Disabled' }) }
+            Mock -CommandName "Reset-GTUserPassword" -MockWith { }
+            Mock -CommandName "Disable-GTUserDevice" -MockWith { return @([PSCustomObject]@{ User = 'scopecheck@contoso.com'; Status = 'Disabled' }) }
+
+            $null = Invoke-GTUserContainment -UPN 'scopecheck@contoso.com'
+
+            Assert-MockCalled -CommandName "Initialize-GTGraphConnection" -Times 1 -Exactly -ParameterFilter {
+                $Scopes -contains 'User.ReadWrite.All' -and
+                $Scopes -contains 'Device.ReadWrite.All' -and
+                $Scopes -notcontains 'Directory.AccessAsUser.All'
+            }
+            Assert-MockCalled -CommandName "Test-GTGraphScopes" -Times 1 -Exactly -ParameterFilter {
+                $RequiredScopes -contains 'User.ReadWrite.All' -and
+                $RequiredScopes -contains 'Device.ReadWrite.All' -and
+                $RequiredScopes -notcontains 'Directory.AccessAsUser.All'
+            }
+        }
     }
 }

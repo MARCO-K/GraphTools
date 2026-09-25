@@ -154,7 +154,7 @@ function Invoke-GTUserContainment
 
         if ($doDisableDevices)
         {
-            $requiredScopes.Add('Directory.AccessAsUser.All')
+            $requiredScopes.Add('Device.ReadWrite.All')
         }
 
         if ($doStripEntitlements)
