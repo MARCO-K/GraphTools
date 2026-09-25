@@ -10,6 +10,7 @@
 
 ## 📋 Table of Contents
 
+<!-- markdownlint-disable MD051 -->
 - [Overview](#overview)
 - [Key Features](#key-features)
   - [Zero-Dependency Microsoft Graph REST Engine](#zero-dependency-microsoft-graph-rest-engine)
@@ -27,6 +28,7 @@
 - [Documentation](#documentation)
 - [Contributing](#contributing)
 - [License](#license)
+<!-- markdownlint-enable MD051 -->
 
 ## 🎯 Overview
 
@@ -596,6 +598,7 @@ When using GraphTools in production:
 ### Zero External SDK Dependencies
 
 Unlike traditional Graph automation tools, GraphTools does **not** depend on `Microsoft.Graph.*` SDK modules:
+
 - **Transport & Security**: Built on native .NET cryptographic providers (`RSACertificateExtensions`) and PowerShell REST primitives (`Invoke-RestMethod`).
 - **Logging & Messaging**: Leverages [`PSFramework`](https://psframework.org/) for robust, configurable enterprise logging.
 - **SDK Interoperability**: If an existing interactive SDK session is present in the runspace, GraphTools can seamlessly adopt it as a fallback.
