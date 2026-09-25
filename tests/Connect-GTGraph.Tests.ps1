@@ -2,7 +2,7 @@ if (-not (Get-Command Write-PSFMessage -ErrorAction SilentlyContinue)) { functio
 
 Describe "Connect-GTGraph, Disconnect-GTGraph & Get-GTConnection" -Tag 'Unit' {
     BeforeAll {
-        Get-ChildItem -Path (Join-Path -Path $PSScriptRoot -ChildPath '..\internal\functions\*.ps1') | ForEach-Object { . $_.FullName }
+        Get-ChildItem -Path (Join-Path -Path $PSScriptRoot -ChildPath '..\internal\functions\*.ps1') | Sort-Object Name | ForEach-Object { . $_.FullName }
 
         $connectFile = Join-Path -Path $PSScriptRoot -ChildPath '..\functions\Connect-GTGraph.ps1'
         if (Test-Path $connectFile) { . $connectFile }

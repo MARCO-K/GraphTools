@@ -151,7 +151,11 @@ function Get-GTCachedGraphToken
         {
             return [System.Net.NetworkCredential]::new('', $Secret).Password
         }
-        return [string]$Secret
+        elseif ($Secret -is [string])
+        {
+            return $Secret
+        }
+        throw [System.ArgumentException]::new("ClientSecret must be a [string] or [System.Security.SecureString].", "ClientSecret")
     }
 
     function Set-GTTokenCacheEntry
@@ -252,6 +256,15 @@ function Get-GTCachedGraphToken
             {
                 $script:GTConnectionConfig.RefreshToken = $RefreshToken
             }
+        }
+    }
+
+    # Validate ClientSecret parameter type if explicitly bound
+    if ($PSCmdlet.ParameterSetName -eq 'ClientSecret')
+    {
+        if ($null -eq $ClientSecret -or (-not ($ClientSecret -is [string]) -and -not ($ClientSecret -is [System.Security.SecureString])))
+        {
+            throw [System.ArgumentException]::new("ClientSecret must be a [string] or [System.Security.SecureString].", "ClientSecret")
         }
     }
 

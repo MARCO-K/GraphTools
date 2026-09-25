@@ -50,7 +50,9 @@ function Get-GTManagedIdentityToken
         $apiVersion = '2018-02-01'
     }
 
-    $uri = "$endpoint`?resource=$Resource&api-version=$apiVersion"
+    $encodedResource = [System.Uri]::EscapeDataString($Resource)
+    $queryDelimiter = if ($endpoint -match '\?') { '&' } else { '?' }
+    $uri = "$endpoint$queryDelimiter`resource=$encodedResource&api-version=$apiVersion"
     if ($IdentityId)
     {
         $typeParamMap = @{

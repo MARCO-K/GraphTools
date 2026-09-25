@@ -13,11 +13,25 @@ function New-GTPkcePair
 
     $bytes = [byte[]]::new(32)
     $rng = [System.Security.Cryptography.RandomNumberGenerator]::Create()
-    $rng.GetBytes($bytes)
+    try
+    {
+        $rng.GetBytes($bytes)
+    }
+    finally
+    {
+        $rng.Dispose()
+    }
     $verifier = [Convert]::ToBase64String($bytes).TrimEnd('=').Replace('+', '-').Replace('/', '_')
 
     $sha256 = [System.Security.Cryptography.SHA256]::Create()
-    $challengeBytes = $sha256.ComputeHash([System.Text.Encoding]::ASCII.GetBytes($verifier))
+    try
+    {
+        $challengeBytes = $sha256.ComputeHash([System.Text.Encoding]::ASCII.GetBytes($verifier))
+    }
+    finally
+    {
+        $sha256.Dispose()
+    }
     $challenge = [Convert]::ToBase64String($challengeBytes).TrimEnd('=').Replace('+', '-').Replace('/', '_')
 
     return [PSCustomObject]@{

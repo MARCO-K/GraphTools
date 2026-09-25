@@ -2,7 +2,7 @@ if (-not (Get-Command Write-PSFMessage -ErrorAction SilentlyContinue)) { functio
 
 Describe "Get-GTCachedGraphToken" -Tag 'Unit' {
     BeforeAll {
-        Get-ChildItem -Path (Join-Path -Path $PSScriptRoot -ChildPath '..\internal\functions\*.ps1') | ForEach-Object { . $_.FullName }
+        Get-ChildItem -Path (Join-Path -Path $PSScriptRoot -ChildPath '..\internal\functions\*.ps1') | Sort-Object Name | ForEach-Object { . $_.FullName }
     }
 
     BeforeEach {
@@ -188,6 +188,10 @@ Describe "Get-GTCachedGraphToken" -Tag 'Unit' {
 
         It "throws error when neither Certificate nor ClientSecret is provided with TenantId/ClientId" {
             { Get-GTCachedGraphToken -TenantId 't' -ClientId 'c' } | Should -Throw
+        }
+
+        It "throws error when ClientSecret is not a string or SecureString" {
+            { Get-GTCachedGraphToken -TenantId 't' -ClientId 'c' -ClientSecret 12345 } | Should -Throw "ClientSecret must be a*"
         }
     }
 }
