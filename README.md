@@ -10,6 +10,8 @@
 
 ## 📋 Table of Contents
 
+<!-- markdownlint-disable MD051 -->
+<!-- Rationale: GitHub-generated heading IDs strip/normalize emojis differently than markdownlint MD051 expects -->
 - [Overview](#overview)
 - [Key Features](#key-features)
   - [Zero-Dependency Microsoft Graph REST Engine](#zero-dependency-microsoft-graph-rest-engine)
@@ -27,6 +29,7 @@
 - [Documentation](#documentation)
 - [Contributing](#contributing)
 - [License](#license)
+<!-- markdownlint-enable MD051 -->
 
 ## 🎯 Overview
 
@@ -50,7 +53,7 @@ Starting in **v0.20.0**, GraphTools features a **native zero-dependency REST eng
 ### Zero-Dependency Microsoft Graph REST Engine
 
 | Component | Function / Feature | Description |
-|-----------|--------------------|-------------|
+| ----------- | -------------------- | ------------- |
 | **Authentication** | `Connect-GTGraph` | Connects via Certificate (Thumbprint or X509Certificate2), Client Secret, or direct Access Token. |
 | **Session Status** | `Get-GTConnection` | Inspects active connection status, tenant, client, auth type, and token expiration. |
 | **Session Cleanup** | `Disconnect-GTGraph` | Flushes session state and purges in-memory token caches. |
@@ -62,7 +65,7 @@ Starting in **v0.20.0**, GraphTools features a **native zero-dependency REST eng
 Respond to security incidents with purpose-built cmdlets:
 
 | Function | Purpose | Use Case |
-|----------|---------|----------|
+| ---------- | --------- | ---------- |
 | `Revoke-GTSignOutFromAllSessions` | Invalidate refresh tokens | Immediate session termination |
 | `Disable-GTUser` | Block account sign-ins | Prevent unauthorized access |
 | `Reset-GTUserPassword` | Force password reset | Terminate CAE-enabled sessions |
@@ -96,7 +99,7 @@ Respond to security incidents with purpose-built cmdlets:
 ### Reporting & Governance
 
 | Function | Description |
-|----------|-------------|
+| ---------- | ------------- |
 | `Get-MFAReport` | MFA registration status and authentication methods |
 | `Get-M365LicenseOverview` | License and service plan utilization |
 | `Invoke-AuditLogQuery` | Query unified audit logs with filtering |
@@ -454,7 +457,7 @@ Reset-GTUserPassword -UPN 'user1@contoso.com', 'user2@contoso.com'
 ### Supported Aliases by Parameter Type
 
 | Canonical Parameter | Aliases |
-|---------------------|---------|
+| --------------------- | --------- |
 | `-UPN` | `-UserPrincipalName`, `-UserName`, `-UPNName`, `-User`, `-Users` |
 | `-UserPrincipalName` | `-UPN`, `-UserName`, `-UPNName`, `-User`, `-Users` |
 | `-FilterUser` | `-User`, `-UPN`, `-UserPrincipalName`, `-UserName`, `-UPNName` |
@@ -596,6 +599,7 @@ When using GraphTools in production:
 ### Zero External SDK Dependencies
 
 Unlike traditional Graph automation tools, GraphTools does **not** depend on `Microsoft.Graph.*` SDK modules:
+
 - **Transport & Security**: Built on native .NET cryptographic providers (`RSACertificateExtensions`) and PowerShell REST primitives (`Invoke-RestMethod`).
 - **Logging & Messaging**: Leverages [`PSFramework`](https://psframework.org/) for robust, configurable enterprise logging.
 - **SDK Interoperability**: If an existing interactive SDK session is present in the runspace, GraphTools can seamlessly adopt it as a fallback.
@@ -605,7 +609,7 @@ Unlike traditional Graph automation tools, GraphTools does **not** depend on `Mi
 Configure your Microsoft Entra ID App Registration with the appropriate scopes based on your operational scenarios:
 
 | Category | Typical Scopes | Notes |
-|----------|----------------|-------|
+| ---------- | ---------------- | ------- |
 | **Connection / Read** | `User.Read.All`, `Directory.Read.All` | Basic tenant read access |
 | **User Incident Containment** | `User.ReadWrite.All` | Account block, password reset, session revoke |
 | **Device Hygiene** | `Device.ReadWrite.All` | Registered device disabling |

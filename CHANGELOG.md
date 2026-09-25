@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- **Markdownlint Anchor Resolution & Spacing (`README.md`)**:
+  - Wrapped Table of Contents with `<!-- markdownlint-disable MD051 -->` and `<!-- markdownlint-enable MD051 -->` directives to preserve heading emojis while maintaining 100% valid anchor resolution on GitHub.
+  - Added blank line before unordered list under Zero External SDK Dependencies to comply with `MD032`.
+
 ## [0.24.1] - 2026-09-25
 
 ### Added
