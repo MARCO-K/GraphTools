@@ -16,8 +16,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Wrapped scalar `PSCustomObject` results in array subexpressions `@(...)` across Pester `.Count | Should -Be 1` assertions, resolving `$null` count failures on Windows PowerShell 5.1.
 - **Pipeline Parameter Collision (`Get-GTLegacyAuthReport`)**:
   - Resolved parameter binding collisions where piping values (e.g. `"user@contoso.com" | Get-GTLegacyAuthReport`) triggered false validation errors against `IPAddress`. Routed direct pipeline input through `InputObject` with type/format classification, retaining `ValueFromPipelineByPropertyName` on named parameters.
-- **IPv6 Scope Identifier Parsing (`Get-GTLegacyAuthReport`)**:
+- **IPv6 Scope Identifier Parsing & Normalization (`Get-GTLegacyAuthReport`)**:
   - Handled IPv6 zone/scope identifiers (e.g. `fe80::1%eth0`) in `IPAddress` parameter validation before passing to `[System.Net.IPAddress]::TryParse()`, fixing validation failures on Windows .NET Framework.
+  - Normalized IP strings by stripping zone/scope identifiers upon accumulation into `$targetIPs` and during log filtering comparisons to avoid false negative mismatches against unscoped Graph sign-in log IPs.
 
 ## [0.23.0] - 2026-09-25
 

@@ -270,6 +270,58 @@ Describe "Get-GTLegacyAuthReport" {
             $result.IPAddress | Should -Contain "2001:db8::1"
             $result | Where-Object { $_.IPAddress -ne "2001:db8::1" } | Should -BeNullOrEmpty
         }
+
+        It "should filter by scoped IPv6 address matching unscoped log entry" {
+            Mock -CommandName "Invoke-GTGraphPagedRequest" -MockWith {
+                return @(
+                    [PSCustomObject]@{
+                        CreatedDateTime   = (Get-Date).AddDays(-1)
+                        UserPrincipalName = "user@contoso.com"
+                        ClientAppUsed     = "POP3"
+                        Status            = [PSCustomObject]@{ ErrorCode = 0 }
+                        IpAddress         = "fe80::1"
+                        Location          = [PSCustomObject]@{ City = "Seattle"; CountryOrRegion = "US" }
+                        AppDisplayName    = "Outlook"
+                        Id                = "request-1"
+                    },
+                    [PSCustomObject]@{
+                        CreatedDateTime   = (Get-Date).AddDays(-1)
+                        UserPrincipalName = "user@contoso.com"
+                        ClientAppUsed     = "POP3"
+                        Status            = [PSCustomObject]@{ ErrorCode = 0 }
+                        IpAddress         = "10.0.0.1"
+                        Location          = [PSCustomObject]@{ City = "Seattle"; CountryOrRegion = "US" }
+                        AppDisplayName    = "Outlook"
+                        Id                = "request-2"
+                    }
+                )
+            }
+
+            $result = Get-GTLegacyAuthReport -IPAddress "fe80::1%eth0"
+            @($result).Count | Should -Be 1
+            $result.IPAddress | Should -Be "fe80::1"
+        }
+
+        It "should filter by scoped IPv6 address from pipeline matching unscoped log entry" {
+            Mock -CommandName "Invoke-GTGraphPagedRequest" -MockWith {
+                return @(
+                    [PSCustomObject]@{
+                        CreatedDateTime   = (Get-Date).AddDays(-1)
+                        UserPrincipalName = "user@contoso.com"
+                        ClientAppUsed     = "POP3"
+                        Status            = [PSCustomObject]@{ ErrorCode = 0 }
+                        IpAddress         = "fe80::1"
+                        Location          = [PSCustomObject]@{ City = "Seattle"; CountryOrRegion = "US" }
+                        AppDisplayName    = "Outlook"
+                        Id                = "request-1"
+                    }
+                )
+            }
+
+            $result = "fe80::1%eth0" | Get-GTLegacyAuthReport
+            @($result).Count | Should -Be 1
+            $result.IPAddress | Should -Be "fe80::1"
+        }
     }
 
     Context "Success/Failure Classification" {

@@ -123,7 +123,13 @@ function Get-GTLegacyAuthReport
         # 5. Accumulate Pipeline Input (Do NOT query Graph here)
         if ($UserPrincipalName) { $targetUsers.AddRange($UserPrincipalName) }
         if ($ClientAppUsed)     { $targetApps.AddRange($ClientAppUsed) }
-        if ($IPAddress)         { $targetIPs.AddRange($IPAddress) }
+        if ($IPAddress)
+        {
+            foreach ($ip in $IPAddress)
+            {
+                $targetIPs.Add(($ip -split '%')[0])
+            }
+        }
 
         if ($InputObject)
         {
@@ -140,7 +146,7 @@ function Get-GTLegacyAuthReport
                     }
                     elseif ([System.Net.IPAddress]::TryParse($cleanIp, [ref]$parsedIp))
                     {
-                        $targetIPs.Add($item)
+                        $targetIPs.Add($cleanIp)
                     }
                     else
                     {
@@ -189,7 +195,8 @@ function Get-GTLegacyAuthReport
                 if ($targetUsers.Count -gt 0 -and $log.userPrincipalName -notin $targetUsers) { continue }
 
                 # D. Filter by IP (if specified)
-                if ($targetIPs.Count -gt 0 -and $log.ipAddress -notin $targetIPs) { continue }
+                $cleanLogIp = if ($log.ipAddress) { ($log.ipAddress -split '%')[0] } else { $log.ipAddress }
+                if ($targetIPs.Count -gt 0 -and $cleanLogIp -notin $targetIPs) { continue }
 
                 # --- PROCESSING ---
 
