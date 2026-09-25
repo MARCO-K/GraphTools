@@ -51,12 +51,16 @@ function Initialize-GTGraphConnection
         {
             Write-PSFMessage -Level Verbose -Message 'NewSession requested: refreshing Microsoft Graph token.'
             $script:GTTokenCache = @{
-                AccessToken = $null
-                ExpiresAt   = [DateTime]::MinValue
-                TenantId    = $null
-                ClientId    = $null
-                Scope       = $null
-                AuthType    = $null
+                AccessToken  = $null
+                RefreshToken = $null
+                ExpiresAt    = [DateTime]::MinValue
+                TenantId     = $null
+                ClientId     = $null
+                Scope        = $null
+                AuthType     = $null
+                Claims       = $null
+                Roles        = @()
+                Permissions  = @()
             }
 
             if ($script:GTConnectionConfig)

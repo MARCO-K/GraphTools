@@ -2,11 +2,7 @@ if (-not (Get-Command Write-PSFMessage -ErrorAction SilentlyContinue)) { functio
 
 Describe "Connect-GTGraph, Disconnect-GTGraph & Get-GTConnection" -Tag 'Unit' {
     BeforeAll {
-        $claimsFile = Join-Path -Path $PSScriptRoot -ChildPath '..\internal\functions\Get-GTTokenClaims.ps1'
-        if (Test-Path $claimsFile) { . $claimsFile }
-
-        $tokenFile = Join-Path -Path $PSScriptRoot -ChildPath '..\internal\functions\Get-GTCachedGraphToken.ps1'
-        if (Test-Path $tokenFile) { . $tokenFile }
+        Get-ChildItem -Path (Join-Path -Path $PSScriptRoot -ChildPath '..\internal\functions\*.ps1') | Sort-Object Name | ForEach-Object { . $_.FullName }
 
         $connectFile = Join-Path -Path $PSScriptRoot -ChildPath '..\functions\Connect-GTGraph.ps1'
         if (Test-Path $connectFile) { . $connectFile }
@@ -55,6 +51,92 @@ Describe "Connect-GTGraph, Disconnect-GTGraph & Get-GTConnection" -Tag 'Unit' {
             $conn | Should -Not -BeNullOrEmpty
             $conn.Connected | Should -Be $true
             $conn.AuthType | Should -Be 'DirectToken'
+            $conn.TenantId | Should -BeNullOrEmpty
+            $conn.ClientId | Should -BeNullOrEmpty
+        }
+
+        It "authenticates via [System.Security.SecureString] ClientSecret" {
+            Mock -CommandName Invoke-RestMethod -MockWith {
+                @{
+                    access_token = 'mock-secure-token'
+                    expires_in   = 3600
+                }
+            }
+
+            $secureSecret = [System.Security.SecureString]::new()
+            'secret-val'.ToCharArray() | ForEach-Object { $secureSecret.AppendChar($_) }
+            $conn = Connect-GTGraph -TenantId 'test-tenant' -ClientId 'test-client' -ClientSecret $secureSecret -PassThru
+
+            $conn.Connected | Should -Be $true
+            $conn.AuthType | Should -Be 'ClientSecret'
+            $script:GTConnectionConfig.ClientSecret | Should -BeOfType [System.Security.SecureString]
+        }
+
+        It "authenticates via Azure Managed Identity (System-Assigned)" {
+            Mock -CommandName Get-GTManagedIdentityToken -MockWith {
+                [PSCustomObject]@{
+                    AccessToken = 'mock-msi-token'
+                    ExpiresIn   = 3600
+                }
+            }
+
+            $conn = Connect-GTGraph -Identity -PassThru
+
+            $conn.Connected | Should -Be $true
+            $conn.AuthType | Should -Be 'Identity'
+            $conn.TenantId | Should -BeNullOrEmpty
+            $conn.ClientId | Should -BeNullOrEmpty
+            $script:GTConnectionConfig.AuthType | Should -Be 'Identity'
+        }
+
+        It "authenticates via Azure Managed Identity (User-Assigned with ClientId)" {
+            Mock -CommandName Get-GTManagedIdentityToken -MockWith {
+                [PSCustomObject]@{
+                    AccessToken = 'mock-user-msi-token'
+                    ExpiresIn   = 3600
+                }
+            }
+
+            $conn = Connect-GTGraph -Identity -IdentityId 'uami-client-id-123' -IdentityType ClientId -PassThru
+
+            $conn.Connected | Should -Be $true
+            $conn.AuthType | Should -Be 'Identity'
+            $conn.IdentityId | Should -Be 'uami-client-id-123'
+            $conn.IdentityType | Should -Be 'ClientId'
+        }
+
+        It "authenticates via Interactive browser flow with PKCE" {
+            Mock -CommandName Invoke-GTOAuthHttpListener -MockWith {
+                [PSCustomObject]@{
+                    AccessToken  = 'mock-interactive-access-token'
+                    RefreshToken = 'mock-refresh-token'
+                    ExpiresIn    = 3600
+                }
+            }
+
+            $conn = Connect-GTGraph -Interactive -TenantId 'test-tenant' -ClientId 'test-client' -PassThru
+
+            $conn.Connected | Should -Be $true
+            $conn.AuthType | Should -Be 'Interactive'
+            $conn.RefreshTokenPresent | Should -Be $true
+            $script:GTConnectionConfig.RefreshToken | Should -Be 'mock-refresh-token'
+        }
+
+        It "authenticates via Device Code flow" {
+            Mock -CommandName Invoke-GTDeviceCodeFlow -MockWith {
+                [PSCustomObject]@{
+                    AccessToken  = 'mock-device-access-token'
+                    RefreshToken = 'mock-device-refresh-token'
+                    ExpiresIn    = 3600
+                }
+            }
+
+            $conn = Connect-GTGraph -DeviceCode -TenantId 'test-tenant' -PassThru
+
+            $conn.Connected | Should -Be $true
+            $conn.AuthType | Should -Be 'DeviceCode'
+            $conn.RefreshTokenPresent | Should -Be $true
+            $script:GTConnectionConfig.RefreshToken | Should -Be 'mock-device-refresh-token'
         }
     }
 
