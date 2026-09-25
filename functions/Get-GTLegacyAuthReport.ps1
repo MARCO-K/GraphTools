@@ -52,15 +52,15 @@ function Get-GTLegacyAuthReport
         [ValidateRange(1, 30)]
         [int]$DaysAgo = 7,
 
-        [Parameter(ValueFromPipeline = $true)]
+        [Parameter(ValueFromPipelineByPropertyName = $true)]
         [Alias('UPN','Users','User','UserName','UPNName')]
         [ValidateScript({$_ -match $script:GTValidationRegex.UPN})]
         [string[]]$UserPrincipalName,
 
-        [Parameter(ValueFromPipeline = $true)]
+        [Parameter(ValueFromPipelineByPropertyName = $true)]
         [string[]]$ClientAppUsed,
 
-        [Parameter(ValueFromPipeline = $true)]
+        [Parameter(ValueFromPipelineByPropertyName = $true)]
         [ValidateScript({
             $cleanIp = ($_ -split '%')[0]
             $ip = $null
@@ -72,6 +72,9 @@ function Get-GTLegacyAuthReport
             }
         })]
         [string[]]$IPAddress,
+
+        [Parameter(ValueFromPipeline = $true, DontShow = $true)]
+        [psobject[]]$InputObject,
 
         [switch]$SuccessOnly,
         [switch]$NewSession
@@ -121,6 +124,31 @@ function Get-GTLegacyAuthReport
         if ($UserPrincipalName) { $targetUsers.AddRange($UserPrincipalName) }
         if ($ClientAppUsed)     { $targetApps.AddRange($ClientAppUsed) }
         if ($IPAddress)         { $targetIPs.AddRange($IPAddress) }
+
+        if ($InputObject)
+        {
+            foreach ($item in $InputObject)
+            {
+                if ($null -eq $item) { continue }
+                if ($item -is [string])
+                {
+                    $cleanIp = ($item -split '%')[0]
+                    $parsedIp = $null
+                    if ($item -match $script:GTValidationRegex.UPN)
+                    {
+                        $targetUsers.Add($item)
+                    }
+                    elseif ([System.Net.IPAddress]::TryParse($cleanIp, [ref]$parsedIp))
+                    {
+                        $targetIPs.Add($item)
+                    }
+                    else
+                    {
+                        $targetApps.Add($item)
+                    }
+                }
+            }
+        }
     }
 
     end
