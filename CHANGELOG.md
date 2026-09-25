@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.24.0] - 2026-09-25
+
 ### Added
 
 - **Emergency Incident Response Orchestration (`Invoke-GTUserContainment`)**:
@@ -24,6 +26,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Added new cybersecurity hex shield logo (`assets/logo.jpg`) featuring Entra ID graph topology and circuit-trace wrench.
   - Added wide 16:9 panoramic hero banner (`assets/hero-banner.jpg`) for GitHub and social preview cards.
   - Updated `README.md` to showcase the new high-resolution hero banner and cleaned up legacy root image.
+
+### Fixed
+
+- **Scope Alignment & Least-Privilege Enforcing (`Invoke-GTUserContainment`)**:
+  - Updated required device containment scope check to `Device.ReadWrite.All` instead of legacy delegated `Directory.AccessAsUser.All`.
+  - Enforced strict least-privilege scoping: `User.ReadWrite.All` is now conditionally requested only when user-specific containment actions are active, allowing isolated device or entitlement containment without over-requesting permissions.
+- **Documentation Link Integrity & Scopes**:
+  - Converted local markdown links to repository-relative links in `docs/Invoke-GTUserContainment.md`.
+  - Added dedicated `## REQUIRED PERMISSIONS` section and updated `docs/User-Security-Response.md`.
+  - Added CI integrity test in `tests/Documentation.Tests.ps1` prohibiting local `file:///` URIs in `docs/`.
 
 ## [0.23.1] - 2026-09-25
 
@@ -506,7 +518,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
-[Unreleased]: https://github.com/MARCO-K/GraphTools/compare/v0.14.2...main
+[Unreleased]: https://github.com/MARCO-K/GraphTools/compare/v0.24.0...main
+[0.24.0]: https://github.com/MARCO-K/GraphTools/compare/v0.23.1...v0.24.0
+[0.23.1]: https://github.com/MARCO-K/GraphTools/compare/v0.23.0...v0.23.1
+[0.23.0]: https://github.com/MARCO-K/GraphTools/compare/v0.22.0...v0.23.0
 [0.14.2]: https://github.com/MARCO-K/GraphTools/compare/v0.14.1...v0.14.2
 [0.14.0]: https://github.com/MARCO-K/GraphTools/compare/v0.13.0...v0.14.0
 [0.13.0]: https://github.com/MARCO-K/GraphTools/compare/v0.12.0...v0.13.0
