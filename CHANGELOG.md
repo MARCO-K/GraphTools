@@ -7,6 +7,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- **Repository Visual Identity & Branding**:
+  - Added new cybersecurity hex shield logo (`assets/logo.jpg`) featuring Entra ID graph topology and circuit-trace wrench.
+  - Added wide 16:9 panoramic hero banner (`assets/hero-banner.jpg`) for GitHub and social preview cards.
+  - Updated `README.md` to showcase the new high-resolution hero banner and cleaned up legacy root image.
+
 ## [0.23.1] - 2026-09-25
 
 ### Fixed
