@@ -9,6 +9,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **Emergency Incident Response Orchestration (`Invoke-GTUserContainment`)**:
+  - Implemented single-command containment orchestrator coordinating the 5-step incident response playbook:
+    1. Invalidate active OAuth refresh tokens and session cookies (`Revoke-GTSignOutFromAllSessions`).
+    2. Disable user account in Microsoft Entra ID (`Disable-GTUser`).
+    3. Rotate password to trigger Continuous Access Evaluation (CAE) revocation (`Reset-GTUserPassword`).
+    4. Disable all registered and workplace-joined devices (`Disable-GTUserDevice`).
+    5. Optionally strip all directory entitlements, group memberships, licenses, and PIM eligibilities (`Remove-GTUserEntitlements`).
+  - Supports standard safe containment by default (steps 1-4) and full destructive containment via `-FullContainment` or selective switches (`-RevokeSessions`, `-DisableAccount`, `-ResetPassword`, `-DisableDevices`, `-StripEntitlements`).
+  - Full support for pipeline input, `-WhatIf`, `-Confirm`, and `-Force`.
+  - Emits structured `PSCustomObject` containment report with per-action outcomes, execution timestamps, and aggregated error reporting.
+  - Added full test coverage in `tests/Invoke-GTUserContainment.Tests.ps1` and comprehensive documentation in `docs/Invoke-GTUserContainment.md`.
 - **Repository Visual Identity & Branding**:
   - Added new cybersecurity hex shield logo (`assets/logo.jpg`) featuring Entra ID graph topology and circuit-trace wrench.
   - Added wide 16:9 panoramic hero banner (`assets/hero-banner.jpg`) for GitHub and social preview cards.
