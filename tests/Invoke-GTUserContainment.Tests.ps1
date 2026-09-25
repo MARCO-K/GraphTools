@@ -247,5 +247,33 @@ Describe "Invoke-GTUserContainment" {
                 $RequiredScopes -notcontains 'Directory.AccessAsUser.All'
             }
         }
+
+        It "enforces least-privilege by excluding User.ReadWrite.All when only -DisableDevices is requested" {
+            Mock -CommandName "Initialize-GTGraphConnection" -MockWith { return $true }
+            Mock -CommandName "Test-GTGraphScopes" -MockWith { return $true }
+            Mock -CommandName "Disable-GTUserDevice" -MockWith { return @([PSCustomObject]@{ User = 'devicesonly@contoso.com'; Status = 'Disabled' }) }
+
+            $null = Invoke-GTUserContainment -UPN 'devicesonly@contoso.com' -DisableDevices
+
+            Assert-MockCalled -CommandName "Initialize-GTGraphConnection" -Times 1 -Exactly -ParameterFilter {
+                $Scopes -contains 'Device.ReadWrite.All' -and
+                $Scopes -notcontains 'User.ReadWrite.All' -and
+                $Scopes -notcontains 'Directory.AccessAsUser.All'
+            }
+        }
+
+        It "enforces least-privilege by excluding User.ReadWrite.All and Device.ReadWrite.All when only -StripEntitlements is requested" {
+            Mock -CommandName "Initialize-GTGraphConnection" -MockWith { return $true }
+            Mock -CommandName "Test-GTGraphScopes" -MockWith { return $true }
+            Mock -CommandName "Remove-GTUserEntitlements" -MockWith { return @() }
+
+            $null = Invoke-GTUserContainment -UPN 'entitlementsonly@contoso.com' -StripEntitlements
+
+            Assert-MockCalled -CommandName "Initialize-GTGraphConnection" -Times 1 -Exactly -ParameterFilter {
+                $Scopes -contains 'GroupMember.ReadWrite.All' -and
+                $Scopes -notcontains 'User.ReadWrite.All' -and
+                $Scopes -notcontains 'Device.ReadWrite.All'
+            }
+        }
     }
 }

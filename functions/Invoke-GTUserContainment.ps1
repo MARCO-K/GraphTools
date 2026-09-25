@@ -148,9 +148,13 @@ function Invoke-GTUserContainment
             $doDisableDevices = $true
         }
 
-        # Determine required permissions based on planned actions
+        # Determine required permissions based on planned actions (enforcing least-privilege)
         $requiredScopes = [System.Collections.Generic.List[string]]::new()
-        $requiredScopes.Add('User.ReadWrite.All')
+
+        if ($doRevokeSessions -or $doDisableAccount -or $doResetPassword)
+        {
+            $requiredScopes.Add('User.ReadWrite.All')
+        }
 
         if ($doDisableDevices)
         {
