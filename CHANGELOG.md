@@ -7,6 +7,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- **App Registration Setup & Permission Scenarios Guide (`docs/App-Registration-Setup-Guide.md`)**:
+  - Added end-to-end technical walkthrough for provisioning and securing Microsoft Entra ID App Registrations for GraphTools.
+  - Details certificate-based authentication (RFC 7523), Azure Managed Identity, client secrets, and interactive PKCE flows.
+  - Categorizes least-privilege permission profiles across 4 operational scenarios: Read-Only Security Auditing, Emergency Incident Response, Tenant Hygiene, and Interactive Delegated Console.
+  - Linked walkthrough from `README.md` and `docs/Connect-GTGraph.md`.
+
 ## [0.24.0] - 2026-09-25
 
 ### Added
