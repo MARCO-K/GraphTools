@@ -27,7 +27,7 @@ Describe "Get-GTInactiveDevices" {
             Mock -CommandName "Invoke-GTGraphPagedRequest" -MockWith { return $mockDevices }
 
             $results = Get-GTInactiveDevices -InactiveDays 90
-            $results.Count | Should -Be 1
+            @($results).Count | Should -Be 1
             $results[0].DaysInactive | Should -BeGreaterOrEqual 100
         }
 
@@ -68,7 +68,7 @@ Describe "Get-GTInactiveDevices" {
             }
 
             $results = Get-GTInactiveDevices -InactiveDays 90 -IncludeDisabled
-            $results.Count | Should -Be 1
+            @($results).Count | Should -Be 1
         }
     }
 }

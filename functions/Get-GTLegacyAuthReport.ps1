@@ -52,18 +52,19 @@ function Get-GTLegacyAuthReport
         [ValidateRange(1, 30)]
         [int]$DaysAgo = 7,
 
-        [Parameter(ValueFromPipeline = $true)]
+        [Parameter(ValueFromPipelineByPropertyName = $true)]
         [Alias('UPN','Users','User','UserName','UPNName')]
         [ValidateScript({$_ -match $script:GTValidationRegex.UPN})]
         [string[]]$UserPrincipalName,
 
-        [Parameter(ValueFromPipeline = $true)]
+        [Parameter(ValueFromPipelineByPropertyName = $true)]
         [string[]]$ClientAppUsed,
 
-        [Parameter(ValueFromPipeline = $true)]
+        [Parameter(ValueFromPipelineByPropertyName = $true)]
         [ValidateScript({
+            $cleanIp = ($_ -split '%')[0]
             $ip = $null
-            if ([System.Net.IPAddress]::TryParse($_, [ref]$ip)) {
+            if ([System.Net.IPAddress]::TryParse($cleanIp, [ref]$ip)) {
                 return $true
             }
             else {
@@ -71,6 +72,9 @@ function Get-GTLegacyAuthReport
             }
         })]
         [string[]]$IPAddress,
+
+        [Parameter(ValueFromPipeline = $true, DontShow = $true)]
+        [psobject[]]$InputObject,
 
         [switch]$SuccessOnly,
         [switch]$NewSession
@@ -119,7 +123,38 @@ function Get-GTLegacyAuthReport
         # 5. Accumulate Pipeline Input (Do NOT query Graph here)
         if ($UserPrincipalName) { $targetUsers.AddRange($UserPrincipalName) }
         if ($ClientAppUsed)     { $targetApps.AddRange($ClientAppUsed) }
-        if ($IPAddress)         { $targetIPs.AddRange($IPAddress) }
+        if ($IPAddress)
+        {
+            foreach ($ip in $IPAddress)
+            {
+                $targetIPs.Add(($ip -split '%')[0])
+            }
+        }
+
+        if ($InputObject)
+        {
+            foreach ($item in $InputObject)
+            {
+                if ($null -eq $item) { continue }
+                if ($item -is [string])
+                {
+                    $cleanIp = ($item -split '%')[0]
+                    $parsedIp = $null
+                    if ($item -match $script:GTValidationRegex.UPN)
+                    {
+                        $targetUsers.Add($item)
+                    }
+                    elseif ([System.Net.IPAddress]::TryParse($cleanIp, [ref]$parsedIp))
+                    {
+                        $targetIPs.Add($cleanIp)
+                    }
+                    else
+                    {
+                        $targetApps.Add($item)
+                    }
+                }
+            }
+        }
     }
 
     end
@@ -160,7 +195,8 @@ function Get-GTLegacyAuthReport
                 if ($targetUsers.Count -gt 0 -and $log.userPrincipalName -notin $targetUsers) { continue }
 
                 # D. Filter by IP (if specified)
-                if ($targetIPs.Count -gt 0 -and $log.ipAddress -notin $targetIPs) { continue }
+                $cleanLogIp = if ($log.ipAddress) { ($log.ipAddress -split '%')[0] } else { $log.ipAddress }
+                if ($targetIPs.Count -gt 0 -and $cleanLogIp -notin $targetIPs) { continue }
 
                 # --- PROCESSING ---
 

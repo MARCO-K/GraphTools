@@ -4,7 +4,7 @@
 Describe "Test-GTGuid" -Tag 'Unit' {
     BeforeAll {
         # Load the validation functions
-        $validationFile = Join-Path $PSScriptRoot '..' 'internal' 'functions' 'GTValidation.ps1'
+        $validationFile = Join-Path $PSScriptRoot '..\internal\functions\GTValidation.ps1'
         if (-not (Test-Path $validationFile)) {
             throw "Validation file not found: $validationFile"
         }

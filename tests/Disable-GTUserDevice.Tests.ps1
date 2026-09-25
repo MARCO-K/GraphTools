@@ -10,22 +10,22 @@ if (-not (Get-Command Invoke-GTGraphPagedRequest -ErrorAction SilentlyContinue))
 
 Describe "Disable-GTUserDevice" -Tag 'Unit' {
     BeforeAll {
-        $validationFile = Join-Path $PSScriptRoot '..' 'internal' 'functions' 'GTValidation.ps1'
+        $validationFile = Join-Path $PSScriptRoot '..\internal\functions\GTValidation.ps1'
         if (Test-Path $validationFile) { . $validationFile }
 
-        $guidHelper = Join-Path $PSScriptRoot '..' 'internal' 'functions' 'Test-GTGuid.ps1'
+        $guidHelper = Join-Path $PSScriptRoot '..\internal\functions\Test-GTGuid.ps1'
         if (Test-Path $guidHelper) { . $guidHelper }
 
-        $errorHelperFile = Join-Path $PSScriptRoot '..' 'internal' 'functions' 'Get-GTGraphErrorDetails.ps1'
+        $errorHelperFile = Join-Path $PSScriptRoot '..\internal\functions\Get-GTGraphErrorDetails.ps1'
         if (Test-Path $errorHelperFile) { . $errorHelperFile }
 
-        $utcHelper = Join-Path $PSScriptRoot '..' 'internal' 'functions' 'Get-UTCTime.ps1'
+        $utcHelper = Join-Path $PSScriptRoot '..\internal\functions\Get-UTCTime.ps1'
         if (Test-Path $utcHelper) { . $utcHelper }
 
-        $installHelper = Join-Path $PSScriptRoot '..' 'internal' 'functions' 'Install-GTRequiredModule.ps1'
+        $installHelper = Join-Path $PSScriptRoot '..\internal\functions\Install-GTRequiredModule.ps1'
         if (Test-Path $installHelper) { . $installHelper }
 
-        $initHelper = Join-Path $PSScriptRoot '..' 'internal' 'functions' 'Initialize-GTGraphConnection.ps1'
+        $initHelper = Join-Path $PSScriptRoot '..\internal\functions\Initialize-GTGraphConnection.ps1'
         if (Test-Path $initHelper) { . $initHelper }
 
         function Write-PSFMessage { param($Level, $Message, $ErrorRecord) }
@@ -35,7 +35,7 @@ Describe "Disable-GTUserDevice" -Tag 'Unit' {
         function Invoke-GTGraphRequest { param($Method, $Uri, $Body, $ContentType, $ErrorAction) }
         function Invoke-GTGraphPagedRequest { param($Uri) return @() }
 
-        $functionFile = Join-Path $PSScriptRoot '..' 'functions' 'Disable-GTUserDevice.ps1'
+        $functionFile = Join-Path $PSScriptRoot '..\functions\Disable-GTUserDevice.ps1'
         if (-not (Test-Path $functionFile)) { Throw "Function file not found: $functionFile" }
 
         . $functionFile

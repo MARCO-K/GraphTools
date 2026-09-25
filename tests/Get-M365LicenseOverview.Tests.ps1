@@ -1,6 +1,6 @@
 Describe "Get-M365LicenseOverview" {
     BeforeAll {
-        $validationFile = Join-Path $PSScriptRoot '..' 'internal' 'functions' 'GTValidation.ps1'
+        $validationFile = Join-Path $PSScriptRoot '..\internal\functions\GTValidation.ps1'
         if (Test-Path $validationFile) { . $validationFile }
 
         function global:Install-GTRequiredModule { param($ModuleNames, $Scope, $AllowPrerelease) }
@@ -112,7 +112,7 @@ Describe "Get-M365LicenseOverview" {
             Mock Invoke-GTGraphPagedRequest { @() }
 
             # Should not throw, should continue with empty cache
-            { Get-M365LicenseOverview } | Should -Not -Throw
+            { Get-M365LicenseOverview -WarningAction SilentlyContinue } | Should -Not -Throw
 
             # Should have empty cache
             $script:GTLicenseRefCache.SkuNames | Should -BeNullOrEmpty
@@ -301,13 +301,13 @@ Describe "Get-M365LicenseOverview" {
         It "should handle scope validation failure" {
             Mock Test-GTGraphScopes { $false }
 
-            { Get-M365LicenseOverview } | Should -Not -Throw
+            { Get-M365LicenseOverview -ErrorAction SilentlyContinue } | Should -Not -Throw
         }
 
         It "should handle connection failure" {
             Mock Initialize-GTGraphConnection { $false }
 
-            { Get-M365LicenseOverview } | Should -Not -Throw
+            { Get-M365LicenseOverview -ErrorAction SilentlyContinue } | Should -Not -Throw
         }
 
         It "should handle Invoke-GTGraphPagedRequest errors gracefully" {

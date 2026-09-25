@@ -34,7 +34,7 @@ Describe "Get-GTExpiringSecrets" {
             }
 
             $results = Get-GTExpiringSecrets -DaysUntilExpiry 30
-            $results.Count | Should -Be 1
+            @($results).Count | Should -Be 1
             $results[0].CredentialType | Should -Be "Secret"
             $results[0].DaysRemaining | Should -BeLessThan 11
         }
@@ -71,7 +71,7 @@ Describe "Get-GTExpiringSecrets" {
             }
 
             $results = Get-GTExpiringSecrets -DaysUntilExpiry 10 -Scope ServicePrincipals
-            $results.Count | Should -Be 1
+            @($results).Count | Should -Be 1
             $results[0].ResourceType | Should -Be 'ServicePrincipal'
             $results[0].CredentialType | Should -Be 'Certificate'
         }

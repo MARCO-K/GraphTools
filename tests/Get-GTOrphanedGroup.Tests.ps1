@@ -53,7 +53,7 @@ Describe "Get-GTOrphanedGroup" {
             Mock -CommandName "Invoke-GTGraphPagedRequest" -MockWith { return $mockGroup }
             
             $result = Get-GTOrphanedGroup
-            $result.Count | Should -Be 1
+            @($result).Count | Should -Be 1
             $result[0].OrphanReason | Should -Match "NoOwners"
         }
 
@@ -78,7 +78,7 @@ Describe "Get-GTOrphanedGroup" {
             Mock -CommandName "Invoke-GTGraphPagedRequest" -MockWith { return $mockGroup }
 
             $result = Get-GTOrphanedGroup -CheckDisabledOwners
-            $result.Count | Should -Be 1
+            @($result).Count | Should -Be 1
             $result[0].OrphanReason | Should -Match "AllOwnersDisabled"
         }
 
@@ -103,7 +103,7 @@ Describe "Get-GTOrphanedGroup" {
             Mock -CommandName "Invoke-GTGraphPagedRequest" -MockWith { return $mockGroup }
 
             $result = Get-GTOrphanedGroup -CheckEmpty
-            $result.Count | Should -Be 1
+            @($result).Count | Should -Be 1
             $result[0].OrphanReason | Should -Match "EmptyGroup"
         }
 

@@ -143,7 +143,7 @@ Describe "Invoke-GTGraphBatch" -Tag 'Unit' {
 
             # 1 initial attempt + 2 retries = 3 calls
             $script:callCount | Should -Be 3
-            $responses.Count | Should -Be 1
+            @($responses).Count | Should -Be 1
             $responses[0].Id | Should -Be 'req-fail'
             $responses[0].Status | Should -Be 429
         }
@@ -163,7 +163,7 @@ Describe "Invoke-GTGraphBatch" -Tag 'Unit' {
             $responses = Invoke-GTGraphBatch -Requests @(@{ id = 'req-notfound'; url = '/users/unknown' })
 
             $script:callCount | Should -Be 1
-            $responses.Count | Should -Be 1
+            @($responses).Count | Should -Be 1
             $responses[0].Status | Should -Be 404
         }
     }

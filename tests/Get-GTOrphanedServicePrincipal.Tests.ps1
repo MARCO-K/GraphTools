@@ -34,7 +34,7 @@ Describe "Get-GTOrphanedServicePrincipal" {
             Mock -CommandName "Invoke-GTGraphPagedRequest" -MockWith { return $mockSP }
             
             $result = Get-GTOrphanedServicePrincipal
-            $result.Count | Should -Be 1
+            @($result).Count | Should -Be 1
             $result[0].OrphanReason | Should -Match "NoOwners"
         }
 
@@ -56,7 +56,7 @@ Describe "Get-GTOrphanedServicePrincipal" {
             Mock -CommandName "Invoke-GTGraphPagedRequest" -MockWith { return $mockSP }
 
             $result = Get-GTOrphanedServicePrincipal
-            $result.Count | Should -Be 1
+            @($result).Count | Should -Be 1
             $result[0].OrphanReason | Should -Match "AllOwnersDisabled"
         }
 
@@ -75,7 +75,7 @@ Describe "Get-GTOrphanedServicePrincipal" {
             Mock -CommandName "Invoke-GTGraphPagedRequest" -MockWith { return $mockSP }
 
             $result = Get-GTOrphanedServicePrincipal -CheckExpiredCredentials
-            $result.Count | Should -Be 1
+            @($result).Count | Should -Be 1
             $result[0].OrphanReason | Should -Match "ExpiredCredentials"
         }
     }

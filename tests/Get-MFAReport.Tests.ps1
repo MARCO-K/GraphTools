@@ -1,6 +1,6 @@
 Describe "Get-MFAReport" {
     BeforeAll {
-        $validationFile = Join-Path $PSScriptRoot '..' 'internal' 'functions' 'GTValidation.ps1'
+        $validationFile = Join-Path $PSScriptRoot '..\internal\functions\GTValidation.ps1'
         if (Test-Path $validationFile) { . $validationFile }
 
         # Define stub functions FIRST
@@ -66,7 +66,7 @@ Describe "Get-MFAReport" {
     It "should return a report for a single user from the pipeline" {
         $result = 'adele.vance@contoso.com' | Get-MFAReport
         $result.UPN | Should -Be 'adele.vance@contoso.com'
-        $result.Count | Should -Be 1
+        @($result).Count | Should -Be 1
         Assert-MockCalled -CommandName "Invoke-GTGraphPagedRequest" -ParameterFilter {
             [System.Uri]::UnescapeDataString([string]$Uri) -like "*'adele.vance@contoso.com'*"
         } -Times 1 -Scope It
