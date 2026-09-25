@@ -1,6 +1,6 @@
 # GraphTools
 
-![GraphTools](image.png)
+![GraphTools](assets/hero-banner.jpg)
 
 > A comprehensive PowerShell module for Microsoft Entra ID (Azure AD) security management, incident response, and reporting via Microsoft Graph API.
 
