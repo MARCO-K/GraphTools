@@ -2,12 +2,7 @@ if (-not (Get-Command Write-PSFMessage -ErrorAction SilentlyContinue)) { functio
 
 Describe "Get-GTCachedGraphToken" -Tag 'Unit' {
     BeforeAll {
-        $claimsFile = Join-Path -Path $PSScriptRoot -ChildPath '..\internal\functions\Get-GTTokenClaims.ps1'
-        if (Test-Path $claimsFile) { . $claimsFile }
-
-        $functionFile = Join-Path -Path $PSScriptRoot -ChildPath '..\internal\functions\Get-GTCachedGraphToken.ps1'
-        if (-not (Test-Path $functionFile)) { Throw "Function file not found: $functionFile" }
-        . $functionFile
+        Get-ChildItem -Path (Join-Path -Path $PSScriptRoot -ChildPath '..\internal\functions\*.ps1') | ForEach-Object { . $_.FullName }
     }
 
     BeforeEach {
@@ -117,6 +112,72 @@ Describe "Get-GTCachedGraphToken" -Tag 'Unit' {
             $script:capturedBody.client_secret | Should -Be 'my-secret'
             $script:capturedBody.scope | Should -Be 'https://graph.microsoft.com/.default'
             $script:GTTokenCache.AuthType | Should -Be 'ClientSecret'
+        }
+
+        It "unsecures [System.Security.SecureString] ClientSecret in-flight" {
+            $script:capturedBody = $null
+
+            Mock -CommandName Invoke-RestMethod -MockWith {
+                $script:capturedBody = $Body
+                @{
+                    access_token = 'secure-token-success'
+                    expires_in   = 3600
+                }
+            }
+
+            $secureSecret = [System.Security.SecureString]::new()
+            'super-secure-pass'.ToCharArray() | ForEach-Object { $secureSecret.AppendChar($_) }
+            $token = Get-GTCachedGraphToken -TenantId 'test-tenant' -ClientId 'test-client' -ClientSecret $secureSecret
+
+            $token | Should -Be 'secure-token-success'
+            $script:capturedBody.client_secret | Should -Be 'super-secure-pass'
+        }
+    }
+
+    Context "Managed Identity Flow" {
+        It "retrieves token via Identity parameter set" {
+            Mock -CommandName Get-GTManagedIdentityToken -MockWith {
+                [PSCustomObject]@{
+                    AccessToken = 'mock-msi-token'
+                    ExpiresIn   = 3600
+                }
+            }
+
+            $token = Get-GTCachedGraphToken -Identity
+            $token | Should -Be 'mock-msi-token'
+            $script:GTTokenCache.AuthType | Should -Be 'Identity'
+            $script:GTTokenCache.AccessToken | Should -Be 'mock-msi-token'
+        }
+    }
+
+    Context "Refresh Token Silent Renewal" {
+        It "renews token using stored refresh_token and updates cache and connection config" {
+            $script:GTTokenCache.AccessToken  = 'about-to-expire'
+            $script:GTTokenCache.RefreshToken = 'initial-refresh-token'
+            $script:GTTokenCache.ExpiresAt   = [DateTime]::UtcNow.AddMinutes(2)
+            $script:GTTokenCache.TenantId    = 'test-tenant'
+            $script:GTTokenCache.ClientId    = 'test-client'
+            $script:GTConnectionConfig = @{
+                AuthType     = 'Interactive'
+                TenantId     = 'test-tenant'
+                ClientId     = 'test-client'
+                RefreshToken = 'initial-refresh-token'
+                Scope        = 'https://graph.microsoft.com/.default'
+            }
+
+            Mock -CommandName Invoke-GTRefreshTokenRenewal -MockWith {
+                [PSCustomObject]@{
+                    AccessToken  = 'refreshed-access-token'
+                    RefreshToken = 'rolling-new-refresh-token'
+                    ExpiresIn    = 3600
+                }
+            }
+
+            $token = Get-GTCachedGraphToken
+            $token | Should -Be 'refreshed-access-token'
+            $script:GTTokenCache.AccessToken | Should -Be 'refreshed-access-token'
+            $script:GTTokenCache.RefreshToken | Should -Be 'rolling-new-refresh-token'
+            $script:GTConnectionConfig.RefreshToken | Should -Be 'rolling-new-refresh-token'
         }
     }
 

@@ -2,12 +2,16 @@
 if (-not $script:GTTokenCache)
 {
     $script:GTTokenCache = @{
-        AccessToken = $null
-        ExpiresAt   = [DateTime]::MinValue
-        TenantId    = $null
-        ClientId    = $null
-        Scope       = $null
-        AuthType    = $null
+        AccessToken  = $null
+        RefreshToken = $null
+        ExpiresAt    = [DateTime]::MinValue
+        TenantId     = $null
+        ClientId     = $null
+        Scope        = $null
+        AuthType     = $null
+        Claims       = $null
+        Roles        = @()
+        Permissions  = @()
     }
 }
 
@@ -20,12 +24,14 @@ function Get-GTCachedGraphToken
     .DESCRIPTION
         Implements OAuth 2.0 token acquisition and in-memory caching. Supports:
         - RFC 7523 Certificate-based Client Assertion (RS256 signed JWT via native .NET cryptography)
-        - Client Secret-based Client Credentials
+        - Client Secret-based Client Credentials (supporting both String and SecureString)
+        - Azure Managed Identity (System-Assigned and User-Assigned)
+        - Silent token renewal via OAuth 2.0 refresh_token
         - Direct Bearer token passthrough
         - In-memory caching with a sliding expiration buffer to prevent redundant calls and throttling (HTTP 429).
 
     .PARAMETER TenantId
-        The Microsoft Entra ID Tenant ID (Directory ID).
+        The Microsoft Entra ID Tenant ID (Directory ID) or authority domain.
 
     .PARAMETER ClientId
         The Application (Client) ID of the registered App.
@@ -37,10 +43,22 @@ function Get-GTCachedGraphToken
         An explicit [System.Security.Cryptography.X509Certificates.X509Certificate2] object.
 
     .PARAMETER ClientSecret
-        The client secret string for the registered application.
+        The client secret for application authentication. Supports [string] or [System.Security.SecureString].
 
     .PARAMETER AccessToken
         Direct access token string to store and use.
+
+    .PARAMETER Identity
+        Acquires token via Azure Managed Identity (MSI).
+
+    .PARAMETER IdentityId
+        Identifier for a User-Assigned Managed Identity.
+
+    .PARAMETER IdentityType
+        Specifies how IdentityId is interpreted ('ClientId', 'ResourceId', 'PrincipalId'). Defaults to 'ClientId'.
+
+    .PARAMETER RefreshToken
+        An OAuth 2.0 refresh token string used to acquire a fresh access token.
 
     .PARAMETER Scope
         OAuth 2.0 scope for token request. Defaults to 'https://graph.microsoft.com/.default'.
@@ -59,6 +77,9 @@ function Get-GTCachedGraphToken
 
     .EXAMPLE
         Get-GTCachedGraphToken -TenantId $TenantId -ClientId $ClientId -ClientSecret $Secret
+
+    .EXAMPLE
+        Get-GTCachedGraphToken -Identity
 
     .EXAMPLE
         # Uses session configuration previously set by Connect-GTGraph
@@ -86,35 +107,64 @@ function Get-GTCachedGraphToken
 
         [Parameter(ParameterSetName = 'ClientSecret', Mandatory = $true)]
         [Alias('Secret')]
-        [string]$ClientSecret,
+        [object]$ClientSecret,
 
         [Parameter(ParameterSetName = 'DirectToken', Mandatory = $true)]
         [string]$AccessToken,
 
+        [Parameter(ParameterSetName = 'Identity', Mandatory = $true)]
+        [switch]$Identity,
+
+        [Parameter(ParameterSetName = 'Identity')]
+        [string]$IdentityId,
+
+        [Parameter(ParameterSetName = 'Identity')]
+        [ValidateSet('ClientId', 'ResourceId', 'PrincipalId')]
+        [string]$IdentityType = 'ClientId',
+
+        [Parameter(ParameterSetName = 'RefreshToken', Mandatory = $true)]
+        [string]$RefreshToken,
+
         [Parameter(ParameterSetName = 'Certificate')]
         [Parameter(ParameterSetName = 'CertObject')]
         [Parameter(ParameterSetName = 'ClientSecret')]
+        [Parameter(ParameterSetName = 'Identity')]
+        [Parameter(ParameterSetName = 'RefreshToken')]
         [Parameter(ParameterSetName = 'SessionConfig')]
         [string]$Scope = 'https://graph.microsoft.com/.default',
 
         [Parameter(ParameterSetName = 'Certificate')]
         [Parameter(ParameterSetName = 'CertObject')]
         [Parameter(ParameterSetName = 'ClientSecret')]
+        [Parameter(ParameterSetName = 'Identity')]
+        [Parameter(ParameterSetName = 'RefreshToken')]
         [Parameter(ParameterSetName = 'SessionConfig')]
         [int]$BufferMinutes = 5,
 
         [switch]$ForceRefresh
     )
 
+    function ConvertTo-GTPlainSecret
+    {
+        param($Secret)
+        if ($Secret -is [System.Security.SecureString])
+        {
+            return [System.Net.NetworkCredential]::new('', $Secret).Password
+        }
+        return [string]$Secret
+    }
+
     function Set-GTTokenCacheEntry
     {
+        [Diagnostics.CodeAnalysis.SuppressMessageAttribute('PSUseShouldProcessForStateChangingFunctions', '')]
         param(
             [string]$Token,
             [DateTime]$ExpiresAt,
             [string]$TenantId,
             [string]$ClientId,
             [string]$Scope,
-            [string]$AuthType
+            [string]$AuthType,
+            [string]$RefreshToken
         )
 
         $claims = if (Get-Command Get-GTTokenClaims -ErrorAction SilentlyContinue)
@@ -172,6 +222,7 @@ function Get-GTCachedGraphToken
                 catch
                 {
                     # Retain calculated ExpiresAt on conversion error
+                    $null = $_
                 }
             }
         }
@@ -184,15 +235,24 @@ function Get-GTCachedGraphToken
             }
         }
 
-        $script:GTTokenCache.AccessToken = $Token
-        $script:GTTokenCache.ExpiresAt   = $ExpiresAt
-        $script:GTTokenCache.TenantId    = $TenantId
-        $script:GTTokenCache.ClientId    = $ClientId
-        $script:GTTokenCache.Scope       = $Scope
-        $script:GTTokenCache.AuthType    = $AuthType
-        $script:GTTokenCache.Claims      = $claims
-        $script:GTTokenCache.Roles       = $roles
-        $script:GTTokenCache.Permissions = [string[]]$permissions
+        $script:GTTokenCache.AccessToken  = $Token
+        $script:GTTokenCache.ExpiresAt    = $ExpiresAt
+        $script:GTTokenCache.TenantId     = $TenantId
+        $script:GTTokenCache.ClientId     = $ClientId
+        $script:GTTokenCache.Scope        = $Scope
+        $script:GTTokenCache.AuthType     = $AuthType
+        $script:GTTokenCache.Claims       = $claims
+        $script:GTTokenCache.Roles        = $roles
+        $script:GTTokenCache.Permissions  = [string[]]$permissions
+
+        if ($RefreshToken)
+        {
+            $script:GTTokenCache.RefreshToken = $RefreshToken
+            if ($script:GTConnectionConfig)
+            {
+                $script:GTConnectionConfig.RefreshToken = $RefreshToken
+            }
+        }
     }
 
     # 1. Direct token assignment
@@ -218,6 +278,13 @@ function Get-GTCachedGraphToken
             if (-not $Certificate -and $script:GTConnectionConfig.Certificate) { $Certificate = $script:GTConnectionConfig.Certificate }
             if (-not $ClientSecret -and $script:GTConnectionConfig.ClientSecret) { $ClientSecret = $script:GTConnectionConfig.ClientSecret }
             if ($script:GTConnectionConfig.Scope) { $Scope = $script:GTConnectionConfig.Scope }
+            if (-not $RefreshToken -and $script:GTConnectionConfig.RefreshToken) { $RefreshToken = $script:GTConnectionConfig.RefreshToken }
+            if (-not $Identity -and ($script:GTConnectionConfig.AuthType -eq 'Identity'))
+            {
+                $Identity = $true
+                $IdentityId = $script:GTConnectionConfig.IdentityId
+                $IdentityType = if ($script:GTConnectionConfig.IdentityType) { $script:GTConnectionConfig.IdentityType } else { 'ClientId' }
+            }
         }
     }
 
@@ -237,7 +304,65 @@ function Get-GTCachedGraphToken
         }
     }
 
-    # 4. Validate that credentials exist to request a token
+    # 4. Managed Identity Acquisition / Renewal
+    if ($Identity -or ($PSCmdlet.ParameterSetName -eq 'Identity'))
+    {
+        $idFn = Join-Path $PSScriptRoot 'Get-GTManagedIdentityToken.ps1'
+        if (-not (Get-Command Get-GTManagedIdentityToken -ErrorAction SilentlyContinue) -and (Test-Path $idFn))
+        {
+            . $idFn
+        }
+
+        $idResult = Get-GTManagedIdentityToken -Resource 'https://graph.microsoft.com' -IdentityId $IdentityId -IdentityType $IdentityType
+        Set-GTTokenCacheEntry -Token $idResult.AccessToken `
+                              -ExpiresAt ([DateTime]::UtcNow.AddSeconds($idResult.ExpiresIn)) `
+                              -TenantId $null `
+                              -ClientId $IdentityId `
+                              -Scope $Scope `
+                              -AuthType 'Identity'
+
+        Write-PSFMessage -Level Verbose -Message "Acquired new Microsoft Graph token via Managed Identity. Expires at $($script:GTTokenCache.ExpiresAt.ToString('u'))."
+        return $script:GTTokenCache.AccessToken
+    }
+
+    # 5. Refresh Token Renewal (Delegated Interactive / Device Code flows)
+    $hasRefreshToken = [bool]$RefreshToken -or ($null -ne $script:GTTokenCache.RefreshToken)
+    $effectiveRefreshToken = if ($RefreshToken) { $RefreshToken } else { $script:GTTokenCache.RefreshToken }
+    if ($hasRefreshToken -and $TenantId -and $ClientId -and ($PSCmdlet.ParameterSetName -in 'RefreshToken', 'SessionConfig'))
+    {
+        $renewFn = Join-Path $PSScriptRoot 'Invoke-GTRefreshTokenRenewal.ps1'
+        if (-not (Get-Command Invoke-GTRefreshTokenRenewal -ErrorAction SilentlyContinue) -and (Test-Path $renewFn))
+        {
+            . $renewFn
+        }
+
+        try
+        {
+            $authType = if ($script:GTConnectionConfig -and $script:GTConnectionConfig.AuthType) { $script:GTConnectionConfig.AuthType } else { 'RefreshToken' }
+            $renewResult = Invoke-GTRefreshTokenRenewal -TenantId $TenantId -ClientId $ClientId -RefreshToken $effectiveRefreshToken -Scope $Scope
+            Set-GTTokenCacheEntry -Token $renewResult.AccessToken `
+                                  -ExpiresAt ([DateTime]::UtcNow.AddSeconds($renewResult.ExpiresIn)) `
+                                  -TenantId $TenantId `
+                                  -ClientId $ClientId `
+                                  -Scope $Scope `
+                                  -AuthType $authType `
+                                  -RefreshToken $renewResult.RefreshToken
+
+            Write-PSFMessage -Level Verbose -Message "Silently renewed Microsoft Graph token via refresh_token ($authType). Expires at $($script:GTTokenCache.ExpiresAt.ToString('u'))."
+            return $script:GTTokenCache.AccessToken
+        }
+        catch
+        {
+            Write-PSFMessage -Level Warning -Message "Refresh token renewal failed: $_"
+            # If explicit RefreshToken parameter set, rethrow; otherwise fall through to credentials
+            if ($PSCmdlet.ParameterSetName -eq 'RefreshToken')
+            {
+                throw
+            }
+        }
+    }
+
+    # 6. Validate that credentials exist to request a token
     if (-not $TenantId -or -not $ClientId)
     {
         # Check if we have an active access token regardless
@@ -256,7 +381,7 @@ function Get-GTCachedGraphToken
         return [Convert]::ToBase64String($Bytes).TrimEnd('=').Replace('+', '-').Replace('/', '_')
     }
 
-    # 5. Acquire token via Certificate (RFC 7523 Client Assertion)
+    # 7. Acquire token via Certificate (RFC 7523 Client Assertion)
     if ($Certificate -or $Thumbprint)
     {
         $cert = $Certificate
@@ -324,12 +449,13 @@ function Get-GTCachedGraphToken
         }
         $authType = 'Certificate'
     }
-    # 6. Acquire token via Client Secret
+    # 8. Acquire token via Client Secret (supports string or SecureString)
     elseif ($ClientSecret)
     {
+        $plainSecret = ConvertTo-GTPlainSecret $ClientSecret
         $requestBody = @{
             client_id     = $ClientId
-            client_secret = $ClientSecret
+            client_secret = $plainSecret
             grant_type    = "client_credentials"
             scope         = $Scope
         }

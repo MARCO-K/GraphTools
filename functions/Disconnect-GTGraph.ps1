@@ -5,7 +5,7 @@ function Disconnect-GTGraph
         Disconnects the active Microsoft Graph session and clears cached tokens.
 
     .DESCRIPTION
-        Clears cached credentials, tokens, and session context from the module runspace.
+        Clears cached credentials, tokens, refresh tokens, and session context from the module runspace.
 
     .PARAMETER PassThru
         Returns the disconnection summary object.
@@ -24,12 +24,16 @@ function Disconnect-GTGraph
 
     $script:GTConnectionConfig = $null
     $script:GTTokenCache = @{
-        AccessToken = $null
-        ExpiresAt   = [DateTime]::MinValue
-        TenantId    = $null
-        ClientId    = $null
-        Scope       = $null
-        AuthType    = $null
+        AccessToken  = $null
+        RefreshToken = $null
+        ExpiresAt    = [DateTime]::MinValue
+        TenantId     = $null
+        ClientId     = $null
+        Scope        = $null
+        AuthType     = $null
+        Claims       = $null
+        Roles        = @()
+        Permissions  = @()
     }
 
     Write-PSFMessage -Level Verbose -Message 'Microsoft Graph session disconnected and token cache cleared.'

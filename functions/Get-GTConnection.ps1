@@ -7,7 +7,7 @@ function Get-GTConnection
     .DESCRIPTION
         Inspects the active session configuration and in-memory token cache,
         returning details about the connected tenant, client ID, authentication type,
-        and token validity.
+        identity configuration, token validity, and refresh token presence.
 
     .OUTPUTS
         [PSCustomObject]
@@ -23,10 +23,10 @@ function Get-GTConnection
     $hasToken = ($null -ne $script:GTTokenCache -and -not [string]::IsNullOrWhiteSpace($script:GTTokenCache.AccessToken))
     $isValid = ($hasToken -and ($script:GTTokenCache.ExpiresAt -gt $now))
 
-    $tenantId = if ($script:GTConnectionConfig) { $script:GTConnectionConfig.TenantId } elseif ($script:GTTokenCache) { $script:GTTokenCache.TenantId } else { $null }
-    $clientId = if ($script:GTConnectionConfig) { $script:GTConnectionConfig.ClientId } elseif ($script:GTTokenCache) { $script:GTTokenCache.ClientId } else { $null }
-    $authType = if ($script:GTTokenCache) { $script:GTTokenCache.AuthType } else { $null }
-    $scope    = if ($script:GTConnectionConfig) { $script:GTConnectionConfig.Scope } elseif ($script:GTTokenCache) { $script:GTTokenCache.Scope } else { $null }
+    $tenantId = if ($script:GTConnectionConfig -and $script:GTConnectionConfig.TenantId) { $script:GTConnectionConfig.TenantId } elseif ($script:GTTokenCache) { $script:GTTokenCache.TenantId } else { $null }
+    $clientId = if ($script:GTConnectionConfig -and $script:GTConnectionConfig.ClientId) { $script:GTConnectionConfig.ClientId } elseif ($script:GTTokenCache) { $script:GTTokenCache.ClientId } else { $null }
+    $authType = if ($script:GTTokenCache -and $script:GTTokenCache.AuthType) { $script:GTTokenCache.AuthType } elseif ($script:GTConnectionConfig) { $script:GTConnectionConfig.AuthType } else { $null }
+    $scope    = if ($script:GTConnectionConfig -and $script:GTConnectionConfig.Scope) { $script:GTConnectionConfig.Scope } elseif ($script:GTTokenCache) { $script:GTTokenCache.Scope } else { $null }
     $expires  = if ($script:GTTokenCache) { $script:GTTokenCache.ExpiresAt } else { $null }
 
     $permissions = if ($script:GTTokenCache -and $script:GTTokenCache.Permissions -and $script:GTTokenCache.Permissions.Count -gt 0)
@@ -52,15 +52,18 @@ function Get-GTConnection
     }
 
     [PSCustomObject]@{
-        PSTypeName = 'GraphTools.ConnectionStatus'
-        Connected  = $isValid
-        TenantId   = $tenantId
-        ClientId   = $clientId
-        AuthType   = $authType
-        Scope      = $scope
-        Scopes     = $permissions
-        Roles      = $roles
-        ExpiresAt  = $expires
-        TimeUtc    = $now.ToString('o')
+        PSTypeName          = 'GraphTools.ConnectionStatus'
+        Connected           = $isValid
+        TenantId            = $tenantId
+        ClientId            = $clientId
+        AuthType            = $authType
+        Scope               = $scope
+        Scopes              = $permissions
+        Roles               = $roles
+        ExpiresAt           = $expires
+        IdentityId          = if ($script:GTConnectionConfig -and $script:GTConnectionConfig.IdentityId) { $script:GTConnectionConfig.IdentityId } else { $null }
+        IdentityType        = if ($script:GTConnectionConfig -and $script:GTConnectionConfig.IdentityType) { $script:GTConnectionConfig.IdentityType } else { $null }
+        RefreshTokenPresent = [bool]($script:GTTokenCache -and $script:GTTokenCache.RefreshToken)
+        TimeUtc             = $now.ToString('o')
     }
 }

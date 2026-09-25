@@ -7,6 +7,30 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.23.0] - 2026-09-25
+
+### Added
+
+- **SecureString Support for Client Secrets (`Connect-GTGraph`, `Get-GTCachedGraphToken`)**:
+  - `-ClientSecret` now accepts both encrypted `[System.Security.SecureString]` and plaintext `[string]`.
+  - Credentials passed as `SecureString` are retained encrypted in memory and unmarshalled only in-flight during HTTP dispatch.
+- **Azure Managed Identity Authentication (`Connect-GTGraph -Identity`)**:
+  - Added `-Identity` parameter set for zero-credential authentication within Azure workloads (VMs, App Services, Functions, Container Apps, Automation).
+  - Supports System-Assigned Managed Identity and User-Assigned Managed Identity (`-IdentityId`, `-IdentityType ClientId|ResourceId|PrincipalId`).
+  - Added internal helper `internal/functions/Get-GTManagedIdentityToken.ps1` with automated IMDS / App Service detection.
+- **Interactive Browser Authentication with PKCE (`Connect-GTGraph -Interactive`)**:
+  - Implemented OAuth 2.0 Authorization Code flow with Proof Key for Code Exchange (RFC 7636) via local `[System.Net.HttpListener]`.
+  - Automatically launches the default browser, intercepts the OAuth callback on `http://localhost:$LocalPort/`, displays a completion page, and completes token exchange.
+  - Added internal helper `internal/functions/Invoke-GTOAuthHttpListener.ps1`.
+- **Device Code Authentication (`Connect-GTGraph -DeviceCode`)**:
+  - Added OAuth 2.0 Device Authorization Grant flow for headless Linux/container environments, remote SSH, and PowerShell remoting sessions.
+  - Displays verification URL and code, polling Microsoft identity platform until authorization completes.
+  - Added internal helper `internal/functions/Invoke-GTDeviceCodeFlow.ps1`.
+- **Automated Silent Refresh Token Renewal (`Get-GTCachedGraphToken`, `Invoke-GTRefreshTokenRenewal`)**:
+  - Caches and tracks OAuth 2.0 `refresh_token` across interactive and device code sessions.
+  - Automatically executes silent renewal (`grant_type=refresh_token`) when tokens expire or are within the sliding buffer, seamlessly preserving sessions and rolling refresh tokens without re-prompting.
+  - Added internal helper `internal/functions/Invoke-GTRefreshTokenRenewal.ps1`.
+
 ## [0.22.0] - 2026-09-24
 
 ### Added
