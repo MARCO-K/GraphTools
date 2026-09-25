@@ -6,7 +6,7 @@ This guide provides end-to-end technical walkthroughs for provisioning, securing
 
 ## 📋 Overview
 
-GraphTools communicates directly with the Microsoft Graph REST API (`https://graph.microsoft.com/v1.0`). To authenticate, GraphTools requires a registered application identity in Microsoft Entra ID configured with appropriate credentials and Microsoft Graph API permissions.
+GraphTools communicates directly with the Microsoft Graph REST API (using `https://graph.microsoft.com/v1.0` by default, with selective `https://graph.microsoft.com/beta` endpoint usage when required for advanced features like PIM governance and sign-in activities). To authenticate, GraphTools requires a registered application identity in Microsoft Entra ID configured with appropriate credentials and Microsoft Graph API permissions.
 
 ```mermaid
 flowchart TD
@@ -44,13 +44,16 @@ flowchart TD
      - *For background automation / certificates / client secrets*: Leave blank.
      - *For interactive browser PKCE logins (`Connect-GTGraph -Interactive`)*:
        - Select platform: **Public client/native (mobile & desktop)**.
-       - URI: `http://localhost:8400`
+       - URI: `http://localhost:8400/` *(Note: The trailing slash is required for exact string match)*
 4. Click **Register**.
 5. Record the following values displayed on the **Overview** page:
    - **Application (client) ID**: (e.g. `11111111-2222-3333-4444-555555555555`)
    - **Directory (tenant) ID**: (e.g. `aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee`)
 
 ### Option B: Automated Clean PowerShell Setup
+
+> [!NOTE]
+> Provisioning via Microsoft Graph PowerShell cmdlets (`Connect-MgGraph`, `New-MgApplication`) requires the `Microsoft.Graph.Applications` module on the provisioning machine. This is an optional administrative convenience for initial tenant setup; **GraphTools itself requires zero SDK modules at runtime** and operates purely over native REST.
 
 To automate provisioning directly from PowerShell without web portal interaction, execute this clean script using the Microsoft Graph PowerShell cmdlets:
 
@@ -63,7 +66,7 @@ $appParams = @{
     DisplayName    = "GraphTools-Automation"
     SignInAudience = "AzureADMyOrg"
     PublicClient   = @{
-        RedirectUris = @("http://localhost:8400")
+        RedirectUris = @("http://localhost:8400/")
     }
 }
 
@@ -92,7 +95,7 @@ GraphTools supports five authentication mechanisms. Choose the credential strate
 
 | Credential Type | Best For | Security Posture | Connect Syntax |
 | :--- | :--- | :--- | :--- |
-| **X.509 Certificate (RFC 7523)** | Production servers, admin workstations | High (Hardware/DPAPI protected, non-exportable) | `Connect-GTGraph -TenantId $T -ClientId $C -Thumbprint $Thumb` |
+| **X.509 Certificate (RFC 7523)** | Production servers, admin workstations | High (OS/DPAPI protected in certificate store; non-exportable private key recommended) | `Connect-GTGraph -TenantId $T -ClientId $C -Thumbprint $Thumb` |
 | **Azure Managed Identity** | Azure VMs, Functions, Automation | Highest (Zero-credential, automatic rotation) | `Connect-GTGraph -Identity` |
 | **Client Secret** | Ephemeral CI/CD runners, Docker containers | Moderate (Requires secure vaulting) | `Connect-GTGraph -TenantId $T -ClientId $C -ClientSecret $Secret` |
 | **Interactive (PKCE)** | Interactive administrator troubleshooting | High (Delegated identity with MFA enforcement) | `Connect-GTGraph -Interactive -TenantId $T` |
@@ -104,9 +107,9 @@ GraphTools supports five authentication mechanisms. Choose the credential strate
 
 Certificate-based authentication uses RFC 7523 client assertions signed with asymmetric RS256 cryptography.
 
-#### 🛡️ Security Rationale: Why Self-Signed Certificates are Required for Production
+#### 🛡️ Security Rationale: Why Certificate Authentication is Strongly Recommended over Client Secrets
 
-Using self-signed X.509 certificates instead of shared client secrets is an essential security control for enterprise environments:
+Microsoft Entra ID and GraphTools support both enterprise CA-issued certificates and self-signed X.509 certificates. Using certificate credentials instead of shared client secrets is an essential security control for enterprise environments:
 
 1. **Elimination of Shared Secrets over the Wire**:
    - *Client secrets* are symmetric: the plaintext secret string must be transmitted in every HTTP token request (`POST /oauth2/v2.0/token`). If TLS is intercepted or reverse proxies log HTTP POST payloads, the secret is compromised.
@@ -128,9 +131,10 @@ Using self-signed X.509 certificates instead of shared client secrets is an esse
 
 ---
 
-#### 1. Generate the Self-Signed Certificate
+#### 1. Generate the Certificate
 
-Execute the following PowerShell command on your administration workstation:
+##### Windows (PowerShell 5.1 & PowerShell 7)
+Execute the following PowerShell command on your Windows administration workstation:
 
 ```powershell
 # Store location guidance:
@@ -161,6 +165,15 @@ Export-Certificate -Cert $cert -FilePath $exportPath
 
 > [!IMPORTANT]
 > Notice `-KeyExportPolicy NonExportable`. This ensures the private key is permanently locked to this workstation and cannot be exported into a `.pfx` file. `Export-Certificate` exports only the public `.cer` certificate containing zero private key material.
+
+##### Linux & macOS Alternative (OpenSSL)
+If managing GraphTools from Linux or macOS where `New-SelfSignedCertificate` is unavailable:
+
+```bash
+# Generate private key and public certificate via OpenSSL
+openssl req -x509 -newkey rsa:2048 -keyout graphtools-key.pem -out GraphTools-Automation.cer -days 730 -nodes -subj "/CN=GraphTools-Automation"
+```
+*(On Linux/macOS, use `Connect-GTGraph -Certificate` passing a loaded `[X509Certificate2]` object or convert to PKCS#12).*
 
 #### 2. Upload Public Certificate to Entra ID
 
@@ -394,8 +407,8 @@ Get-GTRecentUser -Top 5
 - **Resolution**: Verify `$cert.Thumbprint` matches the thumbprint listed under **Certificates & secrets** in the Azure portal.
 
 ### `AADSTS50011: The Reply URL Specified in the Request Does Not Match`
-- **Cause**: Occurs during `Connect-GTGraph -Interactive` when the redirect URI `http://localhost:8400` is missing from the App Registration.
-- **Resolution**: Add `http://localhost:8400` under **Authentication** > **Mobile and desktop applications** in the Entra portal.
+- **Cause**: Occurs during `Connect-GTGraph -Interactive` when the redirect URI `http://localhost:8400/` is missing or registered without the required trailing slash in the App Registration.
+- **Resolution**: Add `http://localhost:8400/` (including the trailing slash) under **Authentication** > **Mobile and desktop applications** in the Entra admin center.
 
 ### `HTTP 403 Forbidden / Authorization_RequestDenied`
 - **Cause**: The application has not been granted the required Microsoft Graph permission, or admin consent was not granted.
