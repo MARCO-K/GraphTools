@@ -213,9 +213,21 @@ Get-M365LicenseOverview -FilterLicenseSKU 'ENTERPRISEPACK'
 
 ## 🚨 Security Incident Response
 
-### Complete Containment Workflow
+### Automated Containment Orchestration
 
-When a user account is compromised, execute this comprehensive response:
+Contain compromised accounts with a single command using `Invoke-GTUserContainment`:
+
+```powershell
+# Standard safe containment (sessions, account, password, devices)
+Invoke-GTUserContainment -UPN 'compromised@contoso.com'
+
+# Full containment (including permanent entitlement removal)
+'compromised@contoso.com' | Invoke-GTUserContainment -FullContainment -Force
+```
+
+### Granular Containment Primitives
+
+You can also execute individual containment actions independently:
 
 ```powershell
 $compromisedUser = 'compromised@contoso.com'

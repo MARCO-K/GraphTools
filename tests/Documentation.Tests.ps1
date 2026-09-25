@@ -28,4 +28,19 @@ Describe "Documentation Integrity" -Tag 'Unit' {
         $failureDetails = if ($brokenLinks.Count -gt 0) { "Found broken relative link(s):`n" + ($brokenLinks -join "`n") } else { '' }
         $brokenLinks.Count | Should -Be 0 -Because $failureDetails
     }
+
+    It "has no absolute local file URLs in docs/ directory" {
+        $docsDir = Resolve-Path "$PSScriptRoot/../docs"
+        $docFiles = Get-ChildItem -Path $docsDir -Filter *.md
+
+        $filesWithLocalLinks = [System.Collections.Generic.List[string]]::new()
+        foreach ($file in $docFiles) {
+            $content = Get-Content $file.FullName -Raw
+            if ($content -match '\[([^\]]+)\]\(file:///[^)]+\)') {
+                $filesWithLocalLinks.Add($file.Name)
+            }
+        }
+
+        $filesWithLocalLinks.Count | Should -Be 0 -Because "Documentation must use repo-relative paths instead of local file:/// URIs"
+    }
 }

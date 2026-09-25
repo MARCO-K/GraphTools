@@ -4,8 +4,11 @@ This document describes the separate functions available in GraphTools for respo
 
 ## Overview
 
-When a user account is compromised or needs to be secured, GraphTools provides five distinct functions that can be used individually or together:
+When a user account is compromised or needs to be secured, GraphTools provides an all-in-one incident response orchestrator as well as individual standalone functions:
 
+* **[Invoke-GTUserContainment](Invoke-GTUserContainment.md)** - Automated emergency containment orchestrator (coordinates steps 1-5 in a single call)
+
+### Standalone Primitives:
 1. **Revoke-GTSignOutFromAllSessions** - Revoke refresh tokens
 2. **Disable-GTUser** - Disable the user account
 3. **Reset-GTUserPassword** - Reset the user's password
@@ -13,6 +16,24 @@ When a user account is compromised or needs to be secured, GraphTools provides f
 5. **Remove-GTUserEntitlements** - Remove access rights and privileges (including PIM role eligibilities)
 
 ## Functions
+
+### 0. Invoke-GTUserContainment (Orchestrator)
+
+Executes rapid security containment workflows for compromised user accounts with minimum operational latency.
+
+**Purpose**: Runs the full or standard containment playbook in a single command, returning structured forensic results.
+
+**Required Permissions**: `User.ReadWrite.All`, `Device.ReadWrite.All` (plus role scopes if using `-StripEntitlements`)
+
+**Example**:
+
+```powershell
+# Standard safe containment (sessions, account, password, devices)
+Invoke-GTUserContainment -UPN 'compromised@contoso.com'
+
+# Full containment (including entitlement stripping)
+Invoke-GTUserContainment -UPN 'compromised@contoso.com' -FullContainment -Force
+```
 
 ### 1. Revoke-GTSignOutFromAllSessions
 
@@ -62,7 +83,7 @@ Disables all devices registered to a user in Microsoft Entra ID.
 
 **Purpose**: Prevents access from all devices registered to the user account, adding an additional layer of security.
 
-**Required Permissions**: `Directory.AccessAsUser.All`
+**Required Permissions**: `Device.ReadWrite.All`
 
 **Example**:
 
