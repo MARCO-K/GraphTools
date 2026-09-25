@@ -1,6 +1,6 @@
 Describe "Get-M365LicenseOverview" {
     BeforeAll {
-        $validationFile = Join-Path $PSScriptRoot '..' 'internal' 'functions' 'GTValidation.ps1'
+        $validationFile = Join-Path $PSScriptRoot '..\internal\functions\GTValidation.ps1'
         if (Test-Path $validationFile) { . $validationFile }
 
         function global:Install-GTRequiredModule { param($ModuleNames, $Scope, $AllowPrerelease) }

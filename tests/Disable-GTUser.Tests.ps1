@@ -2,7 +2,7 @@ Describe "Disable-GTUser" {
     
     BeforeAll {
         # 1. Load Dependencies
-        $validationFile = Join-Path $PSScriptRoot '..' 'internal' 'functions' 'GTValidation.ps1'
+        $validationFile = Join-Path $PSScriptRoot '..\internal\functions\GTValidation.ps1'
         if (Test-Path $validationFile) { . $validationFile }
 
         # Provide lightweight stubs for common helpers in case they are missing during discovery
@@ -12,7 +12,7 @@ Describe "Disable-GTUser" {
         if (-not (Get-Command Write-PSFMessage -ErrorAction SilentlyContinue)) { function Write-PSFMessage { param($Level, $Message, $ErrorRecord) } }
         if (-not (Get-Command Get-UTCTime -ErrorAction SilentlyContinue)) { function Get-UTCTime { return [DateTime]::UtcNow } }
         if (-not (Get-Command Invoke-GTGraphRequest -ErrorAction SilentlyContinue)) { function Invoke-GTGraphRequest { param($Method, $Uri, $Body, $ContentType, $ErrorAction, [switch]$All) return $null } }
-        $batchFile = Join-Path $PSScriptRoot '..' 'internal' 'functions' 'Invoke-GTGraphBatch.ps1'
+        $batchFile = Join-Path $PSScriptRoot '..\internal\functions\Invoke-GTGraphBatch.ps1'
         if (Test-Path $batchFile) { . $batchFile }
         if (-not (Get-Command Invoke-GTGraphBatch -ErrorAction SilentlyContinue)) { function Invoke-GTGraphBatch { param($Requests) return @() } }
 
@@ -55,7 +55,7 @@ Describe "Disable-GTUser" {
             
             $results = Disable-GTUser -UPN "test@contoso.com" -Force
             
-            $results.Count | Should -Be 1
+            @($results).Count | Should -Be 1
             $results[0].Status | Should -Be "Disabled"
         }
     }

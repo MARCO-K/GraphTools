@@ -1,11 +1,11 @@
 # Load dependencies
-$validationFile = Join-Path $PSScriptRoot '..' 'internal' 'functions' 'GTValidation.ps1'
+$validationFile = Join-Path $PSScriptRoot '..\internal\functions\GTValidation.ps1'
 if (Test-Path $validationFile)
 {
     . $validationFile
 }
 
-$errorHelperFile = Join-Path $PSScriptRoot '..' 'internal' 'functions' 'Get-GTGraphErrorDetails.ps1'
+$errorHelperFile = Join-Path $PSScriptRoot '..\internal\functions\Get-GTGraphErrorDetails.ps1'
 if (Test-Path $errorHelperFile)
 {
     . $errorHelperFile
@@ -14,10 +14,10 @@ if (Test-Path $errorHelperFile)
 Describe "Reset-GTUserPassword" {
     BeforeAll {
         # Load dependencies inside BeforeAll
-        $validationFile = Join-Path $PSScriptRoot '..' 'internal' 'functions' 'GTValidation.ps1'
+        $validationFile = Join-Path $PSScriptRoot '..\internal\functions\GTValidation.ps1'
         if (Test-Path $validationFile) { . $validationFile }
 
-        $errorHelperFile = Join-Path $PSScriptRoot '..' 'internal' 'functions' 'Get-GTGraphErrorDetails.ps1'
+        $errorHelperFile = Join-Path $PSScriptRoot '..\internal\functions\Get-GTGraphErrorDetails.ps1'
         if (Test-Path $errorHelperFile) { . $errorHelperFile }
 
         function global:Write-PSFMessage { param($Level, $Message, $ErrorRecord) }

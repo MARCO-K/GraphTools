@@ -4,7 +4,7 @@ Describe "Remove-GTUserEnterpriseAppOwnership" {
         function Write-PSFMessage { }
         
         # Load the error handling helper function (required by Remove-GTUserEnterpriseAppOwnership)
-        $errorHelperFile = Join-Path $PSScriptRoot '..' 'internal' 'functions' 'Get-GTGraphErrorDetails.ps1'
+        $errorHelperFile = Join-Path $PSScriptRoot '..\internal\functions\Get-GTGraphErrorDetails.ps1'
         if (Test-Path $errorHelperFile) {
             . $errorHelperFile
         } else {

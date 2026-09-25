@@ -41,7 +41,7 @@ Describe "Get-GTUnusedApps" {
             Mock -CommandName "Invoke-GTGraphPagedRequest" -MockWith { return $mockSPs }
 
             $results = Get-GTUnusedApps -DaysSinceLastSignIn 90
-            $results.Count | Should -Be 1
+            @($results).Count | Should -Be 1
             $results[0].Status | Should -Be "Inactive"
         }
 
@@ -57,7 +57,7 @@ Describe "Get-GTUnusedApps" {
             Mock -CommandName "Invoke-GTGraphPagedRequest" -MockWith { return $mockSPs }
 
             $results = Get-GTUnusedApps -DaysSinceLastSignIn 90 -IncludeNeverUsed
-            $results.Count | Should -Be 1
+            @($results).Count | Should -Be 1
             $results[0].Status | Should -Be "Never Used"
         }
     }

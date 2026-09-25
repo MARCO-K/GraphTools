@@ -1,6 +1,6 @@
 Describe "Invoke-AuditLogQuery" {
     BeforeAll {
-        $validationFile = Join-Path $PSScriptRoot '..' 'internal' 'functions' 'GTValidation.ps1'
+        $validationFile = Join-Path $PSScriptRoot '..\internal\functions\GTValidation.ps1'
         if (Test-Path $validationFile) { . $validationFile }
 
         # Define stub functions FIRST
@@ -101,7 +101,7 @@ Describe "Invoke-AuditLogQuery" {
 
     It "should filter by user ID" {
         $result = Invoke-AuditLogQuery -UserIds "user1@contoso.com"
-        $result.Count | Should -Be 1
+        @($result).Count | Should -Be 1
         $result.UserId | Should -Be "user1@contoso.com"
     }
 

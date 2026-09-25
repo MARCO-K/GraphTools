@@ -400,7 +400,7 @@ Describe "Get-GTLegacyAuthReport" {
             }
 
             $result = Get-GTLegacyAuthReport -SuccessOnly
-            $result.Count | Should -Be 1
+            @($result).Count | Should -Be 1
             $result.Status | Should -Contain "Success"
             $result.IPAddress | Should -Contain "192.168.1.1"
         }

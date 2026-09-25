@@ -36,7 +36,7 @@ Describe "Remove-GTPIMRoleEligibility" {
             Assert-MockCalled -CommandName "Invoke-GTGraphRequest" -Times 1 -ParameterFilter {
                 $Method -eq 'DELETE' -and $Uri -eq 'beta/roleManagement/directory/roleAssignmentSchedules/Sched1'
             }
-            $results.Count | Should -Be 1
+            @($results).Count | Should -Be 1
             $results[0].Status | Should -Be "Success"
         }
 
@@ -62,7 +62,7 @@ Describe "Remove-GTPIMRoleEligibility" {
             Assert-MockCalled -CommandName "Invoke-GTGraphRequest" -Times 1 -ParameterFilter {
                 $Method -eq 'DELETE' -and $Uri -eq 'beta/roleManagement/directory/roleEligibilitySchedules/Sched2'
             }
-            $results.Count | Should -Be 1
+            @($results).Count | Should -Be 1
             $results[0].Status | Should -Be "Success"
         }
     }

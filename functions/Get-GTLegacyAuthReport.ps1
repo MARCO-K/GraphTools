@@ -62,8 +62,9 @@ function Get-GTLegacyAuthReport
 
         [Parameter(ValueFromPipeline = $true)]
         [ValidateScript({
+            $cleanIp = ($_ -split '%')[0]
             $ip = $null
-            if ([System.Net.IPAddress]::TryParse($_, [ref]$ip)) {
+            if ([System.Net.IPAddress]::TryParse($cleanIp, [ref]$ip)) {
                 return $true
             }
             else {

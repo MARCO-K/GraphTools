@@ -7,6 +7,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.23.1] - 2026-09-25
+
+### Fixed
+
+- **Windows PowerShell 5.1 Test Suite & Join-Path Compatibility**:
+  - Replaced multi-argument `Join-Path` invocations across 9 test files (`Disable-GTUser`, `Disable-GTUserDevice`, `Get-GTRecentUser`, `Get-M365LicenseOverview`, `Get-MFAReport`, `Invoke-AuditLogQuery`, `Remove-GTUserEnterpriseAppOwnership`, `Reset-GTUserPassword`, `Test-GTGuid`) with single relative child paths (`Join-Path $PSScriptRoot '..\...'`), eliminating `ParameterBindingException` under Windows PowerShell 5.1.
+  - Wrapped scalar `PSCustomObject` results in array subexpressions `@(...)` across Pester `.Count | Should -Be 1` assertions, resolving `$null` count failures on Windows PowerShell 5.1.
+- **IPv6 Scope Identifier Parsing (`Get-GTLegacyAuthReport`)**:
+  - Handled IPv6 zone/scope identifiers (e.g. `fe80::1%eth0`) in `IPAddress` parameter validation before passing to `[System.Net.IPAddress]::TryParse()`, fixing validation failures on Windows .NET Framework.
+
 ## [0.23.0] - 2026-09-25
 
 ### Added
