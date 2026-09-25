@@ -124,6 +124,8 @@ Respond to security incidents with purpose-built cmdlets:
 - **Zero SDK Dependencies**: No `Microsoft.Graph.*` modules required. All requests and cryptographic operations are performed via native .NET and PowerShell REST primitives.
 - **Entra ID App Registration**: Application permissions or delegated permissions scoped to your administration needs.
 
+> 💡 **New to this setup?** Follow the [step-by-step setup guide](docs/App-Registration-Setup-Guide.md) for a walkthrough covering new app registration configuration including permission setup for different usage scenarios.
+
 ### Install from Repository
 
 1. Clone the repository:

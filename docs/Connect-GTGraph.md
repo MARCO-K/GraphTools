@@ -141,8 +141,9 @@ RefreshTokenPresent  NoteProperty bool RefreshTokenPresent=True
 
 ---
 
-## 🔄 Related Cmdlets
+## 🔄 Related Cmdlets & Guides
 
+- [`App-Registration-Setup-Guide`](App-Registration-Setup-Guide.md): Walkthrough for provisioning app registrations and configuring scenario-based permissions.
 - [`Disconnect-GTGraph`](../functions/Disconnect-GTGraph.ps1): Clears connection configuration and flushes cached tokens.
 - [`Get-GTConnection`](../functions/Get-GTConnection.ps1): Inspects active connection state, identity metadata, and token validity.
 - [`Invoke-GTGraphRequest`](../internal/functions/Invoke-GTGraphRequest.ps1): Executes REST queries using the cached connection.

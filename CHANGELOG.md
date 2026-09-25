@@ -7,6 +7,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.24.1] - 2026-09-25
+
+### Added
+
+- **App Registration Setup & Permission Scenarios Guide (`docs/App-Registration-Setup-Guide.md`)**:
+  - Added end-to-end technical walkthrough for provisioning and securing Microsoft Entra ID App Registrations for GraphTools.
+  - Details certificate-based authentication (RFC 7523), Azure Managed Identity, client secrets, and interactive PKCE flows.
+  - Categorizes least-privilege permission profiles across 4 operational scenarios: Read-Only Security Auditing, Emergency Incident Response, Tenant Hygiene, and Interactive Delegated Console.
+  - Provides automated clean PowerShell scripts (`New-MgApplication`, `New-MgServicePrincipal`, `Add-MgApplicationKey`) for SDK-equipped administrators and native OpenSSL commands for Linux/macOS.
+  - Highlights essential security rationale for certificate credentials (asymmetric isolation, non-exportable DPAPI protection, elimination of secret leaks).
+  - Linked walkthrough from `README.md` and `docs/Connect-GTGraph.md`.
+
 ## [0.24.0] - 2026-09-25
 
 ### Added
@@ -518,7 +530,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
-[Unreleased]: https://github.com/MARCO-K/GraphTools/compare/v0.24.0...main
+[Unreleased]: https://github.com/MARCO-K/GraphTools/compare/v0.24.1...main
+[0.24.1]: https://github.com/MARCO-K/GraphTools/compare/v0.24.0...v0.24.1
 [0.24.0]: https://github.com/MARCO-K/GraphTools/compare/v0.23.1...v0.24.0
 [0.23.1]: https://github.com/MARCO-K/GraphTools/compare/v0.23.0...v0.23.1
 [0.23.0]: https://github.com/MARCO-K/GraphTools/compare/v0.22.0...v0.23.0
