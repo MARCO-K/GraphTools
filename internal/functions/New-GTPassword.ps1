@@ -32,20 +32,50 @@ function New-GTPassword
     $Numbers = 48..57 | ForEach-Object { [char]$_ }   # 0-9
     $Special = '!@#$%^&*()_+-=[]{}|;:,.<>?/`~' -split ''
 
-    # Ensure at least one character from each set
-    $Password = @(
-        ($Uppercase | Get-Random -Count 1)
-        ($Lowercase | Get-Random -Count 1)
-        ($Numbers   | Get-Random -Count 1)
-        ($Special   | Get-Random -Count 1)
-    )
+    $rng = [System.Security.Cryptography.RandomNumberGenerator]::Create()
+    $byteBuffer = [byte[]]::new(4)
 
-    # Fill remaining characters randomly from all sets
-    $AllChars = $Uppercase + $Lowercase + $Numbers + $Special
-    $Password += ($AllChars | Get-Random -Count ($CharacterCount - $Password.Count))
+    # Helper function to get secure random items
+    $GetSecureRandomItem = {
+        param([array]$Collection, [int]$Count)
+        $result = @()
+        for ($i = 0; $i -lt $Count; $i++) {
+            $rng.GetBytes($byteBuffer)
+            $index = [BitConverter]::ToUInt32($byteBuffer, 0) % $Collection.Count
+            $result += $Collection[$index]
+        }
+        return $result
+    }
 
-    # Shuffle the password
-    $Password = -join ($Password | Get-Random -Count $Password.Count)
+    try {
+        # Ensure at least one character from each set
+        $Password = @(
+            (& $GetSecureRandomItem -Collection $Uppercase -Count 1)
+            (& $GetSecureRandomItem -Collection $Lowercase -Count 1)
+            (& $GetSecureRandomItem -Collection $Numbers -Count 1)
+            (& $GetSecureRandomItem -Collection $Special -Count 1)
+        )
+
+        # Fill remaining characters randomly from all sets
+        $AllChars = $Uppercase + $Lowercase + $Numbers + $Special
+        $remaining = $CharacterCount - $Password.Count
+        if ($remaining -gt 0) {
+            $Password += (& $GetSecureRandomItem -Collection $AllChars -Count $remaining)
+        }
+
+        # Shuffle the password securely (Fisher-Yates)
+        for ($i = $Password.Count - 1; $i -gt 0; $i--) {
+            $rng.GetBytes($byteBuffer)
+            $j = [BitConverter]::ToUInt32($byteBuffer, 0) % ($i + 1)
+            $temp = $Password[$i]
+            $Password[$i] = $Password[$j]
+            $Password[$j] = $temp
+        }
+
+        $Password = -join $Password
+    } finally {
+        $rng.Dispose()
+    }
 
     $Password
 }
