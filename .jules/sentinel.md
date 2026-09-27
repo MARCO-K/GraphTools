@@ -1,0 +1,4 @@
+## 2024-05-27 - Use Cryptographically Secure PRNG for Passwords
+**Vulnerability:** The script `New-GTPassword.ps1` used PowerShell's built-in `Get-Random` cmdlet, which is not a cryptographically secure pseudo-random number generator (CSPRNG), to generate random characters for passwords.
+**Learning:** `Get-Random` is predictable and not suitable for security-sensitive operations like password generation. Furthermore, when implementing a CSPRNG in PowerShell 5.1/older .NET, avoid `[Math]::Abs([BitConverter]::ToInt32($bytes, 0))` as it will throw an overflow exception if the random bytes evaluate to `Int32.MinValue`.
+**Prevention:** Always use `[System.Security.Cryptography.RandomNumberGenerator]` for generating passwords, secrets, or keys. When deriving positive integers from random bytes, use a bitwise AND mask (`-band 0x7FFFFFFF`) to safely guarantee a positive value without the risk of overflow.

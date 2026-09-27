@@ -32,20 +32,50 @@ function New-GTPassword
     $Numbers = 48..57 | ForEach-Object { [char]$_ }   # 0-9
     $Special = '!@#$%^&*()_+-=[]{}|;:,.<>?/`~' -split ''
 
+    # Initialize cryptographic random number generator
+    $rng = [System.Security.Cryptography.RandomNumberGenerator]::Create()
+
+    # Helper scriptblock to select random items
+    $GetRandomElement = {
+        param([array]$Array, [int]$Count = 1)
+        $result = @()
+        for ($i = 0; $i -lt $Count; $i++) {
+            $bytes = New-Object byte[] 4
+            $rng.GetBytes($bytes)
+            # Use bitwise AND to ensure positive integer and avoid Math.Abs overflow on Int32.MinValue
+            $index = ([BitConverter]::ToInt32($bytes, 0) -band 0x7FFFFFFF) % $Array.Count
+            $result += $Array[$index]
+        }
+        if ($Count -eq 1) { return $result[0] }
+        return $result
+    }
+
     # Ensure at least one character from each set
     $Password = @(
-        ($Uppercase | Get-Random -Count 1)
-        ($Lowercase | Get-Random -Count 1)
-        ($Numbers   | Get-Random -Count 1)
-        ($Special   | Get-Random -Count 1)
+        (& $GetRandomElement -Array $Uppercase)
+        (& $GetRandomElement -Array $Lowercase)
+        (& $GetRandomElement -Array $Numbers)
+        (& $GetRandomElement -Array $Special)
     )
 
     # Fill remaining characters randomly from all sets
     $AllChars = $Uppercase + $Lowercase + $Numbers + $Special
-    $Password += ($AllChars | Get-Random -Count ($CharacterCount - $Password.Count))
+    $remainingCount = $CharacterCount - $Password.Count
+    if ($remainingCount -gt 0) {
+        $Password += & $GetRandomElement -Array $AllChars -Count $remainingCount
+    }
 
-    # Shuffle the password
-    $Password = -join ($Password | Get-Random -Count $Password.Count)
+    # Shuffle the password cryptographically
+    $shuffledPassword = $Password | ForEach-Object {
+        $bytes = New-Object byte[] 4
+        $rng.GetBytes($bytes)
+        [PSCustomObject]@{
+            Char = $_
+            Rand = [BitConverter]::ToInt32($bytes, 0)
+        }
+    } | Sort-Object Rand | Select-Object -ExpandProperty Char
 
-    $Password
+    $rng.Dispose()
+
+    -join $shuffledPassword
 }
