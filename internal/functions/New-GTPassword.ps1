@@ -22,30 +22,57 @@ function New-GTPassword
         
         Generates a 16-character random password
     #>
+    [CmdletBinding()]
     param (
-        [ValidateRange(10, 20)][int]$CharacterCount = 12
+        [ValidateRange(10, 20)]
+        [int]$CharacterCount = 12
     )
 
     # Define character sets
     $Uppercase = 65..90 | ForEach-Object { [char]$_ }   # A-Z
     $Lowercase = 97..122 | ForEach-Object { [char]$_ }  # a-z
-    $Numbers = 48..57 | ForEach-Object { [char]$_ }   # 0-9
-    $Special = '!@#$%^&*()_+-=[]{}|;:,.<>?/`~' -split ''
+    $Numbers   = 48..57 | ForEach-Object { [char]$_ }   # 0-9
+    $Special   = [char[]]'!@#$%^&*()_+-=[]{}|;:,.<>?/`~'
 
-    # Ensure at least one character from each set
-    $Password = @(
-        ($Uppercase | Get-Random -Count 1)
-        ($Lowercase | Get-Random -Count 1)
-        ($Numbers   | Get-Random -Count 1)
-        ($Special   | Get-Random -Count 1)
-    )
+    $rng = [System.Security.Cryptography.RandomNumberGenerator]::Create()
+    $byteBuffer = [byte[]]::new(4)
 
-    # Fill remaining characters randomly from all sets
-    $AllChars = $Uppercase + $Lowercase + $Numbers + $Special
-    $Password += ($AllChars | Get-Random -Count ($CharacterCount - $Password.Count))
+    # Rejection sampling helper to eliminate modulo bias
+    $GetSecureBoundedIndex = {
+        param([uint32]$Max)
+        $fullSets = [uint32]::MaxValue - ([uint32]::MaxValue % $Max)
+        do {
+            $rng.GetBytes($byteBuffer)
+            $rand = [BitConverter]::ToUInt32($byteBuffer, 0)
+        } while ($rand -ge $fullSets)
+        return [int]($rand % $Max)
+    }
 
-    # Shuffle the password
-    $Password = -join ($Password | Get-Random -Count $Password.Count)
+    try {
+        # Ensure at least one character from each set
+        $Password = [System.Collections.Generic.List[char]]::new()
+        $Password.Add($Uppercase[(& $GetSecureBoundedIndex -Max $Uppercase.Count)])
+        $Password.Add($Lowercase[(& $GetSecureBoundedIndex -Max $Lowercase.Count)])
+        $Password.Add($Numbers[(& $GetSecureBoundedIndex -Max $Numbers.Count)])
+        $Password.Add($Special[(& $GetSecureBoundedIndex -Max $Special.Count)])
 
-    $Password
+        # Fill remaining characters randomly from all sets
+        $AllChars = $Uppercase + $Lowercase + $Numbers + $Special
+        while ($Password.Count -lt $CharacterCount) {
+            $Password.Add($AllChars[(& $GetSecureBoundedIndex -Max $AllChars.Count)])
+        }
+
+        # Fisher-Yates shuffle with rejection sampling
+        for ($i = $Password.Count - 1; $i -gt 0; $i--) {
+            $j = & $GetSecureBoundedIndex -Max ($i + 1)
+            $temp = $Password[$i]
+            $Password[$i] = $Password[$j]
+            $Password[$j] = $temp
+        }
+
+        return (-join $Password)
+    }
+    finally {
+        $rng.Dispose()
+    }
 }

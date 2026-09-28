@@ -7,6 +7,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Security
+
+- **Cryptographically Secure Password Generation (`New-GTPassword`)**:
+  - Replaced pseudo-random `Get-Random` with `[System.Security.Cryptography.RandomNumberGenerator]` (CSPRNG) for character selection and Fisher-Yates shuffle.
+  - Implemented rejection sampling algorithm to eliminate modulo bias across index selections.
+  - Fixed character array definition for `$Special` by casting to `[char[]]`, eliminating empty string tokens from `-split` that could cause generated passwords to be shorter than requested or omit special characters.
+  - Added comprehensive Pester unit test suite in `tests/New-GTPassword.Tests.ps1`.
+
 ### Fixed
 
 - **Markdownlint Anchor Resolution & Spacing (`README.md`)**:
