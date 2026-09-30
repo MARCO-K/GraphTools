@@ -171,6 +171,7 @@ Describe "Authentication Flows & Helpers" -Tag 'Unit' {
             $script:capturedBody.grant_type | Should -Be 'refresh_token'
             $script:capturedBody.client_id | Should -Be 'client-y'
             $script:capturedBody.refresh_token | Should -Be 'old-refresh'
+            $script:capturedBody.claims | Should -Match 'CP1'
         }
     }
 

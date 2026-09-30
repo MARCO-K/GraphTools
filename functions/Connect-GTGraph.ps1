@@ -10,12 +10,13 @@ function Connect-GTGraph
         - In-memory X509Certificate2 object
         - Client Secret (Application credentials, supporting both String and SecureString)
         - Azure Managed Identity (System-Assigned & User-Assigned)
-        - Interactive Browser (Delegated OAuth 2.0 with PKCE via local HttpListener)
+        - Interactive Browser (Delegated OAuth 2.0 with PKCE via dynamic loopback HttpListener)
         - Device Code flow (Delegated OAuth 2.0 for headless/remote CLI)
         - Direct Access Token (Bearer token passthrough)
 
         Stores connection context in the module runspace and caches tokens in memory with an automatic
-        sliding expiration buffer and silent refresh_token renewal for interactive sessions.
+        sliding expiration buffer and silent refresh_token renewal. Supports optional DPAPI-encrypted
+        refresh token persistence across PowerShell sessions via -PersistRefreshToken.
 
     .PARAMETER TenantId
         Microsoft Entra ID Directory (Tenant) ID or authority domain ('organizations', 'common', or GUID).
@@ -46,7 +47,14 @@ function Connect-GTGraph
         Authenticates interactively via default web browser using OAuth 2.0 Authorization Code flow with PKCE.
 
     .PARAMETER LocalPort
-        Local HTTP port for browser redirect callback in Interactive mode. Defaults to 8400.
+        Local HTTP port for browser redirect callback in Interactive mode. Defaults to 0 (dynamic OS-assigned free port).
+
+    .PARAMETER ForceConsent
+        Forces the interactive consent prompt (prompt=consent) during interactive authentication.
+
+    .PARAMETER PersistRefreshToken
+        Opt-in switch to securely persist the refresh token to disk using DPAPI encryption (Windows)
+        for silent re-authentication across PowerShell sessions.
 
     .PARAMETER DeviceCode
         Authenticates using OAuth 2.0 Device Authorization flow for headless or remote CLI environments.
@@ -77,6 +85,9 @@ function Connect-GTGraph
 
     .EXAMPLE
         Connect-GTGraph -Interactive -TenantId $TenantId
+
+    .EXAMPLE
+        Connect-GTGraph -Interactive -PersistRefreshToken
 
     .EXAMPLE
         Connect-GTGraph -DeviceCode -TenantId $TenantId
@@ -126,7 +137,14 @@ function Connect-GTGraph
         [switch]$Interactive,
 
         [Parameter(ParameterSetName = 'Interactive', Mandatory = $false)]
-        [int]$LocalPort = 8400,
+        [int]$LocalPort = 0,
+
+        [Parameter(ParameterSetName = 'Interactive', Mandatory = $false)]
+        [switch]$ForceConsent,
+
+        [Parameter(ParameterSetName = 'Interactive', Mandatory = $false)]
+        [Parameter(ParameterSetName = 'DeviceCode', Mandatory = $false)]
+        [switch]$PersistRefreshToken,
 
         [Parameter(ParameterSetName = 'DeviceCode', Mandatory = $true)]
         [switch]$DeviceCode,
@@ -175,43 +193,157 @@ function Connect-GTGraph
     # 2. Interactive Browser Auth with PKCE
     elseif ($Interactive -or ($PSCmdlet.ParameterSetName -eq 'Interactive'))
     {
-        $listenerFn = Join-Path $PSScriptRoot '..\internal\functions\Invoke-GTOAuthHttpListener.ps1'
-        if (-not (Get-Command Invoke-GTOAuthHttpListener -ErrorAction SilentlyContinue) -and (Test-Path $listenerFn))
+        $silentSuccess = $false
+        $candidateRefreshToken = $null
+
+        # Attempt silent re-authentication via in-memory or persisted refresh token
+        if (-not $ForceConsent)
         {
-            . $listenerFn
+            if ($script:GTTokenCache -and $script:GTTokenCache.RefreshToken -and
+                $script:GTTokenCache.TenantId -eq $TenantId -and $script:GTTokenCache.ClientId -eq $ClientId)
+            {
+                $candidateRefreshToken = $script:GTTokenCache.RefreshToken
+            }
+            else
+            {
+                $persistedFn = Join-Path $PSScriptRoot '..\internal\functions\Get-GTPersistedTokenCache.ps1'
+                if (-not (Get-Command Get-GTPersistedTokenCache -ErrorAction SilentlyContinue) -and (Test-Path $persistedFn))
+                {
+                    . $persistedFn
+                }
+                if (Get-Command Get-GTPersistedTokenCache -ErrorAction SilentlyContinue)
+                {
+                    $persistedEntry = Get-GTPersistedTokenCache -TenantId $TenantId -ClientId $ClientId -AuthType 'Interactive'
+                    if ($persistedEntry -and $persistedEntry.RefreshToken)
+                    {
+                        $candidateRefreshToken = $persistedEntry.RefreshToken
+                    }
+                }
+            }
+
+            if ($candidateRefreshToken)
+            {
+                $renewFn = Join-Path $PSScriptRoot '..\internal\functions\Invoke-GTRefreshTokenRenewal.ps1'
+                if (-not (Get-Command Invoke-GTRefreshTokenRenewal -ErrorAction SilentlyContinue) -and (Test-Path $renewFn))
+                {
+                    . $renewFn
+                }
+
+                if (Get-Command Invoke-GTRefreshTokenRenewal -ErrorAction SilentlyContinue)
+                {
+                    try
+                    {
+                        Write-PSFMessage -Level Verbose -Message "Attempting silent interactive re-authentication using cached refresh token..."
+                        $renewResult = Invoke-GTRefreshTokenRenewal -TenantId $TenantId -ClientId $ClientId -RefreshToken $candidateRefreshToken -Scope $Scope
+                        $token = $renewResult.AccessToken
+
+                        $script:GTConnectionConfig = @{
+                            AuthType            = 'Interactive'
+                            TenantId            = $TenantId
+                            ClientId            = $ClientId
+                            RefreshToken        = $renewResult.RefreshToken
+                            Scope               = $Scope
+                            LocalPort           = $LocalPort
+                            PersistRefreshToken = [bool]$PersistRefreshToken
+                        }
+
+                        $tokenFile = Join-Path $PSScriptRoot '..\internal\functions\Get-GTCachedGraphToken.ps1'
+                        if (-not (Get-Command Get-GTCachedGraphToken -ErrorAction SilentlyContinue) -and (Test-Path $tokenFile))
+                        {
+                            . $tokenFile
+                        }
+
+                        $null = Get-GTCachedGraphToken -AccessToken $renewResult.AccessToken
+                        $script:GTTokenCache.AuthType = 'Interactive'
+                        $script:GTTokenCache.TenantId = $TenantId
+                        $script:GTTokenCache.ClientId = $ClientId
+                        $script:GTTokenCache.Scope = $Scope
+                        $script:GTTokenCache.ExpiresAt = [DateTime]::UtcNow.AddSeconds($renewResult.ExpiresIn)
+                        $script:GTTokenCache.RefreshToken = $renewResult.RefreshToken
+
+                        if ($PersistRefreshToken)
+                        {
+                            $saveCacheFn = Join-Path $PSScriptRoot '..\internal\functions\Save-GTPersistedTokenCache.ps1'
+                            if (-not (Get-Command Save-GTPersistedTokenCache -ErrorAction SilentlyContinue) -and (Test-Path $saveCacheFn))
+                            {
+                                . $saveCacheFn
+                            }
+                            if (Get-Command Save-GTPersistedTokenCache -ErrorAction SilentlyContinue)
+                            {
+                                $null = Save-GTPersistedTokenCache -TenantId $TenantId -ClientId $ClientId -RefreshToken $renewResult.RefreshToken -Scope $Scope -AuthType 'Interactive'
+                            }
+                        }
+
+                        $authType = 'Interactive'
+                        $silentSuccess = $true
+                        Write-PSFMessage -Level Verbose -Message "Silent interactive re-authentication succeeded."
+                    }
+                    catch
+                    {
+                        Write-PSFMessage -Level Verbose -Message "Silent re-authentication failed, falling back to browser flow: $_"
+                    }
+                }
+            }
         }
 
-        $authResult = Invoke-GTOAuthHttpListener -TenantId $TenantId -ClientId $ClientId -LocalPort $LocalPort -Scope $Scope
-        $token = $authResult.AccessToken
-
-        $script:GTConnectionConfig = @{
-            AuthType     = 'Interactive'
-            TenantId     = $TenantId
-            ClientId     = $ClientId
-            RefreshToken = $authResult.RefreshToken
-            Scope        = $Scope
-            LocalPort    = $LocalPort
-        }
-
-        # Cache token & refresh token directly
-        $tokenFile = Join-Path $PSScriptRoot '..\internal\functions\Get-GTCachedGraphToken.ps1'
-        if (-not (Get-Command Get-GTCachedGraphToken -ErrorAction SilentlyContinue) -and (Test-Path $tokenFile))
+        if (-not $silentSuccess)
         {
-            . $tokenFile
-        }
+            $listenerFn = Join-Path $PSScriptRoot '..\internal\functions\Invoke-GTOAuthHttpListener.ps1'
+            if (-not (Get-Command Invoke-GTOAuthHttpListener -ErrorAction SilentlyContinue) -and (Test-Path $listenerFn))
+            {
+                . $listenerFn
+            }
 
-        $null = Get-GTCachedGraphToken -AccessToken $authResult.AccessToken
-        $script:GTTokenCache.AuthType = 'Interactive'
-        $script:GTTokenCache.TenantId = $TenantId
-        $script:GTTokenCache.ClientId = $ClientId
-        $script:GTTokenCache.Scope = $Scope
-        $script:GTTokenCache.ExpiresAt = [DateTime]::UtcNow.AddSeconds($authResult.ExpiresIn)
-        if ($authResult.RefreshToken)
-        {
-            $script:GTTokenCache.RefreshToken = $authResult.RefreshToken
-        }
+            $authResult = Invoke-GTOAuthHttpListener -TenantId $TenantId `
+                                                     -ClientId $ClientId `
+                                                     -LocalPort $LocalPort `
+                                                     -Scope $Scope `
+                                                     -ForceConsent:$ForceConsent
+            $token = $authResult.AccessToken
 
-        $authType = 'Interactive'
+            $script:GTConnectionConfig = @{
+                AuthType            = 'Interactive'
+                TenantId            = $TenantId
+                ClientId            = $ClientId
+                RefreshToken        = $authResult.RefreshToken
+                Scope               = $Scope
+                LocalPort           = $LocalPort
+                PersistRefreshToken = [bool]$PersistRefreshToken
+            }
+
+            # Cache token & refresh token directly
+            $tokenFile = Join-Path $PSScriptRoot '..\internal\functions\Get-GTCachedGraphToken.ps1'
+            if (-not (Get-Command Get-GTCachedGraphToken -ErrorAction SilentlyContinue) -and (Test-Path $tokenFile))
+            {
+                . $tokenFile
+            }
+
+            $null = Get-GTCachedGraphToken -AccessToken $authResult.AccessToken
+            $script:GTTokenCache.AuthType = 'Interactive'
+            $script:GTTokenCache.TenantId = $TenantId
+            $script:GTTokenCache.ClientId = $ClientId
+            $script:GTTokenCache.Scope = $Scope
+            $script:GTTokenCache.ExpiresAt = [DateTime]::UtcNow.AddSeconds($authResult.ExpiresIn)
+            if ($authResult.RefreshToken)
+            {
+                $script:GTTokenCache.RefreshToken = $authResult.RefreshToken
+
+                if ($PersistRefreshToken)
+                {
+                    $saveCacheFn = Join-Path $PSScriptRoot '..\internal\functions\Save-GTPersistedTokenCache.ps1'
+                    if (-not (Get-Command Save-GTPersistedTokenCache -ErrorAction SilentlyContinue) -and (Test-Path $saveCacheFn))
+                    {
+                        . $saveCacheFn
+                    }
+                    if (Get-Command Save-GTPersistedTokenCache -ErrorAction SilentlyContinue)
+                    {
+                        $null = Save-GTPersistedTokenCache -TenantId $TenantId -ClientId $ClientId -RefreshToken $authResult.RefreshToken -Scope $Scope -AuthType 'Interactive'
+                    }
+                }
+            }
+
+            $authType = 'Interactive'
+        }
     }
     # 3. Device Code Flow
     elseif ($DeviceCode -or ($PSCmdlet.ParameterSetName -eq 'DeviceCode'))
@@ -226,11 +358,12 @@ function Connect-GTGraph
         $token = $authResult.AccessToken
 
         $script:GTConnectionConfig = @{
-            AuthType     = 'DeviceCode'
-            TenantId     = $TenantId
-            ClientId     = $ClientId
-            RefreshToken = $authResult.RefreshToken
-            Scope        = $Scope
+            AuthType            = 'DeviceCode'
+            TenantId            = $TenantId
+            ClientId            = $ClientId
+            RefreshToken        = $authResult.RefreshToken
+            Scope               = $Scope
+            PersistRefreshToken = [bool]$PersistRefreshToken
         }
 
         # Cache token & refresh token directly
@@ -249,6 +382,19 @@ function Connect-GTGraph
         if ($authResult.RefreshToken)
         {
             $script:GTTokenCache.RefreshToken = $authResult.RefreshToken
+
+            if ($PersistRefreshToken)
+            {
+                $saveCacheFn = Join-Path $PSScriptRoot '..\internal\functions\Save-GTPersistedTokenCache.ps1'
+                if (-not (Get-Command Save-GTPersistedTokenCache -ErrorAction SilentlyContinue) -and (Test-Path $saveCacheFn))
+                {
+                    . $saveCacheFn
+                }
+                if (Get-Command Save-GTPersistedTokenCache -ErrorAction SilentlyContinue)
+                {
+                    $null = Save-GTPersistedTokenCache -TenantId $TenantId -ClientId $ClientId -RefreshToken $authResult.RefreshToken -Scope $Scope -AuthType 'DeviceCode'
+                }
+            }
         }
 
         $authType = 'DeviceCode'

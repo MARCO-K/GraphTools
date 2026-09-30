@@ -46,19 +46,22 @@ function Invoke-GTOAuthHttpListener
     .SYNOPSIS
         Performs OAuth 2.0 Authorization Code flow with PKCE via a local HTTP listener.
     .DESCRIPTION
-        Starts a local HTTP listener on localhost, opens the system default browser
-        to the Microsoft identity platform authorization endpoint, intercepts the authorization code callback,
-        renders a browser completion page, and exchanges the code for access and refresh tokens.
+        Binds a local HTTP listener on localhost (using an OS-assigned dynamic port by default),
+        opens the system default browser to the Microsoft identity platform authorization endpoint,
+        filters out non-OAuth stray browser requests, intercepts the authorization code callback,
+        validates CSRF state, renders a completion card, and exchanges the code for tokens.
     .PARAMETER TenantId
         Microsoft Entra ID Tenant ID or authority domain ('organizations', 'common', or GUID).
     .PARAMETER ClientId
         The Application (Client) ID.
     .PARAMETER LocalPort
-        Local port for HTTP listener callback. Defaults to 8400.
+        Local port for HTTP listener callback. Defaults to 0 (dynamic port discovery).
     .PARAMETER Scope
         Requested permission scopes. Defaults to 'https://graph.microsoft.com/.default'.
     .PARAMETER TimeoutSeconds
         Timeout waiting for browser sign-in. Defaults to 180 seconds.
+    .PARAMETER ForceConsent
+        Forces interactive consent prompt (prompt=consent).
     .OUTPUTS
         [PSCustomObject] containing AccessToken, RefreshToken, and ExpiresIn.
     #>
@@ -72,33 +75,72 @@ function Invoke-GTOAuthHttpListener
         [string]$ClientId,
 
         [Parameter()]
-        [int]$LocalPort = 8400,
+        [int]$LocalPort = 0,
 
         [Parameter()]
         [string]$Scope = 'https://graph.microsoft.com/.default',
 
         [Parameter()]
-        [int]$TimeoutSeconds = 180
+        [int]$TimeoutSeconds = 180,
+
+        [Parameter()]
+        [switch]$ForceConsent
     )
 
-    $redirectUri = "http://localhost:$LocalPort/"
-    $listener = [System.Net.HttpListener]::new()
-    $listener.Prefixes.Add($redirectUri)
+    $freePortHelper = Join-Path $PSScriptRoot 'Get-GTFreePort.ps1'
+    if (-not (Get-Command Get-GTFreePort -ErrorAction SilentlyContinue) -and (Test-Path $freePortHelper))
+    {
+        . $freePortHelper
+    }
 
-    try
+    $autoPort = (-not $LocalPort -or $LocalPort -le 0)
+    $maxBindAttempts = if ($autoPort) { 5 } else { 1 }
+    $listener = $null
+    $activePort = $LocalPort
+
+    for ($attempt = 1; $attempt -le $maxBindAttempts; $attempt++)
     {
-        $listener.Start()
+        if ($autoPort)
+        {
+            $activePort = Get-GTFreePort
+        }
+        $candidate = [System.Net.HttpListener]::new()
+        $candidate.Prefixes.Add("http://localhost:$activePort/")
+        try
+        {
+            $candidate.Start()
+            $listener = $candidate
+            break
+        }
+        catch
+        {
+            $candidate.Close()
+            if ($attempt -eq $maxBindAttempts)
+            {
+                throw "Failed to start local HTTP listener on http://localhost:$activePort/ after $attempt attempt(s): $_"
+            }
+        }
     }
-    catch
-    {
-        throw "Failed to start local HTTP listener on $redirectUri. Ensure port $LocalPort is available or specify a different -LocalPort. Error: $_"
-    }
+    $redirectUri = "http://localhost:$activePort/"
 
     try
     {
         $pkce = New-GTPkcePair
-        $state = [Guid]::NewGuid().ToString()
 
+        $stateBytes = [byte[]]::new(16)
+        $rng = [System.Security.Cryptography.RandomNumberGenerator]::Create()
+        try
+        {
+            $rng.GetBytes($stateBytes)
+        }
+        finally
+        {
+            $rng.Dispose()
+        }
+        $state = [Convert]::ToBase64String($stateBytes).TrimEnd('=').Replace('+', '-').Replace('/', '_')
+
+        $caeClaims = '{"access_token":{"xms_cc":{"values":["CP1"]}}}'
+        $prompt = if ($ForceConsent) { 'consent' } else { 'select_account' }
         $requestedScope = if ($Scope -notmatch '\boffline_access\b') { "$Scope offline_access".Trim() } else { $Scope }
 
         $authParams = @(
@@ -109,11 +151,13 @@ function Invoke-GTOAuthHttpListener
             "scope=$([System.Uri]::EscapeDataString($requestedScope))",
             "state=$([System.Uri]::EscapeDataString($state))",
             "code_challenge=$([System.Uri]::EscapeDataString($pkce.CodeChallenge))",
-            "code_challenge_method=S256"
+            "code_challenge_method=S256",
+            "claims=$([System.Uri]::EscapeDataString($caeClaims))",
+            "prompt=$([System.Uri]::EscapeDataString($prompt))"
         )
         $authorizeUrl = "https://login.microsoftonline.com/$TenantId/oauth2/v2.0/authorize?{0}" -f ($authParams -join '&')
 
-        Write-PSFMessage -Level Host -Message "Opening default browser for interactive authentication to Microsoft Graph..."
+        Write-PSFMessage -Level Host -Message "Opening default browser for interactive authentication to Microsoft Graph (listening on $redirectUri)..."
         Write-PSFMessage -Level Verbose -Message "Navigating to: $authorizeUrl"
 
         try
@@ -125,20 +169,40 @@ function Invoke-GTOAuthHttpListener
             Write-PSFMessage -Level Host -Message "Could not launch default browser automatically. Please open this URL manually:`n$authorizeUrl"
         }
 
-        # Wait for callback
-        $contextTask = $listener.GetContextAsync()
+        # Wait for callback while ignoring stray requests (e.g., favicon.ico, browser preconnects)
         $stopwatch = [System.Diagnostics.Stopwatch]::StartNew()
+        $context = $null
 
-        while (-not $contextTask.IsCompleted)
+        while (-not $context)
         {
-            if ($stopwatch.Elapsed.TotalSeconds -ge $TimeoutSeconds)
+            $remainingSeconds = $TimeoutSeconds - $stopwatch.Elapsed.TotalSeconds
+            if ($remainingSeconds -le 0)
             {
                 throw "Interactive login timed out after $TimeoutSeconds seconds waiting for browser callback."
             }
-            Start-Sleep -Milliseconds 200
+
+            $contextTask = $listener.GetContextAsync()
+            $waitMs = [int][Math]::Min([Math]::Max(100, $remainingSeconds * 1000), 5000)
+            if (-not $contextTask.Wait($waitMs))
+            {
+                continue
+            }
+
+            $candidateContext = $contextTask.Result
+            $rawQuery = $candidateContext.Request.Url.Query.TrimStart('?')
+            $hasAuthResponse = ($rawQuery -match '(^|&)code=') -or ($rawQuery -match '(^|&)error=')
+
+            if ($hasAuthResponse)
+            {
+                $context = $candidateContext
+            }
+            else
+            {
+                $candidateContext.Response.StatusCode = 404
+                $candidateContext.Response.Close()
+            }
         }
 
-        $context = $contextTask.Result
         $request = $context.Request
         $response = $context.Response
 
@@ -155,8 +219,59 @@ function Invoke-GTOAuthHttpListener
             }
         }
 
-        # Render friendly browser response
-        $html = @"
+        $hasError = $queryParams.ContainsKey('error')
+        $returnedState = $queryParams['state']
+        $isStateValid = ($returnedState -eq $state)
+        $authCode = $queryParams['code']
+
+        if ($hasError -or -not $isStateValid -or -not $authCode)
+        {
+            $errDesc = if ($queryParams.ContainsKey('error_description')) { $queryParams['error_description'] } else { $queryParams['error'] }
+            if (-not $errDesc -and -not $isStateValid) { $errDesc = 'CSRF state verification failed.' }
+            if (-not $errDesc -and -not $authCode) { $errDesc = 'Missing authorization code in server response.' }
+
+            $errorHtml = @"
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="utf-8">
+    <title>Authentication Failed - GraphTools</title>
+    <style>
+        body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; text-align: center; padding-top: 60px; background-color: #fef2f2; color: #991b1b; }
+        .card { background: white; max-width: 480px; margin: 0 auto; padding: 40px; border-radius: 12px; box-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.1); border: 1px solid #fecaca; }
+        h2 { color: #dc2626; margin-bottom: 8px; }
+        p { color: #7f1d1d; font-size: 15px; }
+    </style>
+</head>
+<body>
+    <div class="card">
+        <h2>Authentication Failed</h2>
+        <p>$([System.Net.WebUtility]::HtmlEncode($errDesc))</p>
+    </div>
+</body>
+</html>
+"@
+            $bytes = [System.Text.Encoding]::UTF8.GetBytes($errorHtml)
+            $response.StatusCode = 400
+            $response.ContentLength64 = $bytes.Length
+            $response.ContentType = 'text/html; charset=utf-8'
+            $response.OutputStream.Write($bytes, 0, $bytes.Length)
+            $response.OutputStream.Flush()
+            $response.Close()
+
+            if (-not $isStateValid)
+            {
+                throw "State mismatch detected during interactive authentication callback. Rejecting response."
+            }
+            if ($hasError)
+            {
+                throw "Interactive authentication failed: $errDesc"
+            }
+            throw "No authorization code was returned by Microsoft identity platform."
+        }
+
+        # Render successful response
+        $successHtml = @"
 <!DOCTYPE html>
 <html>
 <head>
@@ -177,30 +292,13 @@ function Invoke-GTOAuthHttpListener
 </body>
 </html>
 "@
-        $bytes = [System.Text.Encoding]::UTF8.GetBytes($html)
+        $bytes = [System.Text.Encoding]::UTF8.GetBytes($successHtml)
+        $response.StatusCode = 200
         $response.ContentLength64 = $bytes.Length
         $response.ContentType = 'text/html; charset=utf-8'
         $response.OutputStream.Write($bytes, 0, $bytes.Length)
         $response.OutputStream.Flush()
         $response.Close()
-
-        if ($queryParams.ContainsKey('error'))
-        {
-            $desc = if ($queryParams.ContainsKey('error_description')) { $queryParams['error_description'] } else { $queryParams['error'] }
-            throw "Interactive authentication failed: $desc"
-        }
-
-        if (-not $queryParams.ContainsKey('code'))
-        {
-            throw "No authorization code was returned by Microsoft identity platform."
-        }
-
-        if ($queryParams.ContainsKey('state') -and ($queryParams['state'] -ne $state))
-        {
-            throw "State mismatch detected during interactive authentication callback. Rejecting response."
-        }
-
-        $authCode = $queryParams['code']
     }
     finally
     {
@@ -217,6 +315,7 @@ function Invoke-GTOAuthHttpListener
         redirect_uri  = $redirectUri
         code_verifier = $pkce.CodeVerifier
         scope         = $requestedScope
+        claims        = $caeClaims
     }
 
     try

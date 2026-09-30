@@ -122,6 +122,55 @@ Describe "Connect-GTGraph, Disconnect-GTGraph & Get-GTConnection" -Tag 'Unit' {
             $script:GTConnectionConfig.RefreshToken | Should -Be 'mock-refresh-token'
         }
 
+        It "silently re-authenticates via cached refresh token without calling listener" {
+            $script:GTTokenCache.TenantId = 'test-tenant'
+            $script:GTTokenCache.ClientId = 'test-client'
+            $script:GTTokenCache.RefreshToken = 'existing-refresh-token'
+
+            Mock -CommandName Invoke-GTRefreshTokenRenewal -MockWith {
+                [PSCustomObject]@{
+                    AccessToken  = 'silent-access-token'
+                    RefreshToken = 'silent-renewed-refresh-token'
+                    ExpiresIn    = 86400
+                }
+            }
+
+            $script:listenerCalled = $false
+            Mock -CommandName Invoke-GTOAuthHttpListener -MockWith {
+                $script:listenerCalled = $true
+            }
+
+            $conn = Connect-GTGraph -Interactive -TenantId 'test-tenant' -ClientId 'test-client' -PassThru
+
+            $conn.Connected | Should -Be $true
+            $conn.AuthType | Should -Be 'Interactive'
+            $script:listenerCalled | Should -Be $false
+            $script:GTTokenCache.AccessToken | Should -Be 'silent-access-token'
+            $script:GTTokenCache.RefreshToken | Should -Be 'silent-renewed-refresh-token'
+        }
+
+        It "bypasses silent re-authentication when -ForceConsent is specified" {
+            $script:GTTokenCache.TenantId = 'test-tenant'
+            $script:GTTokenCache.ClientId = 'test-client'
+            $script:GTTokenCache.RefreshToken = 'existing-refresh-token'
+
+            $script:listenerCalled = $false
+            Mock -CommandName Invoke-GTOAuthHttpListener -MockWith {
+                $script:listenerCalled = $true
+                [PSCustomObject]@{
+                    AccessToken  = 'forced-consent-access-token'
+                    RefreshToken = 'forced-consent-refresh-token'
+                    ExpiresIn    = 86400
+                }
+            }
+
+            $conn = Connect-GTGraph -Interactive -TenantId 'test-tenant' -ClientId 'test-client' -ForceConsent -PassThru
+
+            $conn.Connected | Should -Be $true
+            $script:listenerCalled | Should -Be $true
+            $script:GTTokenCache.AccessToken | Should -Be 'forced-consent-access-token'
+        }
+
         It "authenticates via Device Code flow" {
             Mock -CommandName Invoke-GTDeviceCodeFlow -MockWith {
                 [PSCustomObject]@{
@@ -170,6 +219,20 @@ Describe "Connect-GTGraph, Disconnect-GTGraph & Get-GTConnection" -Tag 'Unit' {
             $disc.PSObject.TypeNames | Should -Contain 'GraphTools.DisconnectSummary'
             $script:GTConnectionConfig | Should -BeNullOrEmpty
             $script:GTTokenCache.AccessToken | Should -BeNullOrEmpty
+        }
+
+        It "clears persisted cache when -ClearPersistedCache is specified" {
+            Mock -CommandName Clear-GTPersistedTokenCache -MockWith {
+                [PSCustomObject]@{
+                    Cleared      = $true
+                    EntriesReset = -1
+                    Message      = 'All persisted tokens cleared.'
+                }
+            }
+
+            $disc = Disconnect-GTGraph -ClearPersistedCache -PassThru
+
+            $disc.PersistedCacheCleared | Should -Be $true
         }
     }
 

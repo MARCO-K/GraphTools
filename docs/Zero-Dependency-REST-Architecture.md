@@ -215,6 +215,15 @@ flowchart TD
 ### 1. Connecting to Microsoft Graph ([`Connect-GTGraph`](Connect-GTGraph.md))
 
 ```powershell
+# Interactive Browser Authentication (WAM-free PKCE, dynamic loopback port, CAE CP1)
+Connect-GTGraph -Interactive -TenantId $TenantId
+
+# Interactive with DPAPI refresh token persistence (silent re-auth across shell sessions)
+Connect-GTGraph -Interactive -PersistRefreshToken
+
+# Force interactive consent prompt
+Connect-GTGraph -Interactive -ForceConsent
+
 # Certificate-based authentication (Recommended for enterprise / scheduled tasks)
 Connect-GTGraph -TenantId "fa8b2a79-cd59-468b-a25d-a6fef0b4dad1" `
                 -ClientId "af20edf7-7120-4dbd-af20-e1e58e49b0ff" `
@@ -223,6 +232,9 @@ Connect-GTGraph -TenantId "fa8b2a79-cd59-468b-a25d-a6fef0b4dad1" `
 
 # Client Secret authentication (For CI/CD or containers)
 Connect-GTGraph -TenantId $TenantId -ClientId $ClientId -ClientSecret $Secret
+
+# Azure Managed Identity (System-Assigned & User-Assigned)
+Connect-GTGraph -Identity
 
 # Direct Token passthrough
 Connect-GTGraph -AccessToken $BearerToken
@@ -241,16 +253,20 @@ TypeName: GraphTools.ConnectionStatus
 Connected : True
 TenantId  : fa8b2a79-cd59-468b-a25d-a6fef0b4dad1
 ClientId  : af20edf7-7120-4dbd-af20-e1e58e49b0ff
-AuthType  : Certificate
+AuthType  : Interactive
 Scope     : https://graph.microsoft.com/.default
-ExpiresAt : 2026-09-21 19:54:53
-TimeUtc   : 2026-09-21T17:55:00.0000000Z
+ExpiresAt : 2026-09-30 19:54:53
+TimeUtc   : 2026-09-30T07:55:00.0000000Z
 ```
 
 ### 3. Disconnecting & Cache Purge ([`Disconnect-GTGraph`](../functions/Disconnect-GTGraph.ps1))
 
 ```powershell
+# Disconnect active in-memory session
 Disconnect-GTGraph -PassThru
+
+# Disconnect and wipe on-disk DPAPI-encrypted token cache
+Disconnect-GTGraph -ClearPersistedCache -PassThru
 ```
 
 ---
