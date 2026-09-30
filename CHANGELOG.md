@@ -12,12 +12,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Modernized WAM-Free OAuth 2.0 PKCE Engine (`Connect-GTGraph`, `Invoke-GTOAuthHttpListener`)**:
   - Implemented dynamic loopback port discovery (`Get-GTFreePort`) utilizing ephemeral OS-assigned TCP ports with up to 5 collision retries, eliminating static port conflicts on port 8400.
   - Added stray request filtering in `Invoke-GTOAuthHttpListener`: non-OAuth browser traffic (e.g. `/favicon.ico` or browser preconnects) is answered with HTTP 404 while continuing to listen for the authentic OAuth callback query, preventing premature listener termination.
+  - Hardened loopback listener context handling by maintaining a single persistent receive task across poll timeouts, preventing leaked task accumulation.
   - Added Continuous Access Evaluation (CAE) `CP1` client capability advertisement (`claims={"access_token":{"xms_cc":{"values":["CP1"]}}}`), unlocking 24-hour revocable tokens from Microsoft Entra ID.
   - Added opt-in DPAPI refresh token persistence (`-PersistRefreshToken`) via `Save-GTPersistedTokenCache` and `Get-GTPersistedTokenCache` to `%LOCALAPPDATA%\GraphTools\tokens.json` (DPAPI encrypted on Windows, 0700/0600 on POSIX).
-  - Added silent re-authentication across shell sessions: `Connect-GTGraph -Interactive` checks in-memory and persisted refresh token cache before popping the browser.
+  - Added centralized silent re-authentication helper (`Invoke-GTSilentReAuth`) supporting both `Interactive` and `DeviceCode` flows across shell sessions using cached/persisted refresh tokens.
+  - Added centralized session configuration helper (`Set-GTOAuthSession`) to establish connection state, populate token cache with decoded claims, and persist refresh tokens in a single authoritative location.
   - Added `-ForceConsent` switch to force interactive consent (`prompt=consent`) when re-granting permissions or updating scopes.
-  - Added `-ClearPersistedCache` switch to `Disconnect-GTGraph` to securely purge on-disk DPAPI token cache entries.
-  - Added Pester test suites in `tests/Get-GTFreePort.Tests.ps1`, `tests/PersistedTokenCache.Tests.ps1`, and `tests/OAuthHttpListener.Tests.ps1`.
+  - Added `-ClearPersistedCache` switch to `Disconnect-GTGraph` to securely purge on-disk DPAPI token cache entries, with selective `-AuthType` filter support.
+  - Added Pester test suites in `tests/Get-GTFreePort.Tests.ps1`, `tests/PersistedTokenCache.Tests.ps1`, `tests/OAuthHttpListener.Tests.ps1`, `tests/Invoke-GTSilentReAuth.Tests.ps1`, and `tests/Set-GTOAuthSession.Tests.ps1`.
 
 ### Security
 
