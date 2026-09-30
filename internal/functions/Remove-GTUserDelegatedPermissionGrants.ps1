@@ -37,6 +37,7 @@ function Remove-GTUserDelegatedPermissionGrants
         [Parameter(Mandatory = $true)]
         [hashtable]$OutputBase,
         [Parameter(Mandatory = $true)]
+        [AllowEmptyCollection()]
         [System.Collections.Generic.List[PSObject]]$Results
     )
 
@@ -52,19 +53,33 @@ function Remove-GTUserDelegatedPermissionGrants
 
         if ($permissionGrants)
         {
+            $servicePrincipalNameCache = @{}
             foreach ($grant in $permissionGrants)
             {
                 $action = 'RemoveDelegatedPermissionGrant'
 
                 # Get service principal details for better logging
-                try
+                $clientId = [string]$grant.clientId
+                if ([string]::IsNullOrWhiteSpace($clientId))
                 {
-                    $spResp = Invoke-GTGraphRequest -Method GET -Uri "v1.0/servicePrincipals/$($grant.clientId)?`$select=displayName" -ErrorAction SilentlyContinue
-                    $appName = if ($spResp) { $spResp.displayName } else { "App-$($grant.clientId)" }
+                    $appName = "App-$($grant.id)"
                 }
-                catch
+                elseif ($servicePrincipalNameCache.ContainsKey($clientId))
                 {
-                    $appName = "App-$($grant.ClientId)"
+                    $appName = $servicePrincipalNameCache[$clientId]
+                }
+                else
+                {
+                    try
+                    {
+                        $spResp = Invoke-GTGraphRequest -Method GET -Uri "v1.0/servicePrincipals/${clientId}?`$select=displayName" -ErrorAction SilentlyContinue
+                        $appName = if ($spResp) { $spResp.displayName } else { "App-$clientId" }
+                    }
+                    catch
+                    {
+                        $appName = "App-$clientId"
+                    }
+                    $servicePrincipalNameCache[$clientId] = $appName
                 }
 
                 $output = $OutputBase + @{

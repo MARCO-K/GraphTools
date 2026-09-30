@@ -7,6 +7,8 @@ if (-not (Get-Command Get-GTGraphErrorDetails -ErrorAction SilentlyContinue)) {
 
 Describe "Invoke-GTGraphRequest" -Tag 'Unit' {
     BeforeAll {
+        if (Test-Path Function:\Invoke-GTGraphRequest) { Remove-Item Function:\Invoke-GTGraphRequest -Force -ErrorAction SilentlyContinue }
+
         $tokenFile = Join-Path -Path $PSScriptRoot -ChildPath '..\internal\functions\Get-GTCachedGraphToken.ps1'
         if (Test-Path $tokenFile) { . $tokenFile }
 

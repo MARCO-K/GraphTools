@@ -65,11 +65,15 @@ function Import-GitHubCsvToDuckDB
         $conn = New-DuckDBConnection -DB $dbPath
     }
     # For 'ExistingDB' parameter set, $conn is already provided and validated
+    else
+    {
+        $conn = $DBConn
+    }
 
     try
     {
         # Get repository contents
-        $apiUrl = "https://api.github.com/repos/$Owner/$Repository/contents/$Directory"
+        $apiUrl = "https://api.github.com/repos/$Owner/$Repository/contents/${Directory}?ref=$([System.Uri]::EscapeDataString($Branch))"
         Write-PSFMessage -Level Verbose -Message "Retrieving CSV files from GitHub repository: $apiUrl."
 
         $headers = @{
@@ -106,7 +110,8 @@ AS SELECT * FROM read_csv_auto('$downloadUrl');
             }
             catch
             {
-                Write-PSFMessage -Level Error -Message  "Failed to create table $tableName"
+                Write-PSFMessage -Level Error -Message  "Failed to create table $tableName. $($_.Exception.Message)"
+                throw
             }
         }
 
@@ -114,10 +119,11 @@ AS SELECT * FROM read_csv_auto('$downloadUrl');
     catch
     {
         Write-PSFMessage -Level Error -Message "Operation failed: $_"
+        throw
     }
     finally
     {
-        if ($PSCmdlet.ParameterSetName -eq 'newDB')
+        if ($PSCmdlet.ParameterSetName -eq 'newDB' -and $conn)
         {
             $conn.Close()
         }

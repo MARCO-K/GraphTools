@@ -23,7 +23,7 @@ function Remove-GTExpiredInvites {
     .NOTES
     Requires Microsoft Graph connection with User.ReadWrite.All permission.
     #>
-    [CmdletBinding(SupportsShouldProcess)]
+    [CmdletBinding(SupportsShouldProcess, ConfirmImpact = 'High')]
     param(
         [Parameter(Mandatory = $true)]
         [int]$DaysOlderThan,
@@ -34,6 +34,10 @@ function Remove-GTExpiredInvites {
     )
 
     begin {
+        if ($Force -and -not $PSBoundParameters.ContainsKey('Confirm')) {
+            $ConfirmPreference = 'None'
+        }
+
         if (-not (Initialize-GTGraphConnection -Scopes 'User.ReadWrite.All' -NewSession:$NewSession)) {
             Write-Error "Failed to initialize Microsoft Graph connection."
             return
@@ -63,14 +67,19 @@ function Remove-GTExpiredInvites {
 
             foreach ($guest in $expiredGuests) {
                 if ($PSCmdlet.ShouldProcess("$($guest.DisplayName) ($($guest.UserPrincipalName))", "Remove Guest User (Expired Invite)")) {
-                    if ($Force -or $PSCmdlet.ShouldContinue("Are you sure you want to delete guest user '$($guest.DisplayName)'?", "Confirm Deletion")) {
-                        try {
-                            Invoke-GTGraphRequest -Method DELETE -Uri "v1.0/users/$($guest.Id)" -ErrorAction Stop
-                            Write-PSFMessage -Level Output -Message "Removed guest user: $($guest.DisplayName)"
-                        }
-                        catch {
-                            Write-PSFMessage -Level Error -Message "Failed to remove user $($guest.DisplayName): $($_.Exception.Message)"
-                        }
+                    try {
+                        Invoke-GTGraphRequest -Method DELETE -Uri "v1.0/users/$($guest.Id)" -ErrorAction Stop
+                        Write-PSFMessage -Level Output -Message "Removed guest user: $($guest.DisplayName)"
+                    }
+                    catch {
+                        Write-PSFMessage -Level Error -Message "Failed to remove user $($guest.DisplayName): $($_.Exception.Message)"
+                        $errorRecord = [System.Management.Automation.ErrorRecord]::new(
+                            [System.Exception]::new("Failed to remove user $($guest.DisplayName): $($_.Exception.Message)", $_.Exception),
+                            'FailedToRemoveGuestUser',
+                            [System.Management.Automation.ErrorCategory]::InvalidOperation,
+                            $guest
+                        )
+                        $PSCmdlet.WriteError($errorRecord)
                     }
                 }
             }

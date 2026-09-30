@@ -17,6 +17,13 @@ Describe "Invoke-AuditLogQuery" {
         # Dot-source the function under test AFTER stubs
         . "$PSScriptRoot/../functions/Invoke-AuditLogQuery.ps1"
     }
+    AfterAll {
+        Remove-Item Function:\global:Install-GTRequiredModule -Force -ErrorAction SilentlyContinue
+        Remove-Item Function:\global:Test-GTGraphScopes -Force -ErrorAction SilentlyContinue
+        Remove-Item Function:\global:Initialize-GTGraphConnection -Force -ErrorAction SilentlyContinue
+        Remove-Item Function:\global:Write-PSFMessage -Force -ErrorAction SilentlyContinue
+        Remove-Item Function:\global:Invoke-GTGraphRequest -Force -ErrorAction SilentlyContinue
+    }
     BeforeEach {
         $script:storedFilter = $null
         $mockRecords = @(

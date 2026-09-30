@@ -82,8 +82,44 @@ function Remove-GTUserEntitlements {
     begin {
         $results = [System.Collections.Generic.List[PSObject]]::new()
 
+        $selectedOperations = @()
+        if ($removeGroups) { $selectedOperations += 'removeGroups' }
+        if ($removeGroupOwners) { $selectedOperations += 'removeGroupOwners' }
+        if ($removeLicenses) { $selectedOperations += 'removeLicenses' }
+        if ($removeServicePrincipals) { $selectedOperations += 'removeServicePrincipals' }
+        if ($removeEnterpriseAppOwnership) { $selectedOperations += 'removeEnterpriseAppOwnership' }
+        if ($removeUserAppRoleAssignments) { $selectedOperations += 'removeUserAppRoleAssignments' }
+        if ($removeRoleAssignments) { $selectedOperations += 'removeRoleAssignments' }
+        if ($removePIMRoleEligibility) { $selectedOperations += 'removePIMRoleEligibility' }
+        if ($removeAdministrativeUnitMemberships) { $selectedOperations += 'removeAdministrativeUnitMemberships' }
+        if ($removeAccessPackageAssignments) { $selectedOperations += 'removeAccessPackageAssignments' }
+        if ($removeDelegatedPermissionGrants) { $selectedOperations += 'removeDelegatedPermissionGrants' }
+
+        if (-not $removeAll -and $selectedOperations.Count -eq 0)
+        {
+            throw "No entitlement action selected. Specify at least one remove* switch or use -removeAll."
+        }
+
+        $scopeSet = [System.Collections.Generic.HashSet[string]]::new([System.StringComparer]::OrdinalIgnoreCase)
+        if ($removeAll -or $removeGroups) { [void]$scopeSet.Add('GroupMember.ReadWrite.All') }
+        if ($removeAll -or $removeGroupOwners) { [void]$scopeSet.Add('Group.ReadWrite.All') }
+        if ($removeAll -or $removeLicenses) { [void]$scopeSet.Add('Directory.ReadWrite.All') }
+        if ($removeAll -or $removeServicePrincipals -or $removeEnterpriseAppOwnership -or $removeUserAppRoleAssignments) { [void]$scopeSet.Add('Directory.ReadWrite.All') }
+        if ($removeAll -or $removeRoleAssignments) { [void]$scopeSet.Add('RoleManagement.ReadWrite.Directory') }
+        if ($removeAll -or $removePIMRoleEligibility) { [void]$scopeSet.Add('RoleEligibilitySchedule.ReadWrite.Directory') }
+        if ($removeAll -or $removeAdministrativeUnitMemberships) { [void]$scopeSet.Add('AdministrativeUnit.ReadWrite.All') }
+        if ($removeAll -or $removeAccessPackageAssignments) { [void]$scopeSet.Add('EntitlementManagement.ReadWrite.All') }
+        if ($removeAll -or $removeDelegatedPermissionGrants) { [void]$scopeSet.Add('DelegatedPermissionGrant.ReadWrite.All') }
+
+        # Resolving user UPNs via GET /v1.0/users/{upn} requires User.Read.All unless Directory.ReadWrite.All is already included
+        if (-not $scopeSet.Contains('Directory.ReadWrite.All'))
+        {
+            [void]$scopeSet.Add('User.Read.All')
+        }
+
+        $RequiredScopes = @($scopeSet)
+
         # 1. Connection Initialization
-        $RequiredScopes = @('GroupMember.ReadWrite.All', 'Group.ReadWrite.All', 'Directory.ReadWrite.All', 'RoleManagement.ReadWrite.Directory', 'RoleEligibilitySchedule.ReadWrite.Directory', 'AdministrativeUnit.ReadWrite.All', 'EntitlementManagement.ReadWrite.All', 'DelegatedPermissionGrant.ReadWrite.All')
         if (-not (Initialize-GTGraphConnection -Scopes $RequiredScopes -NewSession:$NewSession))
         {
             throw "Failed to initialize Microsoft Graph session."
@@ -92,7 +128,19 @@ function Remove-GTUserEntitlements {
         # 2. Scope Validation
         $conn = Get-GTConnection
         $currentScopes = if ($conn.Scopes) { [string[]]$conn.Scopes } elseif ($conn.Scope) { $conn.Scope -split ' ' } else { @() }
-        $missingScopes = Get-GTMissingScopes -RequiredScopes $RequiredScopes -CurrentScopes $currentScopes
+        $effectiveCurrentScopes = [System.Collections.Generic.HashSet[string]]::new([System.StringComparer]::OrdinalIgnoreCase)
+        foreach ($scope in $currentScopes)
+        {
+            if (-not [string]::IsNullOrWhiteSpace($scope))
+            {
+                [void]$effectiveCurrentScopes.Add($scope)
+            }
+        }
+        if ($effectiveCurrentScopes.Contains('Directory.ReadWrite.All') -or $effectiveCurrentScopes.Contains('Directory.Read.All'))
+        {
+            [void]$effectiveCurrentScopes.Add('User.Read.All')
+        }
+        $missingScopes = Get-GTMissingScopes -RequiredScopes $RequiredScopes -CurrentScopes @($effectiveCurrentScopes)
         if ($missingScopes -and $missingScopes.Count -gt 0)
         {
             throw "Required scopes are missing: $($missingScopes -join ', ')"
@@ -197,4 +245,3 @@ function Remove-GTUserEntitlements {
         return $results
     }
 }
-
