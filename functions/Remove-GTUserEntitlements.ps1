@@ -82,8 +82,38 @@ function Remove-GTUserEntitlements {
     begin {
         $results = [System.Collections.Generic.List[PSObject]]::new()
 
+        $selectedOperations = @()
+        if ($removeGroups) { $selectedOperations += 'removeGroups' }
+        if ($removeGroupOwners) { $selectedOperations += 'removeGroupOwners' }
+        if ($removeLicenses) { $selectedOperations += 'removeLicenses' }
+        if ($removeServicePrincipals) { $selectedOperations += 'removeServicePrincipals' }
+        if ($removeEnterpriseAppOwnership) { $selectedOperations += 'removeEnterpriseAppOwnership' }
+        if ($removeUserAppRoleAssignments) { $selectedOperations += 'removeUserAppRoleAssignments' }
+        if ($removeRoleAssignments) { $selectedOperations += 'removeRoleAssignments' }
+        if ($removePIMRoleEligibility) { $selectedOperations += 'removePIMRoleEligibility' }
+        if ($removeAdministrativeUnitMemberships) { $selectedOperations += 'removeAdministrativeUnitMemberships' }
+        if ($removeAccessPackageAssignments) { $selectedOperations += 'removeAccessPackageAssignments' }
+        if ($removeDelegatedPermissionGrants) { $selectedOperations += 'removeDelegatedPermissionGrants' }
+
+        if (-not $removeAll -and $selectedOperations.Count -eq 0)
+        {
+            throw "No entitlement action selected. Specify at least one remove* switch or use -removeAll."
+        }
+
+        $scopeSet = [System.Collections.Generic.HashSet[string]]::new([System.StringComparer]::OrdinalIgnoreCase)
+        if ($removeAll -or $removeGroups) { [void]$scopeSet.Add('GroupMember.ReadWrite.All') }
+        if ($removeAll -or $removeGroupOwners) { [void]$scopeSet.Add('Group.ReadWrite.All') }
+        if ($removeAll -or $removeLicenses) { [void]$scopeSet.Add('Directory.ReadWrite.All') }
+        if ($removeAll -or $removeServicePrincipals -or $removeEnterpriseAppOwnership -or $removeUserAppRoleAssignments) { [void]$scopeSet.Add('Directory.ReadWrite.All') }
+        if ($removeAll -or $removeRoleAssignments) { [void]$scopeSet.Add('RoleManagement.ReadWrite.Directory') }
+        if ($removeAll -or $removePIMRoleEligibility) { [void]$scopeSet.Add('RoleEligibilitySchedule.ReadWrite.Directory') }
+        if ($removeAll -or $removeAdministrativeUnitMemberships) { [void]$scopeSet.Add('AdministrativeUnit.ReadWrite.All') }
+        if ($removeAll -or $removeAccessPackageAssignments) { [void]$scopeSet.Add('EntitlementManagement.ReadWrite.All') }
+        if ($removeAll -or $removeDelegatedPermissionGrants) { [void]$scopeSet.Add('DelegatedPermissionGrant.ReadWrite.All') }
+
+        $RequiredScopes = @($scopeSet)
+
         # 1. Connection Initialization
-        $RequiredScopes = @('GroupMember.ReadWrite.All', 'Group.ReadWrite.All', 'Directory.ReadWrite.All', 'RoleManagement.ReadWrite.Directory', 'RoleEligibilitySchedule.ReadWrite.Directory', 'AdministrativeUnit.ReadWrite.All', 'EntitlementManagement.ReadWrite.All', 'DelegatedPermissionGrant.ReadWrite.All')
         if (-not (Initialize-GTGraphConnection -Scopes $RequiredScopes -NewSession:$NewSession))
         {
             throw "Failed to initialize Microsoft Graph session."
@@ -197,4 +227,3 @@ function Remove-GTUserEntitlements {
         return $results
     }
 }
-

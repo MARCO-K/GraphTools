@@ -87,6 +87,7 @@ Function Reset-GTUserPassword
                     else {
                         Write-PSFMessage -Level Error -Message "$User - Reset Password Action - $($errorDetails.ErrorMessage)"
                     }
+                    throw "Failed to reset password for $User. $($errorDetails.Reason)"
                 }
             }
         }
