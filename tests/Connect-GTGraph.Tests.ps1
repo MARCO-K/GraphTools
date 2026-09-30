@@ -187,6 +187,34 @@ Describe "Connect-GTGraph, Disconnect-GTGraph & Get-GTConnection" -Tag 'Unit' {
             $conn.RefreshTokenPresent | Should -Be $true
             $script:GTConnectionConfig.RefreshToken | Should -Be 'mock-device-refresh-token'
         }
+
+        It "silently re-authenticates via cached DeviceCode refresh token without calling Invoke-GTDeviceCodeFlow" {
+            $script:GTTokenCache.TenantId = 'test-tenant'
+            $script:GTTokenCache.ClientId = '14d82eec-204b-4a57-bc6d-141461f58e68'
+            $script:GTTokenCache.RefreshToken = 'existing-device-refresh-token'
+            $script:GTTokenCache.AuthType = 'DeviceCode'
+
+            Mock -CommandName Invoke-GTRefreshTokenRenewal -MockWith {
+                [PSCustomObject]@{
+                    AccessToken  = 'silent-device-access-token'
+                    RefreshToken = 'silent-renewed-device-refresh-token'
+                    ExpiresIn    = 86400
+                }
+            }
+
+            $script:deviceFlowCalled = $false
+            Mock -CommandName Invoke-GTDeviceCodeFlow -MockWith {
+                $script:deviceFlowCalled = $true
+            }
+
+            $conn = Connect-GTGraph -DeviceCode -TenantId 'test-tenant' -PassThru
+
+            $conn.Connected | Should -Be $true
+            $conn.AuthType | Should -Be 'DeviceCode'
+            $script:deviceFlowCalled | Should -Be $false
+            $script:GTTokenCache.AccessToken | Should -Be 'silent-device-access-token'
+            $script:GTTokenCache.RefreshToken | Should -Be 'silent-renewed-device-refresh-token'
+        }
     }
 
     Context "Get-GTConnection" {
