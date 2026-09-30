@@ -44,7 +44,7 @@ flowchart TD
      - *For background automation / certificates / client secrets*: Leave blank.
      - *For interactive browser PKCE logins (`Connect-GTGraph -Interactive`)*:
        - Select platform: **Public client/native (mobile & desktop)**.
-       - URI: `http://localhost:8400/` *(Note: The trailing slash is required for exact string match)*
+       - URI: `http://localhost` (Recommended: Entra ID allows any dynamic loopback port when configured as `http://localhost`) and optionally `http://localhost:8400/` (if using fixed `-LocalPort 8400`).
 4. Click **Register**.
 5. Record the following values displayed on the **Overview** page:
    - **Application (client) ID**: (e.g. `11111111-2222-3333-4444-555555555555`)
@@ -66,7 +66,7 @@ $appParams = @{
     DisplayName    = "GraphTools-Automation"
     SignInAudience = "AzureADMyOrg"
     PublicClient   = @{
-        RedirectUris = @("http://localhost:8400/")
+        RedirectUris = @("http://localhost", "http://localhost:8400/")
     }
 }
 
@@ -98,7 +98,7 @@ GraphTools supports five authentication mechanisms. Choose the credential strate
 | **X.509 Certificate (RFC 7523)** | Production servers, admin workstations | High (OS/DPAPI protected in certificate store; non-exportable private key recommended) | `Connect-GTGraph -TenantId $T -ClientId $C -Thumbprint $Thumb` |
 | **Azure Managed Identity** | Azure VMs, Functions, Automation | Highest (Zero-credential, automatic rotation) | `Connect-GTGraph -Identity` |
 | **Client Secret** | Ephemeral CI/CD runners, Docker containers | Moderate (Requires secure vaulting) | `Connect-GTGraph -TenantId $T -ClientId $C -ClientSecret $Secret` |
-| **Interactive (PKCE)** | Interactive administrator troubleshooting | High (Delegated identity with MFA enforcement) | `Connect-GTGraph -Interactive -TenantId $T` |
+| **Interactive (PKCE)** | Interactive administrator troubleshooting | High (Delegated identity with MFA enforcement, CAE CP1, dynamic port, optional DPAPI caching) | `Connect-GTGraph -Interactive -TenantId $T [-PersistRefreshToken]` |
 | **Device Code** | Remote SSH sessions, Linux shells | High (Delegated identity with MFA enforcement) | `Connect-GTGraph -DeviceCode -TenantId $T` |
 
 ---
@@ -134,6 +134,7 @@ Microsoft Entra ID and GraphTools support both enterprise CA-issued certificates
 #### 1. Generate the Certificate
 
 ##### Windows (PowerShell 5.1 & PowerShell 7)
+
 Execute the following PowerShell command on your Windows administration workstation:
 
 ```powershell
@@ -167,22 +168,26 @@ Export-Certificate -Cert $cert -FilePath $exportPath
 > Notice `-KeyExportPolicy NonExportable`. This ensures the private key is permanently locked to this workstation and cannot be exported into a `.pfx` file. `Export-Certificate` exports only the public `.cer` certificate containing zero private key material.
 
 ##### Linux & macOS Alternative (OpenSSL)
+
 If managing GraphTools from Linux or macOS where `New-SelfSignedCertificate` is unavailable:
 
 ```bash
 # Generate private key and public certificate via OpenSSL
 openssl req -x509 -newkey rsa:2048 -keyout graphtools-key.pem -out GraphTools-Automation.cer -days 730 -nodes -subj "/CN=GraphTools-Automation"
 ```
+
 *(On Linux/macOS, use `Connect-GTGraph -Certificate` passing a loaded `[X509Certificate2]` object or convert to PKCS#12).*
 
 #### 2. Upload Public Certificate to Entra ID
 
-##### GUI Method:
+##### GUI Method
+
 1. In the Entra admin center, open your App Registration.
 2. Navigate to **Certificates & secrets** > **Certificates** > **Upload certificate**.
 3. Select `$exportPath` (`GraphTools-Automation.cer`) and click **Add**.
 
-##### Automated Clean PowerShell Method:
+##### Automated Clean PowerShell Method
+
 If you provisioned the application via PowerShell in Step 1, you can attach the certificate public key directly:
 
 ```powershell
@@ -333,13 +338,13 @@ When running GraphTools interactively (`Connect-GTGraph -Interactive` or `-Devic
 Application permissions in Microsoft Graph require tenant administrator consent:
 
 1. Navigate to **API permissions** in your App Registration.
-2. Click **Grant admin consent for <TenantName>**.
+2. Click **Grant admin consent for `<TenantName>`**.
 3. Confirm by selecting **Yes**.
 4. Verify that each requested permission displays a green checkmark under the **Status** column.
 
 ---
 
-## ⚡ Assigning Scopes to Managed Identities
+## Assigning Scopes to Managed Identities
 
 Managed Identities do not have an App Registration portal interface. Assign Microsoft Graph application permissions to a Managed Identity using this clean PowerShell script:
 
@@ -399,18 +404,22 @@ Get-GTRecentUser -Top 5
 ## 🔍 Troubleshooting Common Issues
 
 ### `AADSTS700016: Application with Identifier '...' Was Not Found in the Directory`
+
 - **Cause**: Incorrect `ClientId` or the application was provisioned in a different tenant than `TenantId`.
 - **Resolution**: Verify that the GUIDs match the App Registration Overview blade in the target tenant.
 
 ### `AADSTS700027: Client Assertion Contains an Invalid Signature`
+
 - **Cause**: The certificate thumbprint provided to `Connect-GTGraph` does not match the certificate uploaded to Entra ID, or the certificate has expired.
 - **Resolution**: Verify `$cert.Thumbprint` matches the thumbprint listed under **Certificates & secrets** in the Azure portal.
 
 ### `AADSTS50011: The Reply URL Specified in the Request Does Not Match`
-- **Cause**: Occurs during `Connect-GTGraph -Interactive` when the redirect URI `http://localhost:8400/` is missing or registered without the required trailing slash in the App Registration.
-- **Resolution**: Add `http://localhost:8400/` (including the trailing slash) under **Authentication** > **Mobile and desktop applications** in the Entra admin center.
+
+- **Cause**: Occurs during `Connect-GTGraph -Interactive` when neither `http://localhost` (recommended for dynamic loopback ports) nor `http://localhost:8400/` is registered under Mobile and desktop applications in the App Registration.
+- **Resolution**: Add `http://localhost` under **Authentication** > **Mobile and desktop applications** in the Entra admin center.
 
 ### `HTTP 403 Forbidden / Authorization_RequestDenied`
+
 - **Cause**: The application has not been granted the required Microsoft Graph permission, or admin consent was not granted.
 - **Resolution**: Check the specific cmdlet documentation for required permissions. Ensure **Grant admin consent** was executed in the portal.
 

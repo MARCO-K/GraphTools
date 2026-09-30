@@ -39,6 +39,7 @@ function Invoke-GTRefreshTokenRenewal
         grant_type    = 'refresh_token'
         refresh_token = $RefreshToken
         scope         = $Scope
+        claims        = '{"access_token":{"xms_cc":{"values":["CP1"]}}}'
     }
 
     try
