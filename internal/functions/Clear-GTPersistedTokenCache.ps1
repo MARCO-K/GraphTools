@@ -45,7 +45,7 @@ function Clear-GTPersistedTokenCache
         }
     }
 
-    if ($All -or (-not $TenantId -and -not $ClientId))
+    if ($All -or (-not $TenantId -and -not $ClientId -and -not $AuthType))
     {
         Remove-Item -Path $cacheFile -Force -ErrorAction SilentlyContinue
         return [PSCustomObject]@{

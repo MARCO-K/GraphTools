@@ -96,6 +96,23 @@ Describe "Persisted Token Cache" -Tag 'Unit' {
             $entryBeta.RefreshToken | Should -Be 'token-beta'
         }
 
+        It "clears only matching AuthType when only -AuthType is specified" {
+            $null = Save-GTPersistedTokenCache -TenantId 'tenant-alpha' -ClientId 'client-alpha' -RefreshToken 'token-interactive' -AuthType 'Interactive'
+            $null = Save-GTPersistedTokenCache -TenantId 'tenant-alpha' -ClientId 'client-alpha' -RefreshToken 'token-devicecode' -AuthType 'DeviceCode'
+
+            $clearResult = Clear-GTPersistedTokenCache -AuthType 'DeviceCode'
+
+            $clearResult.Cleared | Should -Be $true
+            $clearResult.EntriesReset | Should -Be 1
+
+            $entryInteractive = Get-GTPersistedTokenCache -TenantId 'tenant-alpha' -ClientId 'client-alpha' -AuthType 'Interactive'
+            $entryDeviceCode = Get-GTPersistedTokenCache -TenantId 'tenant-alpha' -ClientId 'client-alpha' -AuthType 'DeviceCode'
+
+            $entryInteractive | Should -Not -BeNullOrEmpty
+            $entryInteractive.RefreshToken | Should -Be 'token-interactive'
+            $entryDeviceCode | Should -BeNullOrEmpty
+        }
+
         It "clears all entries when -All is specified" {
             $null = Save-GTPersistedTokenCache -TenantId 'tenant-alpha' -ClientId 'client-alpha' -RefreshToken 'token-alpha' -AuthType 'Interactive'
             $null = Save-GTPersistedTokenCache -TenantId 'tenant-beta' -ClientId 'client-beta' -RefreshToken 'token-beta' -AuthType 'Interactive'

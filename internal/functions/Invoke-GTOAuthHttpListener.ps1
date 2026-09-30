@@ -172,6 +172,7 @@ function Invoke-GTOAuthHttpListener
         # Wait for callback while ignoring stray requests (e.g., favicon.ico, browser preconnects)
         $stopwatch = [System.Diagnostics.Stopwatch]::StartNew()
         $context = $null
+        $contextTask = $null
 
         while (-not $context)
         {
@@ -181,7 +182,11 @@ function Invoke-GTOAuthHttpListener
                 throw "Interactive login timed out after $TimeoutSeconds seconds waiting for browser callback."
             }
 
-            $contextTask = $listener.GetContextAsync()
+            if ($null -eq $contextTask)
+            {
+                $contextTask = $listener.GetContextAsync()
+            }
+
             $waitMs = [int][Math]::Min([Math]::Max(100, $remainingSeconds * 1000), 5000)
             if (-not $contextTask.Wait($waitMs))
             {
@@ -189,6 +194,8 @@ function Invoke-GTOAuthHttpListener
             }
 
             $candidateContext = $contextTask.Result
+            $contextTask = $null
+
             $rawQuery = $candidateContext.Request.Url.Query.TrimStart('?')
             $hasAuthResponse = ($rawQuery -match '(^|&)code=') -or ($rawQuery -match '(^|&)error=')
 

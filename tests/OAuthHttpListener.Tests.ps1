@@ -76,5 +76,17 @@ Describe "OAuth HttpListener & PKCE" -Tag 'Unit' {
             $script:capturedTokenBody.code | Should -Be 'auth-code-12345'
             $script:capturedTokenBody.grant_type | Should -Be 'authorization_code'
         }
+
+        It "throws a timeout error if no callback is received before timeout expires" {
+            $port = Get-GTFreePort
+            Mock -CommandName Start-Process -MockWith { param($FilePath) }
+
+            {
+                Invoke-GTOAuthHttpListener -TenantId 'test-tenant' `
+                                           -ClientId 'test-client' `
+                                           -LocalPort $port `
+                                           -TimeoutSeconds 1
+            } | Should -Throw "*timed out after 1 seconds*"
+        }
     }
 }
