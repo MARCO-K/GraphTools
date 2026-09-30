@@ -84,40 +84,6 @@ Describe "Invoke-GTSilentReAuth" -Tag 'Unit' {
             $result.Success | Should -Be $true
             $result.AccessToken | Should -Be 'disk-renewed-access-token'
         }
-
-        It "persists updated refresh token when -PersistRefreshToken is specified" {
-            Mock -CommandName Get-GTPersistedTokenCache -MockWith {
-                [PSCustomObject]@{
-                    RefreshToken = 'disk-persisted-refresh-token'
-                    TenantId     = 'test-tenant'
-                    ClientId     = 'test-client'
-                    AuthType     = 'DeviceCode'
-                }
-            }
-
-            Mock -CommandName Invoke-GTRefreshTokenRenewal -MockWith {
-                [PSCustomObject]@{
-                    AccessToken  = 'disk-renewed-access-token'
-                    RefreshToken = 'new-rolling-refresh-token'
-                    ExpiresIn    = 86400
-                }
-            }
-
-            $script:savedRefreshToken = $null
-            Mock -CommandName Save-GTPersistedTokenCache -MockWith {
-                param($TenantId, $ClientId, $RefreshToken, $Scope, $AuthType)
-                $script:savedRefreshToken = $RefreshToken
-                $true
-            }
-
-            $result = Invoke-GTSilentReAuth -TenantId 'test-tenant' `
-                                            -ClientId 'test-client' `
-                                            -AuthType 'DeviceCode' `
-                                            -PersistRefreshToken
-
-            $result.Success | Should -Be $true
-            $script:savedRefreshToken | Should -Be 'new-rolling-refresh-token'
-        }
     }
 
     Context "Failure Modes" {

@@ -193,7 +193,7 @@ function Connect-GTGraph
     # 2. Interactive Browser Auth with PKCE
     elseif ($Interactive -or ($PSCmdlet.ParameterSetName -eq 'Interactive'))
     {
-        $silentSuccess = $false
+        $sessionResult = $null
 
         # Attempt silent re-authentication via in-memory or persisted refresh token
         if (-not $ForceConsent)
@@ -209,45 +209,32 @@ function Connect-GTGraph
                 $silentResult = Invoke-GTSilentReAuth -TenantId $TenantId `
                                                       -ClientId $ClientId `
                                                       -AuthType 'Interactive' `
-                                                      -Scope $Scope `
-                                                      -PersistRefreshToken:$PersistRefreshToken
+                                                      -Scope $Scope
 
                 if ($silentResult -and $silentResult.Success)
                 {
-                    $token = $silentResult.AccessToken
-
-                    $script:GTConnectionConfig = @{
-                        AuthType            = 'Interactive'
-                        TenantId            = $TenantId
-                        ClientId            = $ClientId
-                        RefreshToken        = $silentResult.RefreshToken
-                        Scope               = $Scope
-                        LocalPort           = $LocalPort
-                        PersistRefreshToken = [bool]$PersistRefreshToken
-                    }
-
-                    $tokenFile = Join-Path $PSScriptRoot '..\internal\functions\Get-GTCachedGraphToken.ps1'
-                    if (-not (Get-Command Get-GTCachedGraphToken -ErrorAction SilentlyContinue) -and (Test-Path $tokenFile))
+                    $setSessionFn = Join-Path $PSScriptRoot '..\internal\functions\Set-GTOAuthSession.ps1'
+                    if (-not (Get-Command Set-GTOAuthSession -ErrorAction SilentlyContinue) -and (Test-Path $setSessionFn))
                     {
-                        . $tokenFile
+                        . $setSessionFn
                     }
 
-                    $null = Get-GTCachedGraphToken -AccessToken $silentResult.AccessToken
-                    $script:GTTokenCache.AuthType = 'Interactive'
-                    $script:GTTokenCache.TenantId = $TenantId
-                    $script:GTTokenCache.ClientId = $ClientId
-                    $script:GTTokenCache.Scope = $Scope
-                    $script:GTTokenCache.ExpiresAt = [DateTime]::UtcNow.AddSeconds($silentResult.ExpiresIn)
-                    $script:GTTokenCache.RefreshToken = $silentResult.RefreshToken
-
-                    $authType = 'Interactive'
-                    $silentSuccess = $true
-                    Write-PSFMessage -Level Verbose -Message "Silent interactive re-authentication succeeded."
+                    if (Get-Command Set-GTOAuthSession -ErrorAction SilentlyContinue)
+                    {
+                        $sessionResult = Set-GTOAuthSession -TenantId $TenantId `
+                                                            -ClientId $ClientId `
+                                                            -AuthType 'Interactive' `
+                                                            -Scope $Scope `
+                                                            -AuthResult $silentResult `
+                                                            -LocalPort $LocalPort `
+                                                            -PersistRefreshToken:$PersistRefreshToken
+                        Write-PSFMessage -Level Verbose -Message "Silent interactive re-authentication succeeded."
+                    }
                 }
             }
         }
 
-        if (-not $silentSuccess)
+        if (-not $sessionResult)
         {
             $listenerFn = Join-Path $PSScriptRoot '..\internal\functions\Invoke-GTOAuthHttpListener.ps1'
             if (-not (Get-Command Invoke-GTOAuthHttpListener -ErrorAction SilentlyContinue) -and (Test-Path $listenerFn))
@@ -260,56 +247,32 @@ function Connect-GTGraph
                                                      -LocalPort $LocalPort `
                                                      -Scope $Scope `
                                                      -ForceConsent:$ForceConsent
-            $token = $authResult.AccessToken
 
-            $script:GTConnectionConfig = @{
-                AuthType            = 'Interactive'
-                TenantId            = $TenantId
-                ClientId            = $ClientId
-                RefreshToken        = $authResult.RefreshToken
-                Scope               = $Scope
-                LocalPort           = $LocalPort
-                PersistRefreshToken = [bool]$PersistRefreshToken
-            }
-
-            # Cache token & refresh token directly
-            $tokenFile = Join-Path $PSScriptRoot '..\internal\functions\Get-GTCachedGraphToken.ps1'
-            if (-not (Get-Command Get-GTCachedGraphToken -ErrorAction SilentlyContinue) -and (Test-Path $tokenFile))
+            $setSessionFn = Join-Path $PSScriptRoot '..\internal\functions\Set-GTOAuthSession.ps1'
+            if (-not (Get-Command Set-GTOAuthSession -ErrorAction SilentlyContinue) -and (Test-Path $setSessionFn))
             {
-                . $tokenFile
+                . $setSessionFn
             }
 
-            $null = Get-GTCachedGraphToken -AccessToken $authResult.AccessToken
-            $script:GTTokenCache.AuthType = 'Interactive'
-            $script:GTTokenCache.TenantId = $TenantId
-            $script:GTTokenCache.ClientId = $ClientId
-            $script:GTTokenCache.Scope = $Scope
-            $script:GTTokenCache.ExpiresAt = [DateTime]::UtcNow.AddSeconds($authResult.ExpiresIn)
-            if ($authResult.RefreshToken)
+            if (Get-Command Set-GTOAuthSession -ErrorAction SilentlyContinue)
             {
-                $script:GTTokenCache.RefreshToken = $authResult.RefreshToken
-
-                if ($PersistRefreshToken)
-                {
-                    $saveCacheFn = Join-Path $PSScriptRoot '..\internal\functions\Save-GTPersistedTokenCache.ps1'
-                    if (-not (Get-Command Save-GTPersistedTokenCache -ErrorAction SilentlyContinue) -and (Test-Path $saveCacheFn))
-                    {
-                        . $saveCacheFn
-                    }
-                    if (Get-Command Save-GTPersistedTokenCache -ErrorAction SilentlyContinue)
-                    {
-                        $null = Save-GTPersistedTokenCache -TenantId $TenantId -ClientId $ClientId -RefreshToken $authResult.RefreshToken -Scope $Scope -AuthType 'Interactive'
-                    }
-                }
+                $sessionResult = Set-GTOAuthSession -TenantId $TenantId `
+                                                    -ClientId $ClientId `
+                                                    -AuthType 'Interactive' `
+                                                    -Scope $Scope `
+                                                    -AuthResult $authResult `
+                                                    -LocalPort $LocalPort `
+                                                    -PersistRefreshToken:$PersistRefreshToken
             }
-
-            $authType = 'Interactive'
         }
+
+        $token = $sessionResult.AccessToken
+        $authType = 'Interactive'
     }
     # 3. Device Code Flow
     elseif ($DeviceCode -or ($PSCmdlet.ParameterSetName -eq 'DeviceCode'))
     {
-        $silentSuccess = $false
+        $sessionResult = $null
 
         # Attempt silent re-authentication via in-memory or persisted refresh token
         $silentReAuthFn = Join-Path $PSScriptRoot '..\internal\functions\Invoke-GTSilentReAuth.ps1'
@@ -323,43 +286,30 @@ function Connect-GTGraph
             $silentResult = Invoke-GTSilentReAuth -TenantId $TenantId `
                                                   -ClientId $ClientId `
                                                   -AuthType 'DeviceCode' `
-                                                  -Scope $Scope `
-                                                  -PersistRefreshToken:$PersistRefreshToken
+                                                  -Scope $Scope
 
             if ($silentResult -and $silentResult.Success)
             {
-                $token = $silentResult.AccessToken
-
-                $script:GTConnectionConfig = @{
-                    AuthType            = 'DeviceCode'
-                    TenantId            = $TenantId
-                    ClientId            = $ClientId
-                    RefreshToken        = $silentResult.RefreshToken
-                    Scope               = $Scope
-                    PersistRefreshToken = [bool]$PersistRefreshToken
-                }
-
-                $tokenFile = Join-Path $PSScriptRoot '..\internal\functions\Get-GTCachedGraphToken.ps1'
-                if (-not (Get-Command Get-GTCachedGraphToken -ErrorAction SilentlyContinue) -and (Test-Path $tokenFile))
+                $setSessionFn = Join-Path $PSScriptRoot '..\internal\functions\Set-GTOAuthSession.ps1'
+                if (-not (Get-Command Set-GTOAuthSession -ErrorAction SilentlyContinue) -and (Test-Path $setSessionFn))
                 {
-                    . $tokenFile
+                    . $setSessionFn
                 }
 
-                $null = Get-GTCachedGraphToken -AccessToken $silentResult.AccessToken
-                $script:GTTokenCache.AuthType = 'DeviceCode'
-                $script:GTTokenCache.TenantId = $TenantId
-                $script:GTTokenCache.ClientId = $ClientId
-                $script:GTTokenCache.Scope = $Scope
-                $script:GTTokenCache.ExpiresAt = [DateTime]::UtcNow.AddSeconds($silentResult.ExpiresIn)
-                $script:GTTokenCache.RefreshToken = $silentResult.RefreshToken
-
-                $authType = 'DeviceCode'
-                $silentSuccess = $true
-                Write-PSFMessage -Level Verbose -Message "Silent DeviceCode re-authentication succeeded."
+                if (Get-Command Set-GTOAuthSession -ErrorAction SilentlyContinue)
+                {
+                    $sessionResult = Set-GTOAuthSession -TenantId $TenantId `
+                                                        -ClientId $ClientId `
+                                                        -AuthType 'DeviceCode' `
+                                                        -Scope $Scope `
+                                                        -AuthResult $silentResult `
+                                                        -PersistRefreshToken:$PersistRefreshToken
+                    Write-PSFMessage -Level Verbose -Message "Silent DeviceCode re-authentication succeeded."
+                }
             }
         }
 
-        if (-not $silentSuccess)
+        if (-not $sessionResult)
         {
             $deviceFn = Join-Path $PSScriptRoot '..\internal\functions\Invoke-GTDeviceCodeFlow.ps1'
             if (-not (Get-Command Invoke-GTDeviceCodeFlow -ErrorAction SilentlyContinue) -and (Test-Path $deviceFn))
@@ -368,50 +318,26 @@ function Connect-GTGraph
             }
 
             $authResult = Invoke-GTDeviceCodeFlow -TenantId $TenantId -ClientId $ClientId -Scope $Scope
-            $token = $authResult.AccessToken
 
-            $script:GTConnectionConfig = @{
-                AuthType            = 'DeviceCode'
-                TenantId            = $TenantId
-                ClientId            = $ClientId
-                RefreshToken        = $authResult.RefreshToken
-                Scope               = $Scope
-                PersistRefreshToken = [bool]$PersistRefreshToken
-            }
-
-            # Cache token & refresh token directly
-            $tokenFile = Join-Path $PSScriptRoot '..\internal\functions\Get-GTCachedGraphToken.ps1'
-            if (-not (Get-Command Get-GTCachedGraphToken -ErrorAction SilentlyContinue) -and (Test-Path $tokenFile))
+            $setSessionFn = Join-Path $PSScriptRoot '..\internal\functions\Set-GTOAuthSession.ps1'
+            if (-not (Get-Command Set-GTOAuthSession -ErrorAction SilentlyContinue) -and (Test-Path $setSessionFn))
             {
-                . $tokenFile
+                . $setSessionFn
             }
 
-            $null = Get-GTCachedGraphToken -AccessToken $authResult.AccessToken
-            $script:GTTokenCache.AuthType = 'DeviceCode'
-            $script:GTTokenCache.TenantId = $TenantId
-            $script:GTTokenCache.ClientId = $ClientId
-            $script:GTTokenCache.Scope = $Scope
-            $script:GTTokenCache.ExpiresAt = [DateTime]::UtcNow.AddSeconds($authResult.ExpiresIn)
-            if ($authResult.RefreshToken)
+            if (Get-Command Set-GTOAuthSession -ErrorAction SilentlyContinue)
             {
-                $script:GTTokenCache.RefreshToken = $authResult.RefreshToken
-
-                if ($PersistRefreshToken)
-                {
-                    $saveCacheFn = Join-Path $PSScriptRoot '..\internal\functions\Save-GTPersistedTokenCache.ps1'
-                    if (-not (Get-Command Save-GTPersistedTokenCache -ErrorAction SilentlyContinue) -and (Test-Path $saveCacheFn))
-                    {
-                        . $saveCacheFn
-                    }
-                    if (Get-Command Save-GTPersistedTokenCache -ErrorAction SilentlyContinue)
-                    {
-                        $null = Save-GTPersistedTokenCache -TenantId $TenantId -ClientId $ClientId -RefreshToken $authResult.RefreshToken -Scope $Scope -AuthType 'DeviceCode'
-                    }
-                }
+                $sessionResult = Set-GTOAuthSession -TenantId $TenantId `
+                                                    -ClientId $ClientId `
+                                                    -AuthType 'DeviceCode' `
+                                                    -Scope $Scope `
+                                                    -AuthResult $authResult `
+                                                    -PersistRefreshToken:$PersistRefreshToken
             }
-
-            $authType = 'DeviceCode'
         }
+
+        $token = $sessionResult.AccessToken
+        $authType = 'DeviceCode'
     }
     # 4. Standard Certificate, ClientSecret, DirectToken flows
     else

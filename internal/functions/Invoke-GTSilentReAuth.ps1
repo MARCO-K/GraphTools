@@ -14,8 +14,6 @@ function Invoke-GTSilentReAuth
         The authentication flow ('Interactive' or 'DeviceCode').
     .PARAMETER Scope
         Requested permission scopes.
-    .PARAMETER PersistRefreshToken
-        When specified, updates the persisted token store with the newly issued rolling refresh token.
     .OUTPUTS
         [PSCustomObject]
     #>
@@ -33,10 +31,7 @@ function Invoke-GTSilentReAuth
         [string]$AuthType,
 
         [Parameter()]
-        [string]$Scope = 'https://graph.microsoft.com/.default',
-
-        [Parameter()]
-        [switch]$PersistRefreshToken
+        [string]$Scope = 'https://graph.microsoft.com/.default'
     )
 
     $candidateRefreshToken = $null
@@ -83,19 +78,6 @@ function Invoke-GTSilentReAuth
             {
                 Write-PSFMessage -Level Verbose -Message "Attempting silent $AuthType re-authentication using cached refresh token..."
                 $renewResult = Invoke-GTRefreshTokenRenewal -TenantId $TenantId -ClientId $ClientId -RefreshToken $candidateRefreshToken -Scope $Scope
-
-                if ($PersistRefreshToken)
-                {
-                    $saveCacheFn = Join-Path $PSScriptRoot 'Save-GTPersistedTokenCache.ps1'
-                    if (-not (Get-Command Save-GTPersistedTokenCache -ErrorAction SilentlyContinue) -and (Test-Path $saveCacheFn))
-                    {
-                        . $saveCacheFn
-                    }
-                    if (Get-Command Save-GTPersistedTokenCache -ErrorAction SilentlyContinue)
-                    {
-                        $null = Save-GTPersistedTokenCache -TenantId $TenantId -ClientId $ClientId -RefreshToken $renewResult.RefreshToken -Scope $Scope -AuthType $AuthType
-                    }
-                }
 
                 return [PSCustomObject]@{
                     PSTypeName   = 'GraphTools.SilentReAuthResult'
