@@ -37,6 +37,7 @@ function Remove-GTUserDelegatedPermissionGrants
         [Parameter(Mandatory = $true)]
         [hashtable]$OutputBase,
         [Parameter(Mandatory = $true)]
+        [AllowEmptyCollection()]
         [System.Collections.Generic.List[PSObject]]$Results
     )
 
@@ -71,7 +72,7 @@ function Remove-GTUserDelegatedPermissionGrants
                 {
                     try
                     {
-                        $spResp = Invoke-GTGraphRequest -Method GET -Uri "v1.0/servicePrincipals/$clientId?`$select=displayName" -ErrorAction SilentlyContinue
+                        $spResp = Invoke-GTGraphRequest -Method GET -Uri "v1.0/servicePrincipals/${clientId}?`$select=displayName" -ErrorAction SilentlyContinue
                         $appName = if ($spResp) { $spResp.displayName } else { "App-$clientId" }
                     }
                     catch

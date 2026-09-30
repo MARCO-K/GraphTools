@@ -20,6 +20,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Added `-ForceConsent` switch to force interactive consent (`prompt=consent`) when re-granting permissions or updating scopes.
   - Added `-ClearPersistedCache` switch to `Disconnect-GTGraph` to securely purge on-disk DPAPI token cache entries, with selective `-AuthType` filter support.
   - Added Pester test suites in `tests/Get-GTFreePort.Tests.ps1`, `tests/PersistedTokenCache.Tests.ps1`, `tests/OAuthHttpListener.Tests.ps1`, `tests/Invoke-GTSilentReAuth.Tests.ps1`, and `tests/Set-GTOAuthSession.Tests.ps1`.
+- **Dynamic Least-Privilege Scoping (`Remove-GTUserEntitlements`)**:
+  - Derives required Graph API permissions dynamically based on selected removal switches instead of requesting a fixed static superset.
+  - Resolves user UPN lookup requirements by ensuring `User.Read.All` is requested unless `Directory.ReadWrite.All` is already present.
+  - Added fail-fast parameter validation guard rejecting executions when neither `-removeAll` nor any removal switch is supplied.
+  - Added unit tests in `tests/Remove-GTUserEntitlements.Tests.ps1`.
+- **Service Principal Name Caching (`Remove-GTUserDelegatedPermissionGrants`)**:
+  - Caches service principal display names per `clientId` across grant iterations, eliminating redundant Graph API lookups.
+  - Safely handles empty or missing `clientId` with fallback to `App-$($grant.id)`.
+  - Added `[AllowEmptyCollection()]` on the `Results` parameter to support empty initial collections.
+  - Added unit tests in `tests/Remove-GTUserDelegatedPermissionGrants.Tests.ps1`.
 
 ### Security
 
@@ -34,6 +44,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Markdownlint Anchor Resolution & Spacing (`README.md`)**:
   - Wrapped Table of Contents with `<!-- markdownlint-disable MD051 -->` and `<!-- markdownlint-enable MD051 -->` directives to preserve heading emojis while maintaining 100% valid anchor resolution on GitHub.
   - Added blank line before unordered list under Zero External SDK Dependencies to comply with `MD032`.
+- **WhatIf Protection and Non-Interactive Deletions (`Remove-GTExpiredInvites`)**:
+  - Removed `ShouldContinue` interactive prompt dependency and eliminated short-circuit `$Force -or` evaluation that previously bypassed `-WhatIf`.
+  - Configured `[CmdletBinding(SupportsShouldProcess, ConfirmImpact = 'High')]` and supported `-Force` to suppress confirmation prompts while strictly preserving `-WhatIf` safety.
+  - Emitted non-terminating error records with target object on individual deletion failures to support pipeline/batch continuation with fail-fast control via `-ErrorAction Stop`.
+  - Added unit tests in `tests/Remove-GTExpiredInvites.Tests.ps1`.
+- **PowerShell Error Pipeline Resilience (`Reset-GTUserPassword`)**:
+  - Emitted non-terminating error records with target object on failure instead of terminating `throw`, allowing multi-user batches and pipeline operations to continue while respecting `-ErrorAction Stop`.
+  - Added unit tests in `tests/Reset-GTUserPassword.Tests.ps1`.
+- **GitHub Branch URL Encoding & DuckDB Error Propagation (`Import-GitHubCsvToDuckDB`)**:
+  - Added URL-encoded branch query parameter (`${Directory}?ref=<Branch>`), fixing PowerShell string interpolation where `?ref` was previously parsed as part of the variable name.
+  - Correctly assigned `$conn` from `$DBConn` for the `ExistingDB` parameter set and added null check before closing connection in `finally`.
+  - Enforced fail-fast errors on table-import and API failures.
+  - Added unit tests in `tests/Import-GitHubCsvToDuckDB.Tests.ps1`.
 
 ## [0.24.1] - 2026-09-25
 

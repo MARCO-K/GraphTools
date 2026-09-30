@@ -31,5 +31,50 @@ Describe "Remove-GTExpiredInvites" {
                 $Method -eq "DELETE" -and $Uri -eq "v1.0/users/1"
             }
         }
+
+        It "should not call Invoke-GTGraphRequest DELETE when WhatIf is specified, even with Force" {
+            Remove-GTExpiredInvites -DaysOlderThan 30 -Force -WhatIf
+
+            Assert-MockCalled -CommandName "Invoke-GTGraphRequest" -Times 0
+        }
+
+        It "should emit non-terminating error and continue processing remaining users if one deletion fails" {
+            Mock -CommandName Get-GTGuestUserReport -MockWith {
+                return @(
+                    [PSCustomObject]@{ Id = "1"; DisplayName = "User1"; UserPrincipalName = "user1@test.com" },
+                    [PSCustomObject]@{ Id = "2"; DisplayName = "User2"; UserPrincipalName = "user2@test.com" }
+                )
+            }
+            Mock -CommandName Invoke-GTGraphRequest -MockWith {
+                param($Method, $Uri)
+                if ($Uri -eq 'v1.0/users/1') {
+                    throw "Graph 403 Forbidden"
+                }
+            }
+
+            $invErrors = $null
+            Remove-GTExpiredInvites -DaysOlderThan 30 -Force -ErrorVariable invErrors -ErrorAction SilentlyContinue
+
+            $userError = $invErrors | Where-Object { $_.FullyQualifiedErrorId -like 'FailedToRemoveGuestUser*' }
+            $userError | Should -Not -BeNullOrEmpty
+            Assert-MockCalled -CommandName "Invoke-GTGraphRequest" -Times 2
+        }
+
+        It "should halt on error when ErrorAction Stop is specified" {
+            Mock -CommandName Get-GTGuestUserReport -MockWith {
+                return @(
+                    [PSCustomObject]@{ Id = "1"; DisplayName = "User1"; UserPrincipalName = "user1@test.com" },
+                    [PSCustomObject]@{ Id = "2"; DisplayName = "User2"; UserPrincipalName = "user2@test.com" }
+                )
+            }
+            Mock -CommandName Invoke-GTGraphRequest -MockWith {
+                param($Method, $Uri)
+                if ($Uri -eq 'v1.0/users/1') {
+                    throw "Graph 403 Forbidden"
+                }
+            }
+
+            { Remove-GTExpiredInvites -DaysOlderThan 30 -Force -ErrorAction Stop } | Should -Throw
+        }
     }
 }

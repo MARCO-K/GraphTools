@@ -80,6 +80,10 @@ Describe "Remove-GTUserEntitlements" {
         It "should accept valid UPN format" {
             { Remove-GTUserEntitlements -UserUPNs "test@contoso.com" -removeAll -WhatIf } | Should -Not -Throw
         }
+
+        It "should throw when neither removeAll nor any remove* switch is specified" {
+            { Remove-GTUserEntitlements -UserUPNs "test@contoso.com" } | Should -Throw "*No entitlement action selected*"
+        }
     }
 
     Context "Scope Validation" {
@@ -99,6 +103,24 @@ Describe "Remove-GTUserEntitlements" {
                 }
             }
             { Remove-GTUserEntitlements -UserUPNs "test@contoso.com" -removeAll } | Should -Throw "*Required scopes are missing*RoleEligibilitySchedule.ReadWrite.Directory*"
+        }
+
+        It "should dynamically require GroupMember.ReadWrite.All and User.Read.All when only removeGroups is specified" {
+            Mock -CommandName "Get-GTConnection" -MockWith { 
+                [PSCustomObject]@{
+                    Scopes = @('GroupMember.ReadWrite.All')
+                }
+            }
+            { Remove-GTUserEntitlements -UserUPNs "test@contoso.com" -removeGroups } | Should -Throw "*Required scopes are missing*user.read.all*"
+        }
+
+        It "should succeed when Directory.ReadWrite.All satisfies User.Read.All for selective removals" {
+            Mock -CommandName "Get-GTConnection" -MockWith { 
+                [PSCustomObject]@{
+                    Scopes = @('GroupMember.ReadWrite.All', 'Directory.ReadWrite.All')
+                }
+            }
+            { Remove-GTUserEntitlements -UserUPNs "test@contoso.com" -removeGroups -WhatIf } | Should -Not -Throw
         }
     }
 

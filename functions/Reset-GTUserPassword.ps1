@@ -77,6 +77,7 @@ Function Reset-GTUserPassword
                     $errorDetails = Get-GTGraphErrorDetails -Exception $_.Exception -ResourceType 'user'
                     
                     # Log appropriate message based on error details
+                    $errorMessage = if ($errorDetails.ErrorMessage) { $errorDetails.ErrorMessage } elseif ($errorDetails.Reason) { $errorDetails.Reason } else { $_.Exception.Message }
                     if ($errorDetails.HttpStatus -in 404, 403) {
                         Write-PSFMessage -Level $errorDetails.LogLevel -Message "$User - Reset Password Action - $($errorDetails.Reason)"
                         Write-PSFMessage -Level Debug -Message "Detailed error ($($errorDetails.HttpStatus)): $($errorDetails.ErrorMessage)"
@@ -85,9 +86,16 @@ Function Reset-GTUserPassword
                         Write-PSFMessage -Level $errorDetails.LogLevel -Message "$User - Reset Password Action - $($errorDetails.Reason)"
                     }
                     else {
-                        Write-PSFMessage -Level Error -Message "$User - Reset Password Action - $($errorDetails.ErrorMessage)"
+                        Write-PSFMessage -Level Error -Message "$User - Reset Password Action - $errorMessage"
                     }
-                    throw "Failed to reset password for $User. $($errorDetails.Reason)"
+
+                    $errorRecord = [System.Management.Automation.ErrorRecord]::new(
+                        [System.Exception]::new("Failed to reset password for $User. $errorMessage", $_.Exception),
+                        'PasswordResetFailed',
+                        [System.Management.Automation.ErrorCategory]::InvalidOperation,
+                        $User
+                    )
+                    $PSCmdlet.WriteError($errorRecord)
                 }
             }
         }

@@ -111,6 +111,12 @@ function Remove-GTUserEntitlements {
         if ($removeAll -or $removeAccessPackageAssignments) { [void]$scopeSet.Add('EntitlementManagement.ReadWrite.All') }
         if ($removeAll -or $removeDelegatedPermissionGrants) { [void]$scopeSet.Add('DelegatedPermissionGrant.ReadWrite.All') }
 
+        # Resolving user UPNs via GET /v1.0/users/{upn} requires User.Read.All unless Directory.ReadWrite.All is already included
+        if (-not $scopeSet.Contains('Directory.ReadWrite.All'))
+        {
+            [void]$scopeSet.Add('User.Read.All')
+        }
+
         $RequiredScopes = @($scopeSet)
 
         # 1. Connection Initialization
@@ -122,7 +128,19 @@ function Remove-GTUserEntitlements {
         # 2. Scope Validation
         $conn = Get-GTConnection
         $currentScopes = if ($conn.Scopes) { [string[]]$conn.Scopes } elseif ($conn.Scope) { $conn.Scope -split ' ' } else { @() }
-        $missingScopes = Get-GTMissingScopes -RequiredScopes $RequiredScopes -CurrentScopes $currentScopes
+        $effectiveCurrentScopes = [System.Collections.Generic.HashSet[string]]::new([System.StringComparer]::OrdinalIgnoreCase)
+        foreach ($scope in $currentScopes)
+        {
+            if (-not [string]::IsNullOrWhiteSpace($scope))
+            {
+                [void]$effectiveCurrentScopes.Add($scope)
+            }
+        }
+        if ($effectiveCurrentScopes.Contains('Directory.ReadWrite.All') -or $effectiveCurrentScopes.Contains('Directory.Read.All'))
+        {
+            [void]$effectiveCurrentScopes.Add('User.Read.All')
+        }
+        $missingScopes = Get-GTMissingScopes -RequiredScopes $RequiredScopes -CurrentScopes @($effectiveCurrentScopes)
         if ($missingScopes -and $missingScopes.Count -gt 0)
         {
             throw "Required scopes are missing: $($missingScopes -join ', ')"

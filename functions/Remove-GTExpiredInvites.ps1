@@ -23,7 +23,7 @@ function Remove-GTExpiredInvites {
     .NOTES
     Requires Microsoft Graph connection with User.ReadWrite.All permission.
     #>
-    [CmdletBinding(SupportsShouldProcess)]
+    [CmdletBinding(SupportsShouldProcess, ConfirmImpact = 'High')]
     param(
         [Parameter(Mandatory = $true)]
         [int]$DaysOlderThan,
@@ -34,6 +34,10 @@ function Remove-GTExpiredInvites {
     )
 
     begin {
+        if ($Force -and -not $PSBoundParameters.ContainsKey('Confirm')) {
+            $ConfirmPreference = 'None'
+        }
+
         if (-not (Initialize-GTGraphConnection -Scopes 'User.ReadWrite.All' -NewSession:$NewSession)) {
             Write-Error "Failed to initialize Microsoft Graph connection."
             return
@@ -62,14 +66,20 @@ function Remove-GTExpiredInvites {
             Write-PSFMessage -Level Verbose -Message "Found $($expiredGuests.Count) expired pending invites."
 
             foreach ($guest in $expiredGuests) {
-                if ($Force -or $PSCmdlet.ShouldProcess("$($guest.DisplayName) ($($guest.UserPrincipalName))", "Remove Guest User (Expired Invite)")) {
+                if ($PSCmdlet.ShouldProcess("$($guest.DisplayName) ($($guest.UserPrincipalName))", "Remove Guest User (Expired Invite)")) {
                     try {
                         Invoke-GTGraphRequest -Method DELETE -Uri "v1.0/users/$($guest.Id)" -ErrorAction Stop
                         Write-PSFMessage -Level Output -Message "Removed guest user: $($guest.DisplayName)"
                     }
                     catch {
                         Write-PSFMessage -Level Error -Message "Failed to remove user $($guest.DisplayName): $($_.Exception.Message)"
-                        throw
+                        $errorRecord = [System.Management.Automation.ErrorRecord]::new(
+                            [System.Exception]::new("Failed to remove user $($guest.DisplayName): $($_.Exception.Message)", $_.Exception),
+                            'FailedToRemoveGuestUser',
+                            [System.Management.Automation.ErrorCategory]::InvalidOperation,
+                            $guest
+                        )
+                        $PSCmdlet.WriteError($errorRecord)
                     }
                 }
             }
