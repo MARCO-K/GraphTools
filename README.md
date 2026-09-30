@@ -54,9 +54,9 @@ Starting in **v0.20.0**, GraphTools features a **native zero-dependency REST eng
 
 | Component | Function / Feature | Description |
 | ----------- | -------------------- | ------------- |
-| **Authentication** | `Connect-GTGraph` | Connects via Certificate (Thumbprint or X509Certificate2), Client Secret, or direct Access Token. |
+| **Authentication** | `Connect-GTGraph` | Connects via Certificate (RFC 7523), Client Secret, Azure Managed Identity, WAM-Free Interactive PKCE (dynamic loopback port, CAE CP1, DPAPI caching), Device Code, or direct Access Token. |
 | **Session Status** | `Get-GTConnection` | Inspects active connection status, tenant, client, auth type, and token expiration. |
-| **Session Cleanup** | `Disconnect-GTGraph` | Flushes session state and purges in-memory token caches. |
+| **Session Cleanup** | `Disconnect-GTGraph` | Flushes session state, purges in-memory token caches, and optionally wipes on-disk DPAPI token cache (`-ClearPersistedCache`). |
 | **REST Invoker** | `Invoke-GTGraphRequest` | Internal invoker with URI normalization, header injection (`ConsistencyLevel`), pagination (`-All`), and 429 backoff. |
 | **Batch Orchestrator** | `Invoke-GTGraphBatch` | Executes JSON `$batch` queries (slices of 20) with subrequest-level 429/503 retry and backoff. |
 
@@ -162,11 +162,20 @@ Respond to security incidents with purpose-built cmdlets:
 GraphTools provides native connection management with zero external dependencies and sliding token caching:
 
 ```powershell
-# Recommended: Certificate-based authentication (RFC 7523 RS256 Client Assertion)
+# Interactive Browser Authentication (WAM-free PKCE, dynamic loopback port, CAE CP1)
+Connect-GTGraph -Interactive -TenantId $TenantId
+
+# Interactive with DPAPI refresh token persistence (silent re-auth across shell sessions)
+Connect-GTGraph -Interactive -PersistRefreshToken
+
+# Recommended for Automation: Certificate-based authentication (RFC 7523 RS256 Client Assertion)
 Connect-GTGraph -TenantId "fa8b2a79-cd59-468b-a25d-a6fef0b4dad1" `
                 -ClientId "af20edf7-7120-4dbd-af20-e1e58e49b0ff" `
                 -Thumbprint "FC57D22ABE444FF1159ED82F971074D9C2443245" `
                 -PassThru
+
+# Alternative: Azure Managed Identity
+Connect-GTGraph -Identity
 
 # Alternative: Client Secret authentication (for CI/CD or containers)
 Connect-GTGraph -TenantId $TenantId -ClientId $ClientId -ClientSecret $Secret

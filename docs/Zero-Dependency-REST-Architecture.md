@@ -1,5 +1,4 @@
 ---
-title: Zero-Dependency Microsoft Graph REST Engine Architecture
 aliases:
   - Zero-Dependency REST Architecture
   - GraphTools REST Engine
@@ -103,6 +102,7 @@ flowchart TD
 Rather than storing plaintext client secrets, enterprise systems should authenticate using hardware- or DPAPI-protected certificates.
 
 ### Token Request Lifecycle
+
 1. **Certificate Discovery:** [`Get-GTCachedGraphToken`](../internal/functions/Get-GTCachedGraphToken.ps1) resolves the target certificate from `Cert:\LocalMachine\My` or `Cert:\CurrentUser\My` by thumbprint.
 2. **Key Extraction:** Extracts the RSA private key via `[System.Security.Cryptography.X509Certificates.RSACertificateExtensions]::GetRSAPrivateKey($cert)`. The key remains protected inside Windows CNG/CAPI and is never exported.
 3. **JWT Header (`alg=RS256`, `typ=JWT`, `x5t`):** Converts the certificate thumbprint hex string into a raw SHA-1 byte array and Base64Url encodes it into the `x5t` header claim.
@@ -142,37 +142,87 @@ sequenceDiagram
 
 ---
 
+## 4b. Modernized WAM-Free OAuth 2.0 PKCE Engine
+
+For interactive administrator workflows, GraphTools bypasses the Windows Web Account Manager (WAM) and heavy MSAL brokers completely by implementing a resilient loopback HTTP listener and RFC 7636 Authorization Code flow with PKCE (`S256`).
+
+### Key Capabilities
+
+1. **Dynamic Ephemeral Port Allocation ([`Get-GTFreePort.ps1`](../internal/functions/Get-GTFreePort.ps1)):** Automatically requests a dynamic free loopback port from the OS TCP stack (`TcpListener(IPAddress.Loopback, 0)`) with up to 5 collision retries, preventing static port collisions when multiple administrative sessions run in parallel.
+2. **CSPRNG State Parameter Defense:** Replaces non-cryptographic GUIDs with 16 cryptographically secure random bytes via `[RandomNumberGenerator]::Create()` (base64url unpadded) to strictly defend against CSRF spoofing.
+3. **Stray Request Filtering:** An async listener loop returns `404 Not Found` to non-OAuth browser traffic (e.g. `/favicon.ico` or browser preconnects) while keeping the listener open for the authentic `?code=...` callback.
+4. **Continuous Access Evaluation (CAE) `CP1`:** Injects the `CP1` client capability (`claims={"access_token":{"xms_cc":{"values":["CP1"]}}}`) to acquire 24-hour revocable tokens.
+5. **Secure DPAPI Token Persistence ([`Save-GTPersistedTokenCache.ps1`](../internal/functions/Save-GTPersistedTokenCache.ps1)):** Opt-in `-PersistRefreshToken` switch encrypts only the `refresh_token` using Windows DPAPI into `%LOCALAPPDATA%\GraphTools\tokens.json` (`chmod 700`/`600` on POSIX) for silent re-authentication across shell sessions without storing access tokens on disk.
+
+```mermaid
+flowchart TD
+    A(["Connect-GTGraph -Interactive"]) --> B{"-ForceConsent specified?"}
+    B -- "NO" --> C{"Valid Refresh Token Available?<br/>(In-Memory or DPAPI Disk Cache)"}
+    B -- "YES" --> F["Launch Interactive Browser Flow"]
+    
+    C -- "YES" --> D["Silent Token Renewal<br/>(POST /oauth2/v2.0/token with grant_type=refresh_token & CAE CP1)"]
+    D -- "Success" --> E["Update $script:GTTokenCache & Active Session"]
+    D -- "Failed / Expired" --> F
+    C -- "NO" --> F
+    
+    F --> G["Get-GTFreePort<br/>(OS-Assigned Ephemeral TCP Port on 127.0.0.1)"]
+    G --> H["Start HttpListener on http://localhost:PORT/"]
+    H --> I["Generate RFC 7636 S256 PKCE Pair + CSPRNG State"]
+    I --> J["Launch System Default Browser to /authorize<br/>(claims CP1, prompt, PKCE challenge)"]
+    
+    J --> K{"Incoming HTTP Request"}
+    K -- "Stray Request (Favicon / Preconnect)" --> L["Respond HTTP 404 & Resume Listening"]
+    L --> K
+    K -- "OAuth Callback (?code=...&state=...)" --> M{"Validate CSPRNG State"}
+    
+    M -- "Mismatch / Error" --> N["Render Browser Error Card & Abort"]
+    M -- "State Matches" --> O["Render Browser Success Card & Close HTTP Listener"]
+    
+    O --> P["Exchange Authorization Code for Tokens<br/>(POST /oauth2/v2.0/token with code_verifier & claims CP1)"]
+    P --> E
+    
+    E --> Q{"-PersistRefreshToken Specified?"}
+    Q -- "YES" --> R["Save-GTPersistedTokenCache<br/>(DPAPI Encrypt on Windows / 0600 on POSIX)"]
+    Q -- "NO" --> S(["Active Connection Established"])
+    R --> S
+```
+
+---
+
 ## 5. Core Engine Components
 
 ### A. Token Manager ([`Get-GTCachedGraphToken.ps1`](../internal/functions/Get-GTCachedGraphToken.ps1))
-* **In-Memory Cache:** `$script:GTTokenCache` maintains the active `AccessToken`, `ExpiresAt`, `TenantId`, `ClientId`, `AuthType`, `Claims`, `Roles`, and `Permissions`.
-* **Token Introspection & Claims Extraction ([`Get-GTTokenClaims.ps1`](../internal/functions/Get-GTTokenClaims.ps1)):** Automatically decodes base64url JWT access token payloads to extract granted `roles` (App-Only application permissions) and `scp` (Delegated scopes), storing them in the cache and surfacing them via [`Get-GTConnection`](../functions/Get-GTConnection.ps1) for strict client-side permission validation.
-* **Sliding Refresh Buffer (`$BufferMinutes = 5`):** Standard Entra tokens expire after 60 minutes (3599 seconds). When remaining validity drops below 5 minutes, a fresh token is requested proactively to avoid in-flight request expiration.
-* **Authentication Fallbacks:**
+
+- **In-Memory Cache:** `$script:GTTokenCache` maintains the active `AccessToken`, `ExpiresAt`, `TenantId`, `ClientId`, `AuthType`, `Claims`, `Roles`, and `Permissions`.
+- **Token Introspection & Claims Extraction ([`Get-GTTokenClaims.ps1`](../internal/functions/Get-GTTokenClaims.ps1)):** Automatically decodes base64url JWT access token payloads to extract granted `roles` (App-Only application permissions) and `scp` (Delegated scopes), storing them in the cache and surfacing them via [`Get-GTConnection`](../functions/Get-GTConnection.ps1) for strict client-side permission validation.
+- **Sliding Refresh Buffer (`$BufferMinutes = 5`):** Standard Entra tokens expire after 60 minutes (3599 seconds). When remaining validity drops below 5 minutes, a fresh token is requested proactively to avoid in-flight request expiration.
+- **Authentication Fallbacks:**
   1. RFC 7523 Certificate thumbprint or direct `X509Certificate2` object.
   2. Client Secret credentials.
   3. Direct Bearer token passthrough.
 
 ### B. Central REST Invoker ([`Invoke-GTGraphRequest.ps1`](../internal/functions/Invoke-GTGraphRequest.ps1))
-* **URI Normalization:** Transparently accepts relative endpoints (`v1.0/users`, `beta/servicePrincipals`) and resolves them to fully qualified URIs.
-* **Header Standardization:** Injects `Authorization`, `client-request-id` (UUID), `Accept = application/json`, and user-provided headers (such as `ConsistencyLevel = eventual`).
-* **Pagination (`-All`):** Recursively follows `@odata.nextLink` until exhausted, using high-performance `[System.Collections.Generic.List[object]]` accumulation.
-* **Resilience & Throttling (HTTP 429/503):**
+
+- **URI Normalization:** Transparently accepts relative endpoints (`v1.0/users`, `beta/servicePrincipals`) and resolves them to fully qualified URIs.
+- **Header Standardization:** Injects `Authorization`, `client-request-id` (UUID), `Accept = application/json`, and user-provided headers (such as `ConsistencyLevel = eventual`).
+- **Pagination (`-All`):** Recursively follows `@odata.nextLink` until exhausted, using high-performance `[System.Collections.Generic.List[object]]` accumulation.
+- **Resilience & Throttling (HTTP 429/503):**
   - Catches HTTP `429` (Too Many Requests) and `503` (Service Unavailable).
   - Inspects and parses the `Retry-After` header across both Windows PowerShell 5.1 and PowerShell 7.x.
   - Automatically falls back to exponential backoff with jitter if `Retry-After` is missing:
     $$\text{Delay} = (\text{RetryBaseDelaySeconds} \times 2^{\text{attempt}}) + \text{random}(1, 3)$$
   - Retries up to `$MaxRetries` before failing.
-* **Diagnostics Integration:** All non-transient exceptions are piped directly into [`Get-GTGraphErrorDetails`](../internal/functions/Get-GTGraphErrorDetails.ps1) for safe, enumeration-resistant error reporting.
+- **Diagnostics Integration:** All non-transient exceptions are piped directly into [`Get-GTGraphErrorDetails`](../internal/functions/Get-GTGraphErrorDetails.ps1) for safe, enumeration-resistant error reporting.
 
 ### C. JSON Batch Orchestrator ([`Invoke-GTGraphBatch.ps1`](../internal/functions/Invoke-GTGraphBatch.ps1))
-* Microsoft Graph supports combining up to 20 subrequests into a single `POST https://graph.microsoft.com/v1.0/$batch`.
-* **Chunking Engine:** Slices arbitrary numbers of requests (e.g. 100 requests) into sequential chunks of 20, executing each batch through `Invoke-GTGraphRequest`.
-* **Two-Tiered Throttling & Error Handling:**
+
+- Microsoft Graph supports combining up to 20 subrequests into a single `POST https://graph.microsoft.com/v1.0/$batch`.
+- **Chunking Engine:** Slices arbitrary numbers of requests (e.g. 100 requests) into sequential chunks of 20, executing each batch through `Invoke-GTGraphRequest`.
+- **Two-Tiered Throttling & Error Handling:**
   - **Envelope Level:** HTTP 429/503 on the root batch request is handled transparently with exponential backoff by `Invoke-GTGraphRequest`.
   - **Subrequest Level:** Microsoft Graph returns `HTTP 200 OK` for the batch envelope even when individual subrequests return `429 Too Many Requests` or `503 Service Unavailable`. `Invoke-GTGraphBatch` scans each subrequest response, extracts subrequest-specific `Retry-After` headers, and automatically isolates and re-batches *only* the throttled subrequests up to `$MaxSubrequestRetries` (default: 3) with jittered backoff.
   - **Missing Response Fallback:** Any subrequest dropped by the Graph batch endpoint is caught and re-attempted, or returned with structured `MissingBatchResponse` diagnostics.
-* **Correlated Responses:** Preserves the original subrequest sequence and returns strongly typed `GraphTools.BatchResponse` objects containing `Id`, `Status`, `Headers`, and parsed `Body`.
+- **Correlated Responses:** Preserves the original subrequest sequence and returns strongly typed `GraphTools.BatchResponse` objects containing `Id`, `Status`, `Headers`, and parsed `Body`.
 
 ```mermaid
 flowchart TD
@@ -205,8 +255,9 @@ flowchart TD
 ```
 
 ### D. Compatibility Bridge ([`Invoke-GTGraphPagedRequest.ps1`](../internal/functions/Invoke-GTGraphPagedRequest.ps1))
-* Existing cmdlets in GraphTools (over 40 call sites) call `Invoke-GTGraphPagedRequest`.
-* Refactored into a pass-through delegating directly to `Invoke-GTGraphRequest -All`, immediately providing the entire module with the benefits of the new REST engine without rewriting individual public functions.
+
+- Existing cmdlets in GraphTools (over 40 call sites) call `Invoke-GTGraphPagedRequest`.
+- Refactored into a pass-through delegating directly to `Invoke-GTGraphRequest -All`, immediately providing the entire module with the benefits of the new REST engine without rewriting individual public functions.
 
 ---
 
@@ -247,6 +298,7 @@ Get-GTConnection
 ```
 
 *Output:*
+
 ```powershell
 TypeName: GraphTools.ConnectionStatus
 
