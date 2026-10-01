@@ -522,10 +522,17 @@ Describe "Get-GTRiskyAppPermissionReport" {
                         value = @([PSCustomObject]@{ id = "graph-sp-id"; appRoles = @() })
                     }
                 }
-                if ($Uri -like "*v1.0/users/*") {
-                    return [PSCustomObject]@{ userPrincipalName = "victim@contoso.com" }
-                }
                 return $null
+            }
+            Mock -CommandName "Invoke-GTGraphBatch" -MockWith {
+                param($Requests)
+                return @(
+                    [PSCustomObject]@{
+                        Id = "user-id-123"
+                        Status = 200
+                        Body = [PSCustomObject]@{ userPrincipalName = "victim@contoso.com" }
+                    }
+                )
             }
             Mock -CommandName "Invoke-GTGraphPagedRequest" -MockWith {
                 param($Uri, $Headers)
@@ -559,6 +566,7 @@ Describe "Get-GTRiskyAppPermissionReport" {
             $result.RiskScore | Should -Be 8
             $result.RiskLevel | Should -Be "High"
             $result.Type | Should -Match "Specific User"
+            $result.GrantedBy | Should -Be "victim@contoso.com"
         }
 
         It "should infer High risk for unmapped *.Manage.All scope via regex heuristics" {
