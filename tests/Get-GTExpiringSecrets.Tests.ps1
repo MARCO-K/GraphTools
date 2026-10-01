@@ -4,7 +4,7 @@ Describe "Get-GTExpiringSecrets" -Tag 'Unit' {
         function global:Test-GTGraphScopes { param([string[]]$RequiredScopes, [switch]$Reconnect, [switch]$Quiet) return $true }
         function global:Write-PSFMessage { param($Level, $Message, $ErrorRecord) }
         function global:Get-GTGraphErrorDetails { param($Exception, $ResourceType) return [PSCustomObject]@{ LogLevel = 'Error'; Reason = 'Mock Error'; ErrorMessage = 'Mock Error Message' } }
-        function global:Invoke-GTGraphPagedRequest { param($Uri, [switch]$All, $Headers) return @() }
+        function global:Invoke-GTGraphPagedRequest { param($Uri, $Headers) return @() }
         function global:Format-ODataDateTime { param([DateTime]$DateTime) return $DateTime.ToUniversalTime().ToString("yyyy-MM-ddTHH:mm:ssZ") }
 
         . "$PSScriptRoot/../internal/functions/Get-UTCTime.ps1"
@@ -259,6 +259,35 @@ Describe "Get-GTExpiringSecrets" -Tag 'Unit' {
             $res[0].IsOrphaned | Should -Be $true
             $res[0].LastSignInDateTime | Should -Not -BeNullOrEmpty
         }
+
+        It "scores OutageRisk as Low for dormant workloads (sign-ins older than 90 days)" {
+            $now = Get-UTCTime
+            $mockSps = @(
+                [PSCustomObject]@{
+                    id                  = "sp-dormant"
+                    appId               = "00000000-0000-0000-0000-000000000099"
+                    displayName         = "DormantSP"
+                    passwordCredentials = @(
+                        [PSCustomObject]@{ keyId = "dormant-cred"; endDateTime = $now.AddDays(1) }
+                    )
+                    keyCredentials      = @()
+                    signInActivity      = [PSCustomObject]@{
+                        lastSignInDateTime = $now.AddDays(-120).ToString("o")
+                    }
+                    owners              = @()
+                }
+            )
+
+            Mock -CommandName "Invoke-GTGraphPagedRequest" -MockWith {
+                param($Uri)
+                if ($Uri -like "*servicePrincipals*") { return $mockSps }
+                return @()
+            }
+
+            $res = Get-GTExpiringSecrets -IncludeImpactAnalysis -Scope ServicePrincipals
+            @($res).Count | Should -Be 1
+            $res[0].OutageRisk | Should -Be "Low"
+        }
     }
 
     Context "Summary KPI Mode" {
@@ -289,7 +318,7 @@ Describe "Get-GTExpiringSecrets" -Tag 'Unit' {
             $summary.TotalCredentialsFound | Should -Be 2
             $summary.ExpiredCount | Should -Be 1
             $summary.CriticalCount | Should -Be 1
-            $summary.OrphanedAppsCount | Should -Be 2
+            $summary.OrphanedAppsCount | Should -Be 1
             $summary.ScanTimestamp | Should -Not -BeNullOrEmpty
         }
     }
@@ -300,16 +329,25 @@ Describe "Get-GTExpiringSecrets" -Tag 'Unit' {
 
             "00000000-0000-0000-0000-000000000099" | Get-GTExpiringSecrets -Scope Applications
             Assert-MockCalled -CommandName "Invoke-GTGraphPagedRequest" -Times 1 -ParameterFilter {
-                $Uri -match "filter=.*00000000-0000-0000-0000-000000000099"
+                $Uri -match "filter=.*appId.*00000000-0000-0000-0000-000000000099"
             }
         }
 
-        It "filters queries by DisplayName passed via pipeline" {
+        It "filters queries by DisplayName passed via pipeline as bare string" {
             Mock -CommandName "Invoke-GTGraphPagedRequest" -MockWith { return @() }
 
             "FinanceApp" | Get-GTExpiringSecrets -Scope Applications
             Assert-MockCalled -CommandName "Invoke-GTGraphPagedRequest" -Times 1 -ParameterFilter {
-                $Uri -match "filter=.*FinanceApp"
+                $Uri -match "filter=.*displayName.*FinanceApp"
+            }
+        }
+
+        It "filters queries by DisplayName property passed via pipeline object" {
+            Mock -CommandName "Invoke-GTGraphPagedRequest" -MockWith { return @() }
+
+            [PSCustomObject]@{ DisplayName = "BillingApp" } | Get-GTExpiringSecrets -Scope Applications
+            Assert-MockCalled -CommandName "Invoke-GTGraphPagedRequest" -Times 1 -ParameterFilter {
+                $Uri -match "filter=.*displayName.*BillingApp"
             }
         }
     }

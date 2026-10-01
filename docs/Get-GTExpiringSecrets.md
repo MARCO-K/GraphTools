@@ -46,8 +46,8 @@ Correlates expiration urgency with Microsoft Entra ID sign-in telemetry (`signIn
 | :--- | :--- | :--- |
 | **`Immediate Outage`** | `Critical` or `Expired` + `IsSoleCredential` + sign-in activity within the last 30 days | **P1 Incident Risk**: Active production workload will halt immediately upon expiration. |
 | **`High`** | `Critical` or `Expired` + `IsSoleCredential` + sign-in activity unavailable | High probability of service disruption. Verify workload ownership. |
-| **`Medium`** | `Critical` or `Expired` with alternative active credentials (rollover in progress), OR dormant workload (no sign-ins in >90 days) | Planned rotation or decommission of inactive application. |
-| **`Low`** | `Warning` tier with multiple active credentials, or non-critical workload | Regular maintenance. |
+| **`Medium`** | `Critical` or `Expired` with alternative active credentials (rollover in progress), OR sign-in activity between 30 and 90 days ago, OR `Warning` tier with `IsSoleCredential` | Planned rotation or verification of secondary rollover credential. |
+| **`Low`** | `Warning` tier with multiple active credentials, OR dormant workload (no sign-ins in >90 days) | Regular maintenance or decommission candidate. |
 | **`None`** | `Healthy` tier | No action required. |
 
 ### 3. Ownership & Custody Verification

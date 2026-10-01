@@ -93,12 +93,12 @@ function Get-GTExpiringSecrets
         [ValidateSet('All', 'Applications', 'ServicePrincipals')]
         [string]$Scope = 'All',
 
-        [Parameter(ValueFromPipeline = $true, ParameterSetName = 'Default')]
-        [Parameter(ValueFromPipeline = $true, ParameterSetName = 'Legacy')]
+        [Parameter(ValueFromPipeline = $true, ValueFromPipelineByPropertyName = $true, ParameterSetName = 'Default')]
+        [Parameter(ValueFromPipeline = $true, ValueFromPipelineByPropertyName = $true, ParameterSetName = 'Legacy')]
         [string[]]$AppId,
 
-        [Parameter(ValueFromPipeline = $true, ParameterSetName = 'Default')]
-        [Parameter(ValueFromPipeline = $true, ParameterSetName = 'Legacy')]
+        [Parameter(ValueFromPipelineByPropertyName = $true, ParameterSetName = 'Default')]
+        [Parameter(ValueFromPipelineByPropertyName = $true, ParameterSetName = 'Legacy')]
         [string[]]$DisplayName,
 
         [switch]$NewSession
@@ -137,8 +137,24 @@ function Get-GTExpiringSecrets
 
     process
     {
-        if ($AppId) { $appIdList.AddRange($AppId) }
         if ($DisplayName) { $displayNameList.AddRange($DisplayName) }
+
+        if ($AppId)
+        {
+            foreach ($item in $AppId)
+            {
+                # Disambiguate piped bare strings: GUIDs are AppIds; non-GUID values are DisplayNames
+                $parsedGuid = [guid]::Empty
+                if ([guid]::TryParse($item, [ref]$parsedGuid))
+                {
+                    $appIdList.Add($item)
+                }
+                else
+                {
+                    $displayNameList.Add($item)
+                }
+            }
+        }
     }
 
     end
@@ -271,9 +287,21 @@ function Get-GTExpiringSecrets
                 {
                     if ($isSoleCredential)
                     {
-                        if ($lastSignIn -and ($now - $lastSignIn).TotalDays -le 30)
+                        if ($lastSignIn)
                         {
-                            'Immediate Outage'
+                            $daysSinceSignIn = ($now - $lastSignIn).TotalDays
+                            if ($daysSinceSignIn -le 30)
+                            {
+                                'Immediate Outage'
+                            }
+                            elseif ($daysSinceSignIn -gt 90)
+                            {
+                                'Low'
+                            }
+                            else
+                            {
+                                'Medium'
+                            }
                         }
                         elseif ($null -eq $lastSignIn)
                         {
@@ -357,7 +385,7 @@ function Get-GTExpiringSecrets
                 $apps = @()
                 try
                 {
-                    $apps = Invoke-GTGraphPagedRequest -Uri $appUri -All
+                    $apps = Invoke-GTGraphPagedRequest -Uri $appUri
                 }
                 catch
                 {
@@ -366,7 +394,7 @@ function Get-GTExpiringSecrets
                         Write-PSFMessage -Level Verbose -Message "Expand owners unsupported on applications query; executing without expand."
                         $fallbackAppUri = "v1.0/applications?`$select=$appSelect"
                         if ($filter) { $fallbackAppUri += "&`$filter=$([Uri]::EscapeDataString($filter))" }
-                        $apps = Invoke-GTGraphPagedRequest -Uri $fallbackAppUri -All
+                        $apps = Invoke-GTGraphPagedRequest -Uri $fallbackAppUri
                     }
                     else
                     {
@@ -392,6 +420,7 @@ function Get-GTExpiringSecrets
                 }
 
                 $spExpand = if ($IncludeImpactAnalysis) { '&$expand=owners($select=id,userPrincipalName,displayName)' } else { '' }
+                # signInActivity requires beta endpoint; v1.0 used otherwise
                 $apiVersion = if ($IncludeImpactAnalysis -and $canReadSignInActivity) { 'beta' } else { 'v1.0' }
                 $spUri = "$apiVersion/servicePrincipals?`$select=$spSelect$spExpand"
                 if ($filter) { $spUri += "&`$filter=$([Uri]::EscapeDataString($filter))" }
@@ -399,7 +428,7 @@ function Get-GTExpiringSecrets
                 $sps = @()
                 try
                 {
-                    $sps = Invoke-GTGraphPagedRequest -Uri $spUri -All
+                    $sps = Invoke-GTGraphPagedRequest -Uri $spUri
                 }
                 catch
                 {
@@ -408,7 +437,7 @@ function Get-GTExpiringSecrets
                         Write-PSFMessage -Level Verbose -Message "Expand owners unsupported on servicePrincipals query; executing without expand."
                         $fallbackSpUri = "$apiVersion/servicePrincipals?`$select=$spSelect"
                         if ($filter) { $fallbackSpUri += "&`$filter=$([Uri]::EscapeDataString($filter))" }
-                        $sps = Invoke-GTGraphPagedRequest -Uri $fallbackSpUri -All
+                        $sps = Invoke-GTGraphPagedRequest -Uri $fallbackSpUri
                     }
                     else
                     {
@@ -426,6 +455,9 @@ function Get-GTExpiringSecrets
             # KPI Summary emission mode
             if ($Summary)
             {
+                $orphanedAppIds = @($results | Where-Object { $_.IsOrphaned -eq $true } | ForEach-Object { $_.Id } | Select-Object -Unique)
+                $soleCredAppIds = @($results | Where-Object { $_.IsSoleCredential -eq $true } | ForEach-Object { $_.Id } | Select-Object -Unique)
+
                 $summaryObj = [PSCustomObject]@{
                     TotalAppsScanned        = [int]$appsScannedCount
                     TotalCredentialsFound   = [int]$results.Count
@@ -433,8 +465,8 @@ function Get-GTExpiringSecrets
                     CriticalCount           = [int]@($results | Where-Object { $_.Status -eq 'Critical' }).Count
                     WarningCount            = [int]@($results | Where-Object { $_.Status -eq 'Warning' }).Count
                     HealthyCount            = [int]@($results | Where-Object { $_.Status -eq 'Healthy' }).Count
-                    SoleCredentialRiskCount = [int]@($results | Where-Object { $_.IsSoleCredential -eq $true }).Count
-                    OrphanedAppsCount       = [int]@($results | Where-Object { $_.IsOrphaned -eq $true }).Count
+                    SoleCredentialRiskCount = [int]$soleCredAppIds.Count
+                    OrphanedAppsCount       = [int]$orphanedAppIds.Count
                     ScanTimestamp           = Format-ODataDateTime -DateTime $now
                 }
                 return $summaryObj
