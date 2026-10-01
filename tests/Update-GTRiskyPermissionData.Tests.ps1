@@ -9,7 +9,7 @@ Describe "Update-GTRiskyPermissionData" {
 
     Context "Execution and File Generation" {
         BeforeEach {
-            $testOutFile = Join-Path ([System.IO.Path]::GetTempPath()) "test-out-permissions-$(Get-Random).json"
+            $testOutFile = Join-Path ([System.IO.Path]::GetTempPath()) "test-out-permissions-$([guid]::NewGuid().ToString().Substring(0, 8)).json"
             $mockPayload = @{
                 permissions = @{
                     "Directory.ReadWrite.All" = @{
