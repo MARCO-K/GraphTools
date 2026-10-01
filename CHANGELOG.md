@@ -39,6 +39,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Centralized User Object Validation (`Test-GTUserObject`)**:
   - Implemented centralized validation helper `Test-GTUserObject` in `GTValidation.ps1` enforcing required `Id` and `UserPrincipalName` properties across PSCustomObjects and Hashtables.
   - Added comprehensive Pester test suite in `tests/Test-GTUserObject.Tests.ps1`.
+- **GitHub Copilot Code Review Agent Skill (`.github/skills/code-review/SKILL.md`)**:
+  - Added repository-level `code-review` agent skill enforcing zero Microsoft Graph SDK dependencies, Windows PowerShell 5.1 and 7+ compatibility, `[PSCustomObject]` pipeline output, DRY consolidation, state-isolated Pester testing, and security guardrails.
 
 ### Changed
 
