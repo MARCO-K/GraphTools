@@ -35,6 +35,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Added comprehensive Pester test suite in `tests/Get-GTGraphHttpStatus.Tests.ps1`.
 - **Centralized HTTP Retry-After Header Parsing (`Get-GTGraphRetryAfterSeconds`)**:
   - Implemented centralized internal helper `Get-GTGraphRetryAfterSeconds` to parse integer delay seconds, TimeSpan deltas, and RFC 1123 HTTP-dates from response headers and exception objects across single-request and batch execution engines.
+  - Added support for `NameValueCollection` and `WebHeaderCollection`, ensuring full Windows PowerShell 5.1 parity when parsing `System.Net.WebException` response headers.
   - Added comprehensive Pester test suite in `tests/Get-GTGraphRetryAfterSeconds.Tests.ps1`.
 - **Centralized User Object Validation (`Test-GTUserObject`)**:
   - Implemented centralized validation helper `Test-GTUserObject` in `GTValidation.ps1` enforcing required `Id` and `UserPrincipalName` properties across PSCustomObjects and Hashtables.

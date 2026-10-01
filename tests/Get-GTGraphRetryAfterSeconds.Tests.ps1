@@ -44,6 +44,20 @@ Describe "Get-GTGraphRetryAfterSeconds" -Tag 'Unit' {
             $seconds | Should -Be 20
         }
 
+        It "extracts integer seconds from WebHeaderCollection (Windows PowerShell 5.1 parity)" {
+            $headers = New-Object System.Net.WebHeaderCollection
+            $headers.Add('Retry-After', '50')
+            $seconds = Get-GTGraphRetryAfterSeconds -Headers $headers
+            $seconds | Should -Be 50
+        }
+
+        It "extracts integer seconds from NameValueCollection" {
+            $headers = New-Object System.Collections.Specialized.NameValueCollection
+            $headers.Add('retry-after', '35')
+            $seconds = Get-GTGraphRetryAfterSeconds -Headers $headers
+            $seconds | Should -Be 35
+        }
+
         It "parses RFC 1123 HTTP-date and computes positive delta seconds" {
             $futureDate = [DateTime]::UtcNow.AddSeconds(60).ToString('R')
             $headers = @{
@@ -96,6 +110,18 @@ Describe "Get-GTGraphRetryAfterSeconds" -Tag 'Unit' {
             }
             $seconds = Get-GTGraphRetryAfterSeconds -Exception $mockEx
             $seconds | Should -Be 12
+        }
+
+        It "extracts retry seconds from WebHeaderCollection on Exception.Response.Headers (PS 5.1 WebException parity)" {
+            $webHeaders = New-Object System.Net.WebHeaderCollection
+            $webHeaders.Add('Retry-After', '75')
+            $mockEx = [PSCustomObject]@{
+                Response = [PSCustomObject]@{
+                    Headers = $webHeaders
+                }
+            }
+            $seconds = Get-GTGraphRetryAfterSeconds -Exception $mockEx
+            $seconds | Should -Be 75
         }
 
         It "extracts retry seconds from Exception.InnerException.Response.Headers" {

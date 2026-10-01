@@ -7,7 +7,7 @@ function Get-GTGraphRetryAfterSeconds
         Parses integer delay seconds, TimeSpan deltas, or RFC 1123 HTTP-date timestamps from response
         headers or exception objects across both single-request and batch execution engines.
     .PARAMETER Headers
-        The response headers collection (hashtable, dictionary, or PSCustomObject).
+        The response headers collection (hashtable, dictionary, NameValueCollection, WebHeaderCollection, or PSCustomObject).
     .PARAMETER Exception
         An exception object containing HTTP response headers.
     .OUTPUTS
@@ -53,11 +53,22 @@ function Get-GTGraphRetryAfterSeconds
             return [int]$responseHeaders.RetryAfter.Delta.TotalSeconds
         }
 
-        # 2. Extract header string value across Hashtable, Dictionary, or PSCustomObject
+        # 2. Extract header string value across Hashtable, Dictionary, NameValueCollection, or PSCustomObject
         $headerVal = $null
         if ($responseHeaders -is [System.Collections.IDictionary])
         {
             foreach ($key in $responseHeaders.Keys)
+            {
+                if ($key -like 'retry-after*')
+                {
+                    $headerVal = [string]$responseHeaders[$key]
+                    break
+                }
+            }
+        }
+        elseif ($responseHeaders -is [System.Collections.Specialized.NameValueCollection])
+        {
+            foreach ($key in $responseHeaders.AllKeys)
             {
                 if ($key -like 'retry-after*')
                 {
