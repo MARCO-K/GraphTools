@@ -6,6 +6,7 @@ Describe "Remove-GTUserDelegatedPermissionGrants" {
         function global:Invoke-GTGraphRequest { param($Uri, $Method = 'GET', $Body, $Headers, $ContentType, [switch]$All, [int]$MaxRetries, [int]$RetryBaseDelaySeconds, $Token, [switch]$Raw, $ErrorAction) }
         function global:Get-GTGraphErrorDetails { param($Exception, $ResourceType) return [PSCustomObject]@{ HttpStatus = 500; LogLevel = 'Error'; Reason = 'Mock Error'; ErrorMessage = 'Mock Error' } }
 
+        . "$PSScriptRoot/../internal/functions/GTValidation.ps1"
         . "$PSScriptRoot/../internal/functions/Remove-GTUserDelegatedPermissionGrants.ps1"
     }
 
@@ -15,6 +16,7 @@ Describe "Remove-GTUserDelegatedPermissionGrants" {
         Remove-Item Function:\global:Invoke-GTGraphPagedRequest -Force -ErrorAction SilentlyContinue
         Remove-Item Function:\global:Invoke-GTGraphRequest -Force -ErrorAction SilentlyContinue
         Remove-Item Function:\global:Get-GTGraphErrorDetails -Force -ErrorAction SilentlyContinue
+        Remove-Item Function:\Test-GTUserObject -Force -ErrorAction SilentlyContinue
     }
 
     Context "Service Principal Caching and Deletion" {

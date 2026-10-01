@@ -5,6 +5,10 @@ if (-not (Get-Command Test-GTGraphScopes -ErrorAction SilentlyContinue)) { funct
 if (-not (Get-Command Write-PSFMessage -ErrorAction SilentlyContinue)) { function Write-PSFMessage { param($Level, $Message, $ErrorRecord) } }
 if (-not (Get-Command Get-GTGraphErrorDetails -ErrorAction SilentlyContinue)) { function Get-GTGraphErrorDetails { param($Exception, $ResourceType) return @{ LogLevel = 'Error'; Reason = 'Mock Error'; ErrorMessage = 'Mock Error Message' } } }
 if (-not (Get-Command Get-UTCTime -ErrorAction SilentlyContinue)) { function Get-UTCTime { return [DateTime]::UtcNow } }
+if (-not (Get-Command Format-ODataDateTime -ErrorAction SilentlyContinue)) {
+    $formatDateFile = "$PSScriptRoot/../internal/functions/Format-ODataDateTime.ps1"
+    if (Test-Path $formatDateFile) { . $formatDateFile }
+}
 
 ## Mock the validation regex
 $script:GTValidationRegex = @{
@@ -20,6 +24,9 @@ Describe "Get-GTLegacyAuthReport" {
         function global:Get-GTGraphErrorDetails { param($Exception, $ResourceType) return [PSCustomObject]@{ LogLevel = 'Error'; Reason = 'Mock Error'; ErrorMessage = 'Mock Error Message' } }
         function global:Get-UTCTime { return [DateTime]::UtcNow }
         function global:Invoke-GTGraphPagedRequest { param($Uri, [switch]$All) return @() }
+
+        $formatDateFile = "$PSScriptRoot/../internal/functions/Format-ODataDateTime.ps1"
+        if (Test-Path $formatDateFile) { . $formatDateFile }
 
         $script:GTValidationRegex = @{
             UPN = '^[^@\s]+@[^@\s]+\.[^@\s]+$'
@@ -624,5 +631,10 @@ Describe "Get-GTLegacyAuthReport" {
             $result = Get-GTLegacyAuthReport
             $result.ClientAppUsed | Should -Contain "POP3"
         }
+    }
+
+    AfterAll {
+        Remove-Item Function:\Get-GTLegacyAuthReport -Force -ErrorAction SilentlyContinue
+        Remove-Item Function:\Format-ODataDateTime -Force -ErrorAction SilentlyContinue
     }
 }

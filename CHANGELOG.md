@@ -30,6 +30,23 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Safely handles empty or missing `clientId` with fallback to `App-$($grant.id)`.
   - Added `[AllowEmptyCollection()]` on the `Results` parameter to support empty initial collections.
   - Added unit tests in `tests/Remove-GTUserDelegatedPermissionGrants.Tests.ps1`.
+- **Centralized HTTP Status Code Extraction (`Get-GTGraphHttpStatus`)**:
+  - Implemented centralized internal helper `Get-GTGraphHttpStatus` to extract integer HTTP status codes from WebException, HttpRequestException, inner exceptions, and textual Graph SDK error patterns.
+  - Added comprehensive Pester test suite in `tests/Get-GTGraphHttpStatus.Tests.ps1`.
+- **Centralized HTTP Retry-After Header Parsing (`Get-GTGraphRetryAfterSeconds`)**:
+  - Implemented centralized internal helper `Get-GTGraphRetryAfterSeconds` to parse integer delay seconds, TimeSpan deltas, and RFC 1123 HTTP-dates from response headers and exception objects across single-request and batch execution engines.
+  - Added comprehensive Pester test suite in `tests/Get-GTGraphRetryAfterSeconds.Tests.ps1`.
+- **Centralized User Object Validation (`Test-GTUserObject`)**:
+  - Implemented centralized validation helper `Test-GTUserObject` in `GTValidation.ps1` enforcing required `Id` and `UserPrincipalName` properties across PSCustomObjects and Hashtables.
+  - Added comprehensive Pester test suite in `tests/Test-GTUserObject.Tests.ps1`.
+
+### Changed
+
+- **DRY Principle Consolidation & Code Reuse**:
+  - Refactored `New-GTPassword` to utilize centralized `Get-GTSecureRandomInt`, eliminating duplicate RNG allocation and rejection sampling.
+  - Refactored `Invoke-GTGraphRequest`, `Invoke-GTGraphBatch`, and `Get-GTGraphErrorDetails` to use `Get-GTGraphHttpStatus` and `Get-GTGraphRetryAfterSeconds`, eliminating duplicate header parsing and status code extraction logic.
+  - Replaced hardcoded date format strings (`ToString('yyyy-MM-ddTHH:mm:ssZ')`) across reporting cmdlets (`Get-GTLegacyAuthReport`, `Get-GTLicenseCostReport`, `Get-GTServicePrincipalReport`, `Get-M365LicenseOverview`) with `Format-ODataDateTime`.
+  - Standardized parameter validation across all 11 user containment and entitlement removal cmdlets (`Remove-GTUser*.ps1` and `Remove-GTPIMRoleEligibilityInternal.ps1`) using `[ValidateScript({ Test-GTUserObject -User $_ })]`.
 
 ### Security
 

@@ -193,7 +193,8 @@ function Get-GTLicenseCostReport
             }
 
             # --- Step 2: Find Zombie Users ---
-            $cutoff = $utcNow.AddDays(-$InactiveDays).ToString("yyyy-MM-ddTHH:mm:ssZ")
+            $cutoffDate = $utcNow.AddDays(-$InactiveDays)
+            $cutoff = Format-ODataDateTime -DateTime $cutoffDate
             
             Write-PSFMessage -Level Verbose -Message "Scanning for users inactive since $cutoff..."
 

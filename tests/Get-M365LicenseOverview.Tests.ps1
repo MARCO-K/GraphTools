@@ -46,6 +46,7 @@ Describe "Get-M365LicenseOverview" {
         . "$PSScriptRoot/../internal/functions/New-GTODataFilter.ps1"
         . "$PSScriptRoot/../internal/functions/Invoke-GTGraphPagedRequest.ps1"
         . "$PSScriptRoot/../internal/functions/Get-UTCTime.ps1"
+        . "$PSScriptRoot/../internal/functions/Format-ODataDateTime.ps1"
 
         # Dot-source the function under test
         . "$PSScriptRoot/../functions/Get-M365LicenseOverview.ps1"
@@ -434,5 +435,10 @@ Describe "Get-M365LicenseOverview" {
             $results = Get-M365LicenseOverview
             $results | Should -HaveCount 0  # No service plans means no output
         }
+    }
+
+    AfterAll {
+        Remove-Item Function:\Get-M365LicenseOverview -Force -ErrorAction SilentlyContinue
+        Remove-Item Function:\Format-ODataDateTime -Force -ErrorAction SilentlyContinue
     }
 }

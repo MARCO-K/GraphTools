@@ -5,12 +5,21 @@ Describe "Invoke-GTGraphBatch" -Tag 'Unit' {
         $randFile = Join-Path -Path $PSScriptRoot -ChildPath '..\internal\functions\Get-GTSecureRandomInt.ps1'
         if (Test-Path $randFile) { . $randFile }
 
+        $retryFile = Join-Path -Path $PSScriptRoot -ChildPath '..\internal\functions\Get-GTGraphRetryAfterSeconds.ps1'
+        if (Test-Path $retryFile) { . $retryFile }
+
         $reqFile = Join-Path -Path $PSScriptRoot -ChildPath '..\internal\functions\Invoke-GTGraphRequest.ps1'
         if (Test-Path $reqFile) { . $reqFile }
 
         $functionFile = Join-Path -Path $PSScriptRoot -ChildPath '..\internal\functions\Invoke-GTGraphBatch.ps1'
         if (-not (Test-Path $functionFile)) { Throw "Function file not found: $functionFile" }
         . $functionFile
+    }
+
+    AfterAll {
+        Remove-Item Function:\Invoke-GTGraphBatch -Force -ErrorAction SilentlyContinue
+        Remove-Item Function:\Get-GTGraphRetryAfterSeconds -Force -ErrorAction SilentlyContinue
+        Remove-Item Function:\Get-GTSecureRandomInt -Force -ErrorAction SilentlyContinue
     }
 
     Context "Batch Execution & URL Normalization" {

@@ -59,27 +59,14 @@ function Get-GTGraphErrorDetails
         [string]$ResourceType = 'resource'
     )
 
-    $httpStatus = $null
-    $errorMsg = $Exception.Message
-
-    # Attempt to extract status code from common locations used by HTTP-based SDK exceptions.
-    # [int] cast handles both numeric values and HttpStatusCode enum members.
-    if ($Exception.Response -and $Exception.Response.StatusCode) {
-        try { $httpStatus = [int]$Exception.Response.StatusCode } catch {}
-    }
-    if (-not $httpStatus -and $Exception.InnerException -and
-        $Exception.InnerException.Response -and $Exception.InnerException.Response.StatusCode) {
-        try { $httpStatus = [int]$Exception.InnerException.Response.StatusCode } catch {}
+    if (-not (Get-Command -Name Get-GTGraphHttpStatus -ErrorAction SilentlyContinue))
+    {
+        $statusHelper = Join-Path $PSScriptRoot 'Get-GTGraphHttpStatus.ps1'
+        if (Test-Path $statusHelper) { . $statusHelper }
     }
 
-    # Some SDKs surface status code as numeric string in the message; attempt pattern matching
-    if (-not $httpStatus) {
-        if ($errorMsg -imatch '\b404\b' -or $errorMsg -imatch 'not found') { $httpStatus = 404 }
-        elseif ($errorMsg -imatch '\b403\b' -or $errorMsg -imatch 'Insufficient privileges') { $httpStatus = 403 }
-        elseif ($errorMsg -imatch '\b401\b' -or $errorMsg -imatch 'Unauthorized') { $httpStatus = 401 }
-        elseif ($errorMsg -imatch '\b429\b' -or $errorMsg -imatch 'throttl') { $httpStatus = 429 }
-        elseif ($errorMsg -imatch '\b400\b' -or $errorMsg -imatch 'Bad Request') { $httpStatus = 400 }
-    }
+    $httpStatus = Get-GTGraphHttpStatus -Exception $Exception
+    $errorMsg = if ($Exception) { $Exception.Message } else { '' }
 
     # Compose a user-friendly reason and logging level based on status
     $reason = "Failed: $errorMsg"

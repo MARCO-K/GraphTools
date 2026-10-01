@@ -29,13 +29,7 @@ function Remove-GTUserServicePrincipalOwnerships
     param(
         [Parameter(Mandatory = $true, ValueFromPipeline = $true)]
         [ValidateNotNullOrEmpty()]
-        [ValidateScript({
-            if ($_.Id -and $_.UserPrincipalName) {
-                $true
-            } else {
-                throw "User object must have 'Id' and 'UserPrincipalName' properties"
-            }
-        })]
+        [ValidateScript({ Test-GTUserObject -User $_ })]
         [object]$User,
         [Parameter(Mandatory = $true)]
         [hashtable]$OutputBase,

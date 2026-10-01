@@ -1,6 +1,13 @@
 Describe "New-GTPassword" -Tag 'Unit' {
     BeforeAll {
+        $randFile = Join-Path -Path $PSScriptRoot -ChildPath '..\internal\functions\Get-GTSecureRandomInt.ps1'
+        if (Test-Path $randFile) { . $randFile }
+
         . "$PSScriptRoot/../internal/functions/New-GTPassword.ps1"
+    }
+
+    AfterAll {
+        Remove-Item Function:\New-GTPassword -Force -ErrorAction SilentlyContinue
     }
 
     Context "Parameter Validation" {

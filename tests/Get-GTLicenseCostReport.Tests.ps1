@@ -10,6 +10,7 @@ Describe "Get-GTLicenseCostReport" {
 
         # Provide a UTC time helper used by the function under test
         . "$PSScriptRoot/../internal/functions/Get-UTCTime.ps1"
+        . "$PSScriptRoot/../internal/functions/Format-ODataDateTime.ps1"
 
         # Dot-source the function under test AFTER stubs
         . "$PSScriptRoot/../functions/Get-GTLicenseCostReport.ps1"
@@ -107,5 +108,11 @@ Describe "Get-GTLicenseCostReport" {
         # This test ensures the user with no assignedLicenses doesn't break the run
     $result = Get-GTLicenseCostReport -InactiveDays 90 -SkuNameMap $skuMap
         $result.Count | Should -BeGreaterThan 0
+    }
+
+    AfterAll {
+        Remove-Item Function:\Get-GTLicenseCostReport -Force -ErrorAction SilentlyContinue
+        Remove-Item Function:\Format-ODataDateTime -Force -ErrorAction SilentlyContinue
+        Remove-Item Function:\Get-UTCTime -Force -ErrorAction SilentlyContinue
     }
 }

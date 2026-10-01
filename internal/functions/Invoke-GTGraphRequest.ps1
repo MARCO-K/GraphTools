@@ -84,6 +84,17 @@ function Invoke-GTGraphRequest
         [switch]$Raw
     )
 
+    if (-not (Get-Command -Name Get-GTGraphHttpStatus -ErrorAction SilentlyContinue))
+    {
+        $statusHelper = Join-Path $PSScriptRoot 'Get-GTGraphHttpStatus.ps1'
+        if (Test-Path $statusHelper) { . $statusHelper }
+    }
+    if (-not (Get-Command -Name Get-GTGraphRetryAfterSeconds -ErrorAction SilentlyContinue))
+    {
+        $retryHelper = Join-Path $PSScriptRoot 'Get-GTGraphRetryAfterSeconds.ps1'
+        if (Test-Path $retryHelper) { . $retryHelper }
+    }
+
     # 1. Normalize target URI
     $normalizedUri = $Uri.Trim()
     if ($normalizedUri -notmatch '^https?://')
@@ -126,53 +137,6 @@ function Invoke-GTGraphRequest
         {
             $serializedBody = $Body | ConvertTo-Json -Depth 10 -Compress
         }
-    }
-
-    # Helper: extract HTTP status code across PS 5.1 and PS 7+
-    function Get-HttpStatusFromException($ex)
-    {
-        if ($ex.Response -and $ex.Response.StatusCode)
-        {
-            return [int]$ex.Response.StatusCode
-        }
-        if ($ex.InnerException -and $ex.InnerException.Response -and $ex.InnerException.Response.StatusCode)
-        {
-            return [int]$ex.InnerException.Response.StatusCode
-        }
-        if ($ex.Message -match '\b(400|401|403|404|429|500|502|503|504)\b')
-        {
-            return [int]$Matches[1]
-        }
-        return $null
-    }
-
-    # Helper: extract Retry-After seconds across PS 5.1 and PS 7+
-    function Get-HttpRetryAfterSecond($ex)
-    {
-        try
-        {
-            $responseHeaders = $ex.Response.Headers
-            if ($responseHeaders)
-            {
-                if ($responseHeaders['Retry-After'])
-                {
-                    $val = [string]($responseHeaders['Retry-After'])
-                    if ($val -as [int])
-                    {
-                        return [int]$val
-                    }
-                }
-                elseif ($responseHeaders.RetryAfter -and $responseHeaders.RetryAfter.Delta)
-                {
-                    return [int]$responseHeaders.RetryAfter.Delta.TotalSeconds
-                }
-            }
-        }
-        catch
-        {
-            Write-PSFMessage -Level Verbose -Message "Unable to parse Retry-After header: $_"
-        }
-        return $null
     }
 
     # 5. Execution and pagination loop
@@ -218,10 +182,10 @@ function Invoke-GTGraphRequest
             }
             catch
             {
-                $statusCode = Get-HttpStatusFromException $_.Exception
+                $statusCode = Get-GTGraphHttpStatus -Exception $_.Exception
                 if ($statusCode -in 429, 503 -and $attempt -lt $MaxRetries)
                 {
-                    $retryAfter = Get-HttpRetryAfterSecond $_.Exception
+                    $retryAfter = Get-GTGraphRetryAfterSeconds -Exception $_.Exception
                     if (-not $retryAfter -or $retryAfter -le 0)
                     {
                         $jitter = Get-GTSecureRandomInt -Minimum 1 -Maximum 3

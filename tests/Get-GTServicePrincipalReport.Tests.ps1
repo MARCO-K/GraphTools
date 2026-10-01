@@ -24,8 +24,16 @@ Describe "Get-GTServicePrincipalReport" {
         Mock -CommandName Test-GTGraphScopes -MockWith { return $true } -Verifiable
         Mock -CommandName Invoke-GTGraphPagedRequest -MockWith { return @() }
         
+        $formatFile = "$PSScriptRoot/../internal/functions/Format-ODataDateTime.ps1"
+        if (Test-Path $formatFile) { . $formatFile }
+        
         # Load the function under test
         . "$PSScriptRoot/../functions/Get-GTServicePrincipalReport.ps1"
+    }
+
+    AfterAll {
+        Remove-Item Function:\Get-GTServicePrincipalReport -Force -ErrorAction SilentlyContinue
+        Remove-Item Function:\Format-ODataDateTime -Force -ErrorAction SilentlyContinue
     }
 
     Context "Parameter Sets" {
@@ -49,6 +57,30 @@ Describe "Get-GTServicePrincipalReport" {
 
         It "should accept ExpandOwners switch" {
             { Get-GTServicePrincipalReport -ExpandOwners } | Should -Not -Throw
+        }
+    }
+
+    Context "Credential Expiry Formatting" {
+        It "formats key and password credential expiry dates using Format-ODataDateTime" {
+            $testExpiry = [DateTime]::new(2027, 5, 20, 14, 30, 0, [System.DateTimeKind]::Utc)
+            $mockSp = [PSCustomObject]@{
+                id = 'sp-123'
+                appId = 'app-123'
+                displayName = 'Test SP'
+                servicePrincipalType = 'Application'
+                accountEnabled = $true
+                keyCredentials = @(
+                    [PSCustomObject]@{ endDateTime = $testExpiry }
+                )
+                passwordCredentials = @(
+                    [PSCustomObject]@{ endDateTime = $testExpiry }
+                )
+            }
+            Mock -CommandName Invoke-GTGraphPagedRequest -MockWith { return @($mockSp) }
+
+            $result = Get-GTServicePrincipalReport -AppId 'app-123' -IncludeCredentials
+            $result.KeyCredentialExpiryDates | Should -Be "2027-05-20T14:30:00Z"
+            $result.PasswordCredentialExpiryDates | Should -Be "2027-05-20T14:30:00Z"
         }
     }
 }

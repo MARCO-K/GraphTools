@@ -1,4 +1,8 @@
 if (-not (Get-Command Write-PSFMessage -ErrorAction SilentlyContinue)) { function Write-PSFMessage { param($Level, $Message, $ErrorRecord) } }
+if (-not (Get-Command Get-GTGraphHttpStatus -ErrorAction SilentlyContinue)) {
+    $statusFile = Join-Path -Path $PSScriptRoot -ChildPath '..\internal\functions\Get-GTGraphHttpStatus.ps1'
+    if (Test-Path $statusFile) { . $statusFile }
+}
 if (-not (Get-Command Get-GTGraphErrorDetails -ErrorAction SilentlyContinue)) {
     $errFile = Join-Path -Path $PSScriptRoot -ChildPath '..\internal\functions\Get-GTGraphErrorDetails.ps1'
     if (Test-Path $errFile) { . $errFile }
@@ -15,9 +19,23 @@ Describe "Invoke-GTGraphRequest" -Tag 'Unit' {
         $randFile = Join-Path -Path $PSScriptRoot -ChildPath '..\internal\functions\Get-GTSecureRandomInt.ps1'
         if (Test-Path $randFile) { . $randFile }
 
+        $statusFile = Join-Path -Path $PSScriptRoot -ChildPath '..\internal\functions\Get-GTGraphHttpStatus.ps1'
+        if (Test-Path $statusFile) { . $statusFile }
+
+        $retryFile = Join-Path -Path $PSScriptRoot -ChildPath '..\internal\functions\Get-GTGraphRetryAfterSeconds.ps1'
+        if (Test-Path $retryFile) { . $retryFile }
+
         $functionFile = Join-Path -Path $PSScriptRoot -ChildPath '..\internal\functions\Invoke-GTGraphRequest.ps1'
         if (-not (Test-Path $functionFile)) { Throw "Function file not found: $functionFile" }
         . $functionFile
+    }
+
+    AfterAll {
+        Remove-Item Function:\Invoke-GTGraphRequest -Force -ErrorAction SilentlyContinue
+        Remove-Item Function:\Get-GTGraphHttpStatus -Force -ErrorAction SilentlyContinue
+        Remove-Item Function:\Get-GTGraphRetryAfterSeconds -Force -ErrorAction SilentlyContinue
+        Remove-Item Function:\Get-GTCachedGraphToken -Force -ErrorAction SilentlyContinue
+        Remove-Item Function:\Get-GTSecureRandomInt -Force -ErrorAction SilentlyContinue
     }
 
     BeforeEach {

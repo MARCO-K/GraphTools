@@ -187,11 +187,11 @@ function Get-GTServicePrincipalReport
                     $reportObject['PasswordCredentialsCount'] = if ($sp.passwordCredentials) { $sp.passwordCredentials.Count } else { 0 }
                     
                     $reportObject['KeyCredentialExpiryDates'] = if ($sp.keyCredentials) { 
-                        ($sp.keyCredentials | ForEach-Object { $_.endDateTime } | Where-Object { $_ } | Sort-Object | ForEach-Object { ([datetime]$_).ToString('yyyy-MM-ddTHH:mm:ssZ') }) -join '; ' 
+                        ($sp.keyCredentials | ForEach-Object { $_.endDateTime } | Where-Object { $_ } | Sort-Object | ForEach-Object { Format-ODataDateTime -DateTime ([datetime]$_) }) -join '; ' 
                     } else { $null }
                     
                     $reportObject['PasswordCredentialExpiryDates'] = if ($sp.passwordCredentials) { 
-                        ($sp.passwordCredentials | ForEach-Object { $_.endDateTime } | Where-Object { $_ } | Sort-Object | ForEach-Object { ([datetime]$_).ToString('yyyy-MM-ddTHH:mm:ssZ') }) -join '; ' 
+                        ($sp.passwordCredentials | ForEach-Object { $_.endDateTime } | Where-Object { $_ } | Sort-Object | ForEach-Object { Format-ODataDateTime -DateTime ([datetime]$_) }) -join '; ' 
                     } else { $null }
                 }
 
