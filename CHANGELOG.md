@@ -7,6 +7,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- **Repository Security Policy (`SECURITY.md`)**:
+  - Established formal security policy documenting supported module versions (`0.25.x`), architectural security guardrails, private vulnerability reporting channels via GitHub Security Advisories, and triage response SLAs.
+
 ### Changed
 
 - **CodeQL Action v4 Upgrade (`.github/workflows/powershell.yml`)**:
