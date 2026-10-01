@@ -9,6 +9,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **Modernized Credential Audit & Impact Analysis (`Get-GTExpiringSecrets`, `docs/Get-GTExpiringSecrets.md`)**:
+  - Enhanced `Get-GTExpiringSecrets` to audit both expired and expiring client secrets and certificates with multi-tier urgency classification (`Expired`, `Critical` ≤7d, `Warning` ≤30d, `Healthy`).
+  - Added `-IncludeImpactAnalysis` engine calculating Single Point of Failure (SPOF) risks (`IsSoleCredential`, `TotalActiveCredentials`), active service liveness (`signInActivity.lastSignInDateTime`), outage risk scoring (`Immediate Outage`, `High`, `Medium`, `Low`), and ownership custody verification (`Owners`, `IsOrphaned`).
+  - Added `-Summary` switch emitting aggregated tenant KPI metric card (`TotalAppsScanned`, `TotalCredentialsFound`, `ExpiredCount`, `CriticalCount`, `WarningCount`, `SoleCredentialRiskCount`, `OrphanedAppsCount`).
+  - Added pipeline filtering support by `AppId` and `DisplayName` with dynamic OData filter construction.
+  - Added comprehensive technical documentation in `docs/Get-GTExpiringSecrets.md`.
+  - Expanded unit test coverage in `tests/Get-GTExpiringSecrets.Tests.ps1` with full state isolation teardown (`AfterAll`).
 - **Repository Security Policy (`SECURITY.md`)**:
   - Established formal security policy documenting supported module versions (`0.25.x`), architectural security guardrails, private vulnerability reporting channels via GitHub Security Advisories, and triage response SLAs.
 

@@ -108,7 +108,7 @@ Respond to security incidents with purpose-built cmdlets:
 | `Get-GTOrphanedServicePrincipal` | Identify orphaned or insecure Service Principals |
 | `Get-GTGuestUserReport` | Report on guest users and invitation status |
 | `Remove-GTExpiredInvites` | Remove expired pending guest invitations |
-| `Get-GTExpiringSecrets` | Find expiring secrets and certificates |
+| [`Get-GTExpiringSecrets`](docs/Get-GTExpiringSecrets.md) | Audit expired & expiring credentials with Single Point of Failure (SPOF) impact analysis |
 | `Get-GTUnusedApps` | Identify unused Service Principals |
 | `Get-GTInactiveDevices` | Identify inactive devices |
 | `Get-GTPIMRoleReport` | Report on eligible and active PIM role assignments |
