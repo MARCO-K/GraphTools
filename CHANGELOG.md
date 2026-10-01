@@ -14,7 +14,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Added detection of illicit consent grants and OAuth phishing attacks targeting regular users (`ConsentType = 'Principal'`) with high-privilege scopes (`Mail.ReadWrite`, `Files.ReadWrite.All`).
   - Added multi-tier risk classification engine (`Critical`, `High`, `Medium`, `Low`) based on curated threat profiles and Microsoft DevX metadata.
   - Added `-Summary` KPI switch emitting aggregated tenant consent metrics (`TotalGrantsScanned`, `TotalAppsScanned`, `CriticalCount`, `HighCount`, `UnverifiedAppsCount`, `ThirdPartyAppsCount`, `UserConsentedCount`).
-  - Added `-TimeoutSeconds` parameter enforcing socket deadlines across all REST calls, with cross-platform support (`OperationTimeoutSeconds` on PowerShell 7+ and `TimeoutSec` on Windows PowerShell 5.1).
+  - Added `-TimeoutSeconds` parameter enforcing socket deadlines across all REST calls, applied via universal `-TimeoutSec` parameter binding across Windows PowerShell 5.1 and all PowerShell 7.x releases.
   - Enforced strict input length bounds (`[ValidateLength]`) and collection size constraints (`[ValidateCount]`) across all parameters to mitigate DoS and buffer expansion risks.
   - Added sanitized user-facing error reporting with zero sensitive token or internal URL leakage, routing forensic diagnostics to debug/verbose logging.
   - Added comprehensive technical documentation in `docs/Get-GTAppConsentReport.md`.

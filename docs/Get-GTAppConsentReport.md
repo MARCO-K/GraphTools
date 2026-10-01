@@ -30,7 +30,7 @@ To adhere to enterprise security standards, `Get-GTAppConsentReport` incorporate
    - User-facing error records are strictly sanitized: raw bearer tokens, internal endpoint URLs, query parameters, and execution stack traces are never emitted to standard error.
    - Detailed forensic exception details are routed exclusively to `Write-PSFMessage -Level Debug` and `-Level Verbose`.
 3. **External API Timeouts**:
-   - Every Microsoft Graph REST query enforces an operation deadline across both PowerShell 7+ (`OperationTimeoutSeconds`) and Windows PowerShell 5.1 (`TimeoutSec`), mitigating socket exhaustion and Slowloris thread hangs.
+   - Every Microsoft Graph REST query enforces an operation deadline using `-TimeoutSec` across Windows PowerShell 5.1 and PowerShell 7.x (where it aliases `ConnectionTimeoutSeconds`), mitigating socket exhaustion and Slowloris thread hangs.
 4. **Security-Focused Code Comments**:
    - All internal validation rules, OData escaping boundaries, and risk classification routines are annotated with clear threat model rationales explaining *why* the guardrails exist.
 
@@ -135,3 +135,14 @@ Get-GTAppConsentReport -ConsentType Principal -UnverifiedOnly -ThirdPartyOnly
 ```powershell
 Get-GTAppConsentReport -Summary
 ```
+
+---
+
+## Required Permissions
+
+| Operation | Microsoft Graph Permission | Endpoint |
+| :--- | :--- | :--- |
+| **OAuth 2.0 Permission Grants** | `DelegatedPermissionGrant.Read.All` | `v1.0/oauth2PermissionGrants` |
+| **Service Principal Metadata** | `Application.Read.All` | `v1.0/servicePrincipals` |
+| **Consenting User Resolution** | `User.Read.All` | `v1.0/users/{id}` |
+

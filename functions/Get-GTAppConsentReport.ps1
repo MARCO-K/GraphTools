@@ -163,7 +163,8 @@ function Get-GTAppConsentReport
         }
 
         # 1. Verify session connectivity and required delegated/app scopes
-        $requiredScopes = @('DelegatedPermissionGrant.Read.All', 'Application.Read.All')
+        # User.Read.All is required to resolve consenting user UPNs from principal IDs without silent 403 authorization failures
+        $requiredScopes = @('DelegatedPermissionGrant.Read.All', 'Application.Read.All', 'User.Read.All')
         if (-not (Initialize-GTGraphConnection -Scopes $requiredScopes -NewSession:$NewSession))
         {
             & $EmitSanitizedError -UserMessage "Failed to initialize Microsoft Graph session. Please authenticate via Connect-GTGraph." -ErrorId 'SessionInitializationFailed' -Category ConnectionError

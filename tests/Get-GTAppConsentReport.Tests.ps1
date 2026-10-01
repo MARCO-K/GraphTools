@@ -60,6 +60,24 @@ Describe "Get-GTAppConsentReport" -Tag 'Unit' {
         }
     }
 
+    Context "Required Scopes Validation" {
+        It "verifies that DelegatedPermissionGrant.Read.All, Application.Read.All, and User.Read.All are requested" {
+            $script:capturedRequiredScopes = $null
+
+            Mock -CommandName "Test-GTGraphScopes" -MockWith {
+                param([string[]]$RequiredScopes, [switch]$Reconnect, [switch]$Quiet)
+                $script:capturedRequiredScopes = $RequiredScopes
+                return $true
+            }
+
+            $null = Get-GTAppConsentReport
+
+            $script:capturedRequiredScopes | Should -Contain 'DelegatedPermissionGrant.Read.All'
+            $script:capturedRequiredScopes | Should -Contain 'Application.Read.All'
+            $script:capturedRequiredScopes | Should -Contain 'User.Read.All'
+        }
+    }
+
     Context "Information Leakage Defense (Sanitized Errors)" {
         It "emits sanitized error record without exposing internal URL or tokens on query failure" {
             Mock -CommandName "Invoke-GTGraphPagedRequest" -MockWith {
