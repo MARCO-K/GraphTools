@@ -7,6 +7,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+
+- **CodeQL Action v4 Upgrade (`.github/workflows/powershell.yml`)**:
+  - Upgraded SARIF upload action from `github/codeql-action/upload-sarif@v3` to `github/codeql-action/upload-sarif@v4` in the `PSScriptAnalyzer` workflow, resolving deprecation warnings.
+
 ## [0.25.0] - 2026-10-01
 
 ### Added
