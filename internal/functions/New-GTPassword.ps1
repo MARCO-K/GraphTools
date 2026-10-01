@@ -34,45 +34,26 @@ function New-GTPassword
     $Numbers   = 48..57 | ForEach-Object { [char]$_ }   # 0-9
     $Special   = [char[]]'!@#$%^&*()_+-=[]{}|;:,.<>?/`~'
 
-    $rng = [System.Security.Cryptography.RandomNumberGenerator]::Create()
-    $byteBuffer = [byte[]]::new(4)
+    # Ensure at least one character from each set
+    $Password = [System.Collections.Generic.List[char]]::new()
+    $Password.Add($Uppercase[(Get-GTSecureRandomInt -Maximum $Uppercase.Count)])
+    $Password.Add($Lowercase[(Get-GTSecureRandomInt -Maximum $Lowercase.Count)])
+    $Password.Add($Numbers[(Get-GTSecureRandomInt -Maximum $Numbers.Count)])
+    $Password.Add($Special[(Get-GTSecureRandomInt -Maximum $Special.Count)])
 
-    # Rejection sampling helper to eliminate modulo bias
-    $GetSecureBoundedIndex = {
-        param([uint32]$Max)
-        $fullSets = [uint32]::MaxValue - ([uint32]::MaxValue % $Max)
-        do {
-            $rng.GetBytes($byteBuffer)
-            $rand = [BitConverter]::ToUInt32($byteBuffer, 0)
-        } while ($rand -ge $fullSets)
-        return [int]($rand % $Max)
+    # Fill remaining characters randomly from all sets
+    $AllChars = $Uppercase + $Lowercase + $Numbers + $Special
+    while ($Password.Count -lt $CharacterCount) {
+        $Password.Add($AllChars[(Get-GTSecureRandomInt -Maximum $AllChars.Count)])
     }
 
-    try {
-        # Ensure at least one character from each set
-        $Password = [System.Collections.Generic.List[char]]::new()
-        $Password.Add($Uppercase[(& $GetSecureBoundedIndex -Max $Uppercase.Count)])
-        $Password.Add($Lowercase[(& $GetSecureBoundedIndex -Max $Lowercase.Count)])
-        $Password.Add($Numbers[(& $GetSecureBoundedIndex -Max $Numbers.Count)])
-        $Password.Add($Special[(& $GetSecureBoundedIndex -Max $Special.Count)])
-
-        # Fill remaining characters randomly from all sets
-        $AllChars = $Uppercase + $Lowercase + $Numbers + $Special
-        while ($Password.Count -lt $CharacterCount) {
-            $Password.Add($AllChars[(& $GetSecureBoundedIndex -Max $AllChars.Count)])
-        }
-
-        # Fisher-Yates shuffle with rejection sampling
-        for ($i = $Password.Count - 1; $i -gt 0; $i--) {
-            $j = & $GetSecureBoundedIndex -Max ($i + 1)
-            $temp = $Password[$i]
-            $Password[$i] = $Password[$j]
-            $Password[$j] = $temp
-        }
-
-        return (-join $Password)
+    # Fisher-Yates shuffle using CSPRNG
+    for ($i = $Password.Count - 1; $i -gt 0; $i--) {
+        $j = Get-GTSecureRandomInt -Maximum ($i + 1)
+        $temp = $Password[$i]
+        $Password[$i] = $Password[$j]
+        $Password[$j] = $temp
     }
-    finally {
-        $rng.Dispose()
-    }
+
+    return (-join $Password)
 }

@@ -9,12 +9,20 @@ if (-not (Get-Command Write-PSFMessage -ErrorAction SilentlyContinue)) { functio
 
 Describe "Get-GTGraphErrorDetails" -Tag 'Unit' {
     BeforeAll {
+        $statusHelper = Join-Path -Path $PSScriptRoot -ChildPath '..\internal\functions\Get-GTGraphHttpStatus.ps1'
+        if (Test-Path $statusHelper) { . $statusHelper }
+
         $functionFile = Join-Path -Path $PSScriptRoot -ChildPath '..\internal\functions\Get-GTGraphErrorDetails.ps1'
         if (-not (Test-Path $functionFile))
         {
             Throw "Function file not found: $functionFile"
         }
         . $functionFile
+    }
+
+    AfterAll {
+        Remove-Item Function:\Get-GTGraphErrorDetails -Force -ErrorAction SilentlyContinue
+        Remove-Item Function:\Get-GTGraphHttpStatus -Force -ErrorAction SilentlyContinue
     }
 
     Context "HTTP Status Code Extraction" {

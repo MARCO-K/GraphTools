@@ -161,7 +161,7 @@ function Get-GTLegacyAuthReport
     {
         $utcNow = Get-UTCTime
         $startDate = $utcNow.AddDays(-$DaysAgo)
-        $filterDate = $startDate.ToString('yyyy-MM-ddTHH:mm:ssZ')
+        $filterDate = Format-ODataDateTime -DateTime $startDate
 
         try
         {

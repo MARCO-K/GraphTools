@@ -121,7 +121,8 @@ function Get-M365LicenseOverview
             }
 
             if ($DaysInactive) {
-                $cutoff = $utcNow.AddDays(-$DaysInactive).ToString("yyyy-MM-ddTHH:mm:ssZ")
+                $cutoffDate = $utcNow.AddDays(-$DaysInactive)
+                $cutoff = Format-ODataDateTime -DateTime $cutoffDate
                 $filterParts.Add("signInActivity/lastSignInDateTime le $cutoff")
             }
 

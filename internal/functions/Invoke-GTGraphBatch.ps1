@@ -55,6 +55,12 @@ function Invoke-GTGraphBatch
 
     begin
     {
+        if (-not (Get-Command -Name Get-GTGraphRetryAfterSeconds -ErrorAction SilentlyContinue))
+        {
+            $retryHelper = Join-Path $PSScriptRoot 'Get-GTGraphRetryAfterSeconds.ps1'
+            if (Test-Path $retryHelper) { . $retryHelper }
+        }
+
         $allRequests = [System.Collections.Generic.List[hashtable]]::new()
     }
 
@@ -170,50 +176,8 @@ function Invoke-GTGraphBatch
                                 [void]$retryRequests.Add($req)
 
                                 # Parse Retry-After header from subrequest headers if present
-                                $retryAfterSec = 0
-                                if ($resp.headers)
-                                {
-                                    $headerVal = $null
-                                    if ($resp.headers -is [hashtable])
-                                    {
-                                        foreach ($k in $resp.headers.Keys)
-                                        {
-                                            if ($k -like 'retry-after*')
-                                            {
-                                                $headerVal = [string]$resp.headers[$k]
-                                                break
-                                            }
-                                        }
-                                    }
-                                    elseif ($resp.headers.PSObject -and $resp.headers.PSObject.Properties)
-                                    {
-                                        foreach ($p in $resp.headers.PSObject.Properties)
-                                        {
-                                            if ($p.Name -like 'retry-after*')
-                                            {
-                                                $headerVal = [string]$p.Value
-                                                break
-                                            }
-                                        }
-                                    }
-
-                                    if ($headerVal)
-                                    {
-                                        $parsedInt = 0
-                                        $parsedDate = [DateTime]::MinValue
-                                        if ([int]::TryParse($headerVal, [ref]$parsedInt))
-                                        {
-                                            $retryAfterSec = $parsedInt
-                                        }
-                                        elseif ([DateTime]::TryParse($headerVal, [ref]$parsedDate))
-                                        {
-                                            $diff = $parsedDate.ToUniversalTime() - [DateTime]::UtcNow
-                                            $retryAfterSec = [int][Math]::Max(1, $diff.TotalSeconds)
-                                        }
-                                    }
-                                }
-
-                                if ($retryAfterSec -gt $maxSubDelay)
+                                $retryAfterSec = Get-GTGraphRetryAfterSeconds -Headers $resp.headers
+                                if ($retryAfterSec -and $retryAfterSec -gt $maxSubDelay)
                                 {
                                     $maxSubDelay = $retryAfterSec
                                 }
