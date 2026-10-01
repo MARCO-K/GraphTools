@@ -3,7 +3,19 @@
 
 Describe "Format-ODataDateTime" -Tag 'Unit' {
     BeforeAll {
-        . "$PSScriptRoot/../internal/functions/Format-ODataDateTime.ps1"
+        $functionFile = Join-Path -Path $PSScriptRoot -ChildPath '..\internal\functions\Format-ODataDateTime.ps1'
+        if (-not (Test-Path $functionFile)) { Throw "Function file not found: $functionFile" }
+        . $functionFile
+    }
+
+    AfterAll {
+        Remove-Item Function:\Format-ODataDateTime -Force -ErrorAction SilentlyContinue
+    }
+
+    Context "Parameter Validation" {
+        It "should require DateTime parameter" {
+            (Get-Command Format-ODataDateTime).Parameters['DateTime'].Attributes.Mandatory -contains $true | Should -BeTrue
+        }
     }
 
     Context "Formatting DateTime objects" {
@@ -33,6 +45,10 @@ Describe "Format-ODataDateTime" -Tag 'Unit' {
     }
 
     Context "Error conditions" {
+        It "should throw if null is provided for DateTime" {
+            { Format-ODataDateTime -DateTime $null } | Should -Throw
+        }
+
         It "should throw if invalid string is provided that cannot be cast to DateTime" {
             { Format-ODataDateTime -DateTime "not-a-date" } | Should -Throw
         }
