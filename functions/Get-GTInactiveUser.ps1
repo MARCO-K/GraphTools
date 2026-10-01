@@ -235,12 +235,12 @@ function Get-GTInactiveUser
 
                 # 3. Calculate Max Date (UTC)
                 # We look at all available sign-in timestamps to find the most recent one
-                $loginDates = @()
+                $loginDates = [System.Collections.Generic.List[datetime]]::new()
                 if ($signinActivity)
                 {
-                    if ($signinActivity.LastSignInDateTime) { $loginDates += $signinActivity.LastSignInDateTime }
-                    if ($signinActivity.LastSuccessfulSignInDateTime) { $loginDates += $signinActivity.LastSuccessfulSignInDateTime }
-                    if ($signinActivity.LastNonInteractiveSignInDateTime) { $loginDates += $signinActivity.LastNonInteractiveSignInDateTime }
+                    if ($signinActivity.LastSignInDateTime) { $loginDates.Add($signinActivity.LastSignInDateTime) }
+                    if ($signinActivity.LastSuccessfulSignInDateTime) { $loginDates.Add($signinActivity.LastSuccessfulSignInDateTime) }
+                    if ($signinActivity.LastNonInteractiveSignInDateTime) { $loginDates.Add($signinActivity.LastNonInteractiveSignInDateTime) }
                 }
 
                 $maxDate = if ($loginDates.Count -gt 0) { ($loginDates | Measure-Object -Maximum | Select-Object -ExpandProperty Maximum) } else { $null }
