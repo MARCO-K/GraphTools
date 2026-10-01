@@ -12,6 +12,9 @@ Describe "Invoke-GTGraphRequest" -Tag 'Unit' {
         $tokenFile = Join-Path -Path $PSScriptRoot -ChildPath '..\internal\functions\Get-GTCachedGraphToken.ps1'
         if (Test-Path $tokenFile) { . $tokenFile }
 
+        $randFile = Join-Path -Path $PSScriptRoot -ChildPath '..\internal\functions\Get-GTSecureRandomInt.ps1'
+        if (Test-Path $randFile) { . $randFile }
+
         $functionFile = Join-Path -Path $PSScriptRoot -ChildPath '..\internal\functions\Invoke-GTGraphRequest.ps1'
         if (-not (Test-Path $functionFile)) { Throw "Function file not found: $functionFile" }
         . $functionFile

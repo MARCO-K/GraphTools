@@ -224,7 +224,8 @@ function Invoke-GTGraphRequest
                     $retryAfter = Get-HttpRetryAfterSecond $_.Exception
                     if (-not $retryAfter -or $retryAfter -le 0)
                     {
-                        $retryAfter = [int]($RetryBaseDelaySeconds * [Math]::Pow(2, $attempt)) + (Get-Random -Minimum 1 -Maximum 3)
+                        $jitter = Get-GTSecureRandomInt -Minimum 1 -Maximum 3
+                        $retryAfter = [int]($RetryBaseDelaySeconds * [Math]::Pow(2, $attempt)) + $jitter
                     }
 
                     Write-PSFMessage -Level Warning -Message "HTTP $statusCode encountered calling '$currentUri'. Retrying after $retryAfter seconds (Attempt $($attempt + 1)/$MaxRetries)..."

@@ -2,6 +2,9 @@ if (-not (Get-Command Write-PSFMessage -ErrorAction SilentlyContinue)) { functio
 
 Describe "Invoke-GTGraphBatch" -Tag 'Unit' {
     BeforeAll {
+        $randFile = Join-Path -Path $PSScriptRoot -ChildPath '..\internal\functions\Get-GTSecureRandomInt.ps1'
+        if (Test-Path $randFile) { . $randFile }
+
         $reqFile = Join-Path -Path $PSScriptRoot -ChildPath '..\internal\functions\Invoke-GTGraphRequest.ps1'
         if (Test-Path $reqFile) { . $reqFile }
 

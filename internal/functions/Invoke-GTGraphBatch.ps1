@@ -288,7 +288,8 @@ function Invoke-GTGraphBatch
                     $subAttempt++
                     if ($maxSubDelay -le 0)
                     {
-                        $maxSubDelay = [int]($RetryBaseDelaySeconds * [Math]::Pow(2, $subAttempt - 1)) + (Get-Random -Minimum 1 -Maximum 3)
+                        $jitter = Get-GTSecureRandomInt -Minimum 1 -Maximum 3
+                        $maxSubDelay = [int]($RetryBaseDelaySeconds * [Math]::Pow(2, $subAttempt - 1)) + $jitter
                     }
 
                     Write-PSFMessage -Level Warning -Message "Batch chunk contains $($retryRequests.Count) throttled subrequest(s). Retrying after $maxSubDelay seconds (Attempt $subAttempt/$MaxSubrequestRetries)..."
