@@ -79,13 +79,9 @@ Provide a concise, prioritized review structured as follows:
     - Dependencies & Compatibility (PS 5.1 + PS 7+)
     - Output Typing & Pipeline Compliance
     - DRY Reuse & Central Utilities
-2. **Automation Principles & Reliability**:
-    - Idempotence, What-If safety, and transient fault handling
-    - Error handling strategy (Fail Fast vs. `$PSCmdlet.WriteError`)
-    - Resource cleanup & configuration decoupling
-3. **Security & Guardrails**:
-    - Secret handling, injection risks, and least-privilege scoping
-4. **Test Suite & State Isolation**:
+2. **Security & Guardrails**:
+    - Secret handling, injection risks, and `-WhatIf` / `ShouldProcess` safety
+3. **Test Suite & State Isolation**:
     - Pester 5.x coverage and `AfterAll` cleanup verification
-5. **Actionable Recommendations**:
+4. **Actionable Recommendations**:
     - Clear, numbered list of required fixes or improvements (if any)
