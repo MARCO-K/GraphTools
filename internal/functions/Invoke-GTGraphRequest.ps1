@@ -181,17 +181,10 @@ function Invoke-GTGraphRequest
                 }
 
                 # Security Guardrail: Enforce API request timeout to prevent socket exhaustion and hanging worker threads.
-                # PowerShell 7+ uses OperationTimeoutSeconds; Windows PowerShell 5.1 uses TimeoutSec.
+                # TimeoutSec is natively supported in Windows PowerShell 5.1 and is an alias for ConnectionTimeoutSeconds across all PowerShell 7.x releases.
                 if ($TimeoutSeconds -gt 0)
                 {
-                    if ($PSVersionTable.PSVersion.Major -ge 7)
-                    {
-                        $restParams['OperationTimeoutSeconds'] = $TimeoutSeconds
-                    }
-                    else
-                    {
-                        $restParams['TimeoutSec'] = $TimeoutSeconds
-                    }
+                    $restParams['TimeoutSec'] = $TimeoutSeconds
                 }
 
                 $response = Invoke-RestMethod @restParams

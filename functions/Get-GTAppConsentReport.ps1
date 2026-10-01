@@ -302,7 +302,6 @@ function Get-GTAppConsentReport
         # 5. Retrieve and index Service Principals for fast O(1) in-memory metadata correlation
         Write-PSFMessage -Level Verbose -Message "Retrieving Service Principals for OAuth grant correlation..."
         $spMap = @{}
-        $spByAppId = @{}
         try
         {
             $spSelect = "id,appId,displayName,publisherName,verifiedPublisher,appOwnerOrganizationId,replyUrls"
@@ -312,7 +311,6 @@ function Get-GTAppConsentReport
             foreach ($sp in $spList)
             {
                 if ($sp.id) { $spMap[$sp.id] = $sp }
-                if ($sp.appId) { $spByAppId[$sp.appId] = $sp }
             }
         }
         catch

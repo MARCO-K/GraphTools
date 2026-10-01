@@ -207,7 +207,7 @@ Describe "Invoke-GTGraphRequest" -Tag 'Unit' {
             $script:capturedTimeout = $null
 
             Mock -CommandName Invoke-RestMethod -MockWith {
-                $script:capturedTimeout = if ($PSVersionTable.PSVersion.Major -ge 7) { $OperationTimeoutSeconds } else { $TimeoutSec }
+                $script:capturedTimeout = if ($null -ne $TimeoutSec) { $TimeoutSec } else { $ConnectionTimeoutSeconds }
                 return @{ value = @() }
             }
 
