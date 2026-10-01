@@ -33,6 +33,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Security
 
+- **Centralized Cryptographically Secure Integer Generation (`Get-GTSecureRandomInt`, `Invoke-GTGraphRequest`, `Invoke-GTGraphBatch`)**:
+  - Replaced insecure `Get-Random` calls with a centralized internal helper `Get-GTSecureRandomInt` utilizing `[System.Security.Cryptography.RandomNumberGenerator]` with 32-bit rejection sampling to eliminate modulo bias.
+  - Standardized exponential backoff and retry jitter calculations across both single-request (`Invoke-GTGraphRequest`) and chunked batch (`Invoke-GTGraphBatch`) execution engines.
+  - Ensured cross-platform compatibility across Windows PowerShell 5.1 and PowerShell 7+.
+  - Added comprehensive Pester unit test suite in `tests/Get-GTSecureRandomInt.Tests.ps1`.
 - **Cryptographically Secure Password Generation (`New-GTPassword`)**:
   - Replaced pseudo-random `Get-Random` with `[System.Security.Cryptography.RandomNumberGenerator]` (CSPRNG) for character selection and Fisher-Yates shuffle.
   - Implemented rejection sampling algorithm to eliminate modulo bias across index selections.

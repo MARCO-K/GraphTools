@@ -224,11 +224,7 @@ function Invoke-GTGraphRequest
                     $retryAfter = Get-HttpRetryAfterSecond $_.Exception
                     if (-not $retryAfter -or $retryAfter -le 0)
                     {
-                        $jitterBytes = [byte[]]::new(1)
-                        $rng = [System.Security.Cryptography.RandomNumberGenerator]::Create()
-                        $rng.GetBytes($jitterBytes)
-                        $rng.Dispose()
-                        $jitter = ($jitterBytes[0] % 2) + 1
+                        $jitter = Get-GTSecureRandomInt -Minimum 1 -Maximum 3
                         $retryAfter = [int]($RetryBaseDelaySeconds * [Math]::Pow(2, $attempt)) + $jitter
                     }
 
