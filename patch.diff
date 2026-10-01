@@ -1,0 +1,19 @@
+<<<<<<< SEARCH
+    BeforeAll {
+        . "$PSScriptRoot/../internal/functions/Format-ODataDateTime.ps1"
+    }
+
+    Context "Formatting DateTime objects" {
+=======
+    BeforeAll {
+        . "$PSScriptRoot/../internal/functions/Format-ODataDateTime.ps1"
+    }
+
+    AfterAll {
+        if (Test-Path Function:\Format-ODataDateTime) {
+            Remove-Item Function:\Format-ODataDateTime
+        }
+    }
+
+    Context "Formatting DateTime objects" {
+>>>>>>> REPLACE
