@@ -68,7 +68,7 @@ function Get-GTManagedIdentityToken
     try
     {
         Write-PSFMessage -Level Verbose -Message "Requesting token from Managed Identity endpoint ($endpoint)..."
-        $response = Invoke-RestMethod -Uri $uri -Headers $headers -Method GET -ErrorAction Stop
+        $response = Invoke-RestMethod -Uri $uri -Headers $headers -Method GET -TimeoutSec 5 -ErrorAction Stop
 
         if (-not $response.access_token)
         {

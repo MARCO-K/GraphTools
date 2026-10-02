@@ -225,6 +225,7 @@ function Invoke-GTOAuthHttpListener
                                            -Uri $tokenEndpoint `
                                            -ContentType 'application/x-www-form-urlencoded' `
                                            -Body $tokenBody `
+                                           -TimeoutSec 30 `
                                            -ErrorAction Stop
 
         if (-not $tokenResponse.access_token)

@@ -204,6 +204,7 @@ function Invoke-GTGraphRequest
                     Method      = $Method
                     Uri         = $currentUri
                     Headers     = $requestHeaders
+                    TimeoutSec  = 120
                     ErrorAction = 'Stop'
                 }
 

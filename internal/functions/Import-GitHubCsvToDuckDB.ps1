@@ -76,7 +76,7 @@ function Import-GitHubCsvToDuckDB
             "Accept" = "application/vnd.github.v3+json"
         }
 
-        $contents = Invoke-RestMethod -Uri $apiUrl -Headers $headers -Method Get
+        $contents = Invoke-RestMethod -Uri $apiUrl -Headers $headers -Method Get -TimeoutSec 30
 
         # Filter CSV files
         $csvFiles = $contents | Where-Object { $_.name -like $FileType }

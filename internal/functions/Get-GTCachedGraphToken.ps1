@@ -486,6 +486,7 @@ function Get-GTCachedGraphToken
                                       -Uri $tokenEndpoint `
                                       -ContentType "application/x-www-form-urlencoded" `
                                       -Body $requestBody `
+                                      -TimeoutSec 30 `
                                       -ErrorAction Stop
 
         if (-not $response.access_token)

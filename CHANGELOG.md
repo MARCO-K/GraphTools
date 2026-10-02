@@ -9,6 +9,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Security
 
+- Added `-TimeoutSec` to all `Invoke-RestMethod` and `Invoke-WebRequest` external API calls across the codebase to prevent resource exhaustion and hanging scripts when endpoints become unresponsive.
 - **Cryptographically Secure Password Generation (`New-GTPassword`)**:
   - Replaced pseudo-random `Get-Random` with `[System.Security.Cryptography.RandomNumberGenerator]` (CSPRNG) for character selection and Fisher-Yates shuffle.
   - Implemented rejection sampling algorithm to eliminate modulo bias across index selections.
