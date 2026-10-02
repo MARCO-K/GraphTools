@@ -29,7 +29,7 @@ Describe "Get-GTInactiveUser" {
                 return [PSCustomObject]@{ value = @($script:CurrentUsers) }
             }
 
-            if ($Uri -like '*/directoryRoles/*/members*') {
+            if ($Uri -like '*/directoryRoles/*/members*' -or $Uri -like '*/directoryRoles(roleTemplateId*') {
                 return [PSCustomObject]@{
                     value = @(
                         [PSCustomObject]@{ id = 'id-admin'; userPrincipalName = 'admin@contoso.com' }
