@@ -26,7 +26,8 @@ function Expand-GTNestedProperties
     {
         # Initialize collection variables at the function scope
         $allColumns = [ordered]@{}
-        $processedData = @()
+        # ⚡ Bolt Optimization: Used generic List instead of array concatenation (+=) to avoid O(N^2) overhead
+        $processedData = [System.Collections.Generic.List[object]]::new()
         $standardizedData = @()
     }
 
@@ -75,7 +76,7 @@ function Expand-GTNestedProperties
                     }
 
                 }
-                $processedData += $output
+                $processedData.Add($output)
                 # Collect all possible columns across all items
                 foreach ($key in $output.Keys)
                 {

@@ -53,7 +53,9 @@ function Import-DuckDBRecords
     {
         Write-PSFMessage -Level Verbose -Message "Starting import to table $TableName"
         # Initialize collection to hold records if processing multiple pipeline items
-        $records = @()
+        # ⚡ Bolt Optimization: Using a generic List to accumulate objects instead of array concatenation (+=)
+        # to prevent O(N^2) memory reallocation performance degradation inside pipeline processing loops.
+        $records = [System.Collections.Generic.List[object]]::new()
 
         # Create output directory and connect to DB based on parameter set
         if ($PSCmdlet.ParameterSetName -eq 'newDB')
@@ -80,39 +82,39 @@ function Import-DuckDBRecords
 
     process
     {
-        if ($null -ne $InputObject)
-        {
-            # For single object input, add to records collection
-            $records += $InputObject
-            Write-PSFMessage -Level Verbose -Message "Added records to processing queue: $($records.count)"
-        }
-        else
+        if ($null -eq $InputObject)
         {
             Write-PSFMessage -Level Error -Message "Received null input object"
             throw "Null input object"
         }
 
 
-        # Process records and deduplicate
-        foreach ($record in $Records)
-        {
-            if (-not $record.ID)
-            {
-                Write-PSFMessage -Level Warning -Message "Skipping record: missing ID field"
-                continue
-            }
-
-            if ($seenIds.Add($record.ID))
-            {
-                $uniqueRecords.Add($record)
-            }
-        }
+        # Add records to processing queue
+        $records.AddRange(@($InputObject))
+        Write-PSFMessage -Level Verbose -Message "Added records to processing queue: $($records.count)"
     }
 
     end
     {
         try
         {
+            # Process records and deduplicate
+            # ⚡ Bolt Optimization: Moved deduplication loop from `process` to `end` block to ensure
+            # we iterate across all pipeline items exactly once (O(N)), avoiding redundant processing.
+            foreach ($record in $records)
+            {
+                if (-not $record.ID)
+                {
+                    Write-PSFMessage -Level Warning -Message "Skipping record: missing ID field"
+                    continue
+                }
+
+                if ($seenIds.Add($record.ID))
+                {
+                    $uniqueRecords.Add($record)
+                }
+            }
+
             # Create dynamic table schema
             if ($uniqueRecords.Count -eq 0)
             {
