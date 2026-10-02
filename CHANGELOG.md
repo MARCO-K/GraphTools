@@ -7,32 +7,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-### Changed
-
-- **Performance Optimization (`Get-GTRiskyAppPermissionReport`)**:
-  - Replaced N+1 individual synchronous user queries with bulk batch resolution via `Invoke-GTGraphBatch` for delegated permission grants, reducing roundtrips by up to ~95%.
-  - Improved error status mapping during batch resolution to only classify HTTP 404 responses as deleted users while correctly falling back to `Unknown` for authorization (403) or transient (500) failures.
-
-## [0.27.0] - 2026-10-01
-
-### Added
-
-- **OAuth Attack Surface & Consent Phishing Audit (`Get-GTAppConsentReport`, `docs/Get-GTAppConsentReport.md`)**:
-  - Implemented `Get-GTAppConsentReport` to audit delegated permission grants (`oauth2PermissionGrants`), correlating them with Service Principal metadata (`verifiedPublisher`, `appOwnerOrganizationId`, `replyUrls`) and consenting user identities.
-  - Added detection of illicit consent grants and OAuth phishing attacks targeting regular users (`ConsentType = 'Principal'`) with high-privilege scopes (`Mail.ReadWrite`, `Files.ReadWrite.All`).
-  - Added multi-tier risk classification engine (`Critical`, `High`, `Medium`, `Low`) based on curated threat profiles and Microsoft DevX metadata.
-  - Added `-Summary` KPI switch emitting aggregated tenant consent metrics (`TotalGrantsScanned`, `TotalAppsScanned`, `CriticalCount`, `HighCount`, `UnverifiedAppsCount`, `ThirdPartyAppsCount`, `UserConsentedCount`).
-  - Added `-TimeoutSeconds` parameter enforcing socket deadlines across all REST calls, applied via universal `-TimeoutSec` parameter binding across Windows PowerShell 5.1 and all PowerShell 7.x releases.
-  - Enforced strict input length bounds (`[ValidateLength]`) and collection size constraints (`[ValidateCount]`) across all parameters to mitigate DoS and buffer expansion risks.
-  - Added sanitized user-facing error reporting with zero sensitive token or internal URL leakage, routing forensic diagnostics to debug/verbose logging.
-  - Added comprehensive technical documentation in `docs/Get-GTAppConsentReport.md`.
-  - Added state-isolated Pester v5 test suite in `tests/Get-GTAppConsentReport.Tests.ps1`.
-
-### Changed
-
-- **REST Invoker Timeout Guardrail (`Invoke-GTGraphRequest`, `Invoke-GTGraphPagedRequest`)**:
-  - Added `-TimeoutSeconds` (default: 30s) to `Invoke-GTGraphRequest` and `Invoke-GTGraphPagedRequest` to prevent thread hangs on stalled network connections.
-
 ## [0.26.0] - 2026-10-01
 
 ### Added
@@ -653,8 +627,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
-[Unreleased]: https://github.com/MARCO-K/GraphTools/compare/v0.27.0...main
-[0.27.0]: https://github.com/MARCO-K/GraphTools/compare/v0.26.0...v0.27.0
+[Unreleased]: https://github.com/MARCO-K/GraphTools/compare/v0.26.0...main
 [0.26.0]: https://github.com/MARCO-K/GraphTools/compare/v0.25.0...v0.26.0
 [0.25.0]: https://github.com/MARCO-K/GraphTools/compare/v0.24.1...v0.25.0
 [0.24.1]: https://github.com/MARCO-K/GraphTools/compare/v0.24.0...v0.24.1

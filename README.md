@@ -115,7 +115,6 @@ Respond to security incidents with purpose-built cmdlets:
 | `Get-GTPolicyControlGapReport` | Analyze Conditional Access policies for security gaps |
 | `Get-GTBreakGlassPolicyReport` | Audit CA policies against emergency access accounts |
 | `Get-GTRiskyAppPermissionReport` | Audit Service Principals for high-risk permissions and Tier-0 attack vectors |
-| [`Get-GTAppConsentReport`](docs/Get-GTAppConsentReport.md) | Audit OAuth 2.0 delegated permission grants, illicit consent, and unverified third-party app attack surface |
 | `Get-GTLegacyAuthReport` | Identify Legacy Authentication usage in sign-in logs |
 | `Get-GTAdminCountReport` | Analyze administrative roles with member counts and risk tiers |
 | `Update-GTRiskyPermissionData` | Update local offline Microsoft Graph DevX permissions metadata |

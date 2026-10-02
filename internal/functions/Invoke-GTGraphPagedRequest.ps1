@@ -24,11 +24,8 @@ function Invoke-GTGraphPagedRequest
         [Parameter(Mandatory = $true)]
         [string]$Uri,
 
-        [hashtable]$Headers,
-
-        # Security Guardrail: Timeout limit forwarded to the underlying REST engine
-        [int]$TimeoutSeconds = 30
+        [hashtable]$Headers
     )
 
-    return (Invoke-GTGraphRequest -Uri $Uri -Headers $Headers -TimeoutSeconds $TimeoutSeconds -All)
+    return (Invoke-GTGraphRequest -Uri $Uri -Headers $Headers -All)
 }
