@@ -29,7 +29,7 @@ Describe "Get-GTInactiveUser" {
                 return [PSCustomObject]@{ value = @($script:CurrentUsers) }
             }
 
-            if ($Uri -like '*/directoryRoles/*/members*') {
+            if ($Uri -like '*/directoryRoles/*/members*' -or $Uri -like '*/directoryRoles(roleTemplateId*') {
                 return [PSCustomObject]@{
                     value = @(
                         [PSCustomObject]@{ id = 'id-admin'; userPrincipalName = 'admin@contoso.com' }
@@ -51,6 +51,8 @@ Describe "Get-GTInactiveUser" {
         . "$PSScriptRoot/../internal/functions/Format-ODataDateTime.ps1"
         . "$PSScriptRoot/../internal/functions/Invoke-GTGraphPagedRequest.ps1"
         . "$PSScriptRoot/../internal/functions/Get-UTCTime.ps1"
+
+        . "$PSScriptRoot/../internal/functions/Get-GTGraphHttpStatus.ps1"
 
         # Dot-source the function under test
         . "$PSScriptRoot/../functions/Get-GTInactiveUser.ps1"
@@ -162,6 +164,45 @@ Describe "Get-GTInactiveUser" {
             $result = Get-GTInactiveUser -ExcludeGlobalAdministrators
             $result.UserPrincipalName | Should -Not -Contain 'admin@contoso.com'
             $result.UserPrincipalName | Should -Contain 'user@contoso.com'
+        }
+
+        It "handles 404 gracefully when Global Administrator role is not activated in tenant" {
+            Mock -CommandName Invoke-GTGraphRequest -MockWith {
+                param($Method, $Uri, $Body, $ContentType, $ErrorAction, [switch]$All)
+                if ($Uri -like '*users*') {
+                    if ($All) {
+                        return @($script:CurrentUsers)
+                    }
+                    return [PSCustomObject]@{ value = @($script:CurrentUsers) }
+                }
+                if ($Uri -like '*/directoryRoles(roleTemplateId*') {
+                    $ex = New-Object System.Management.Automation.MethodInvocationException "404 Not Found"
+                    $ex.Data.Add('StatusCode', 404)
+                    $errRecord = New-Object System.Management.Automation.ErrorRecord $ex, "404", "NotSpecified", $null
+                    throw $errRecord
+                }
+                return [PSCustomObject]@{ value = @() }
+            }
+
+            # Should not throw exception
+            $result = Get-GTInactiveUser -ExcludeGlobalAdministrators
+            $result.UserPrincipalName | Should -Contain 'user@contoso.com'
+            $result.UserPrincipalName | Should -Contain 'admin@contoso.com'
+        }
+
+        It "throws exception on non-404 Graph API errors during role resolution" {
+            Mock -CommandName Invoke-GTGraphRequest -MockWith {
+                if ($Uri -like '*/directoryRoles(roleTemplateId*') {
+                    $ex = New-Object System.Management.Automation.MethodInvocationException "500 Internal Server Error"
+                    $ex.Data.Add('StatusCode', 500)
+                    $errRecord = New-Object System.Management.Automation.ErrorRecord $ex, "500", "NotSpecified", $null
+                    throw $errRecord
+                }
+                return [PSCustomObject]@{ value = @() }
+            }
+
+            # The catch block re-throws, which is caught by the outer catch in Get-GTInactiveUser which outputs a Write-Error
+            { Get-GTInactiveUser -ExcludeGlobalAdministrators -ErrorAction Stop } | Should -Throw
         }
     }
 

@@ -116,20 +116,15 @@ function Get-GTInactiveUser
             if ($ExcludeGlobalAdministrators)
             {
                 $globalAdminTemplateId = '62e90394-69f5-4237-9190-012177145e10'
-                $encodedRoleFilter = [System.Uri]::EscapeDataString("roleTemplateId eq '$globalAdminTemplateId'")
-                $directoryRoleUri = "/v1.0/directoryRoles?`$filter=$encodedRoleFilter"
-                $directoryRoleResponse = Invoke-GTGraphRequest -Method GET -Uri $directoryRoleUri -ErrorAction Stop
-                $globalAdminRole = $null
-                if ($directoryRoleResponse -and $directoryRoleResponse.value)
-                {
-                    $globalAdminRole = $directoryRoleResponse.value | Select-Object -First 1
-                }
 
-                if ($globalAdminRole -and $globalAdminRole.id)
+                # Query directory role members directly by roleTemplateId to avoid preliminary role lookup
+                $membersUri = "/v1.0/directoryRoles(roleTemplateId='$globalAdminTemplateId')/members?`$select=id,userPrincipalName"
+
+                try
                 {
-                    $membersUri = "/v1.0/directoryRoles/$($globalAdminRole.id)/members?`$select=id,userPrincipalName"
                     $membersResponse = Invoke-GTGraphRequest -Method GET -Uri $membersUri -ErrorAction Stop
                     $roleMembers = if ($membersResponse -and $membersResponse.value) { $membersResponse.value } else { @() }
+
                     foreach ($member in $roleMembers)
                     {
                         if ($member.id)
@@ -144,9 +139,18 @@ function Get-GTInactiveUser
 
                     Write-PSFMessage -Level Verbose -Message "Excluding $($excludedGlobalAdminIds.Count) Global Administrator member(s) from results."
                 }
-                else
+                catch
                 {
-                    Write-PSFMessage -Level Verbose -Message 'Global Administrator role not active in tenant. No role-based exclusions applied.'
+                    $statusCode = Get-GTGraphHttpStatus -Exception $_.Exception
+                    if ($statusCode -eq 404)
+                    {
+                        # HTTP 404 indicates the directory role has not been activated/instantiated in the tenant yet.
+                        Write-PSFMessage -Level Verbose -Message 'Global Administrator role not active in tenant. No role-based exclusions applied.'
+                    }
+                    else
+                    {
+                        throw
+                    }
                 }
             }
 
