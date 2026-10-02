@@ -395,6 +395,46 @@ function Get-GTRiskyAppPermissionReport
                     $grants = Invoke-GTGraphPagedRequest -Uri "v1.0/oauth2PermissionGrants?`$filter=resourceId eq '$($graphSp.id)'"
                 }
 
+                # Performance Optimization: Batch resolution of userPrincipalNames
+                $unknownPrincipalIds = [System.Collections.Generic.HashSet[string]]::new([System.StringComparer]::OrdinalIgnoreCase)
+                foreach ($grant in $grants)
+                {
+                    if ($grant.principalId -and $grant.consentType -ne 'AllPrincipals' -and -not $UserCache.ContainsKey($grant.principalId))
+                    {
+                        [void]$unknownPrincipalIds.Add($grant.principalId)
+                    }
+                }
+
+                if ($unknownPrincipalIds.Count -gt 0)
+                {
+                    Write-PSFMessage -Level Verbose -Message "Batch resolving $($unknownPrincipalIds.Count) user principal IDs..."
+                    $batchRequests = [System.Collections.Generic.List[hashtable]]::new()
+                    foreach ($principalId in $unknownPrincipalIds)
+                    {
+                        $batchRequests.Add(@{
+                            id  = $principalId
+                            url = "v1.0/users/$principalId`?`$select=userPrincipalName"
+                        })
+                    }
+
+                    $batchResponses = Invoke-GTGraphBatch -Requests $batchRequests
+                    foreach ($resp in $batchResponses)
+                    {
+                        if ($resp.Status -eq 200 -and $resp.Body.userPrincipalName)
+                        {
+                            $UserCache[$resp.Id] = $resp.Body.userPrincipalName
+                        }
+                        elseif ($resp.Status -eq 404)
+                        {
+                            $UserCache[$resp.Id] = "Deleted User ($($resp.Id))"
+                        }
+                        else
+                        {
+                            $UserCache[$resp.Id] = "Unknown"
+                        }
+                    }
+                }
+
                 foreach ($grant in $grants)
                 {
                     $grantedScopes = $grant.scope -split ' '
@@ -447,15 +487,7 @@ function Get-GTRiskyAppPermissionReport
                                     $grantedBy = "Administrator"
                                 }
                                 elseif ($grant.principalId) {
-                                    if (-not $UserCache.ContainsKey($grant.principalId)) {
-                                        try {
-                                            $uResp = Invoke-GTGraphRequest -Method GET -Uri "v1.0/users/$($grant.principalId)?`$select=userPrincipalName" -ErrorAction SilentlyContinue
-                                            $UserCache[$grant.principalId] = if ($uResp) { $uResp.userPrincipalName } else { "Deleted User ($($grant.principalId))" }
-                                        } catch {
-                                            $UserCache[$grant.principalId] = "Unknown"
-                                        }
-                                    }
-                                    $grantedBy = $UserCache[$grant.principalId]
+                                    $grantedBy = if ($UserCache.ContainsKey($grant.principalId)) { $UserCache[$grant.principalId] } else { "Unknown" }
                                 }
 
                                 $report.Add([PSCustomObject]@{

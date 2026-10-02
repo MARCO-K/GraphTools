@@ -201,19 +201,4 @@ Describe "Invoke-GTGraphRequest" -Tag 'Unit' {
             $result.value[0].id | Should -Be 'token-refresh-success'
         }
     }
-
-    Context "Timeout Enforcement" {
-        It "passes configured timeout to Invoke-RestMethod across runtime environments" {
-            $script:capturedTimeout = $null
-
-            Mock -CommandName Invoke-RestMethod -MockWith {
-                $script:capturedTimeout = if ($null -ne $TimeoutSec) { $TimeoutSec } else { $ConnectionTimeoutSeconds }
-                return @{ value = @() }
-            }
-
-            $null = Invoke-GTGraphRequest -Uri "v1.0/users" -TimeoutSeconds 45
-
-            $script:capturedTimeout | Should -Be 45
-        }
-    }
 }

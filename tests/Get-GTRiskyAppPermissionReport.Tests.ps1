@@ -8,12 +8,17 @@ Describe "Get-GTRiskyAppPermissionReport" {
         function global:Invoke-GTGraphPagedRequest { param($Uri, $Headers) return @() }
         function global:Invoke-GTGraphRequest { param($Method, $Uri, $Body, $ContentType, $ErrorAction, [switch]$All) return $null }
         function global:Get-GTGraphErrorDetails { param($Exception, $ResourceType) return [PSCustomObject]@{ LogLevel = 'Error'; Reason = 'Error'; ErrorMessage = 'Error' } }
+        function global:Invoke-GTGraphBatch { param($Requests, $BatchSize, $MaxSubrequestRetries, $RetryBaseDelaySeconds) return @() }
 
         $helperPath = "$PSScriptRoot/../internal/functions/Get-GTPermissionDefinition.ps1"
         if (Test-Path $helperPath) { . $helperPath } else { Throw "Helper not found: $helperPath" }
 
         $functionPath = "$PSScriptRoot/../functions/Get-GTRiskyAppPermissionReport.ps1"
         if (Test-Path $functionPath) { . $functionPath } else { Throw "Function not found: $functionPath" }
+    }
+
+    AfterAll {
+        Remove-Item Function:\global:Invoke-GTGraphBatch -Force -ErrorAction SilentlyContinue
     }
 
     Context "Parameter Validation" {
@@ -522,10 +527,17 @@ Describe "Get-GTRiskyAppPermissionReport" {
                         value = @([PSCustomObject]@{ id = "graph-sp-id"; appRoles = @() })
                     }
                 }
-                if ($Uri -like "*v1.0/users/*") {
-                    return [PSCustomObject]@{ userPrincipalName = "victim@contoso.com" }
-                }
                 return $null
+            }
+            Mock -CommandName "Invoke-GTGraphBatch" -MockWith {
+                param($Requests)
+                return @(
+                    [PSCustomObject]@{
+                        Id = "user-id-123"
+                        Status = 200
+                        Body = [PSCustomObject]@{ userPrincipalName = "victim@contoso.com" }
+                    }
+                )
             }
             Mock -CommandName "Invoke-GTGraphPagedRequest" -MockWith {
                 param($Uri, $Headers)
@@ -559,6 +571,109 @@ Describe "Get-GTRiskyAppPermissionReport" {
             $result.RiskScore | Should -Be 8
             $result.RiskLevel | Should -Be "High"
             $result.Type | Should -Match "Specific User"
+            $result.GrantedBy | Should -Be "victim@contoso.com"
+        }
+
+        It "should map 404 response to Deleted User in batch cache" {
+            Mock -CommandName "Invoke-GTGraphRequest" -MockWith {
+                param($Method, $Uri, $ErrorAction)
+                if ($Uri -like "*00000003-0000-0000-c000-000000000000*") {
+                    return [PSCustomObject]@{
+                        value = @([PSCustomObject]@{ id = "graph-sp-id"; appRoles = @() })
+                    }
+                }
+                return $null
+            }
+            Mock -CommandName "Invoke-GTGraphBatch" -MockWith {
+                param($Requests)
+                return @(
+                    [PSCustomObject]@{
+                        Id = "deleted-user-id"
+                        Status = 404
+                        Body = $null
+                    }
+                )
+            }
+            Mock -CommandName "Invoke-GTGraphPagedRequest" -MockWith {
+                param($Uri, $Headers)
+                if ($Uri -like "*servicePrincipals*") {
+                    return @(
+                        [PSCustomObject]@{
+                            id = "sp-delegated-del"
+                            appId = "app-delegated-del"
+                            displayName = "Delegated App Del"
+                            signInActivity = $null
+                        }
+                    )
+                }
+                if ($Uri -like "*oauth2PermissionGrants*") {
+                    return @(
+                        [PSCustomObject]@{
+                            clientId = "sp-delegated-del"
+                            scope = "Directory.ReadWrite.All"
+                            consentType = "Principal"
+                            startTime = (Get-Date)
+                            principalId = "deleted-user-id"
+                        }
+                    )
+                }
+                return @()
+            }
+
+            $result = Get-GTRiskyAppPermissionReport -PermissionType Delegated
+            $result | Should -Not -BeNullOrEmpty
+            $result.GrantedBy | Should -Be "Deleted User (deleted-user-id)"
+        }
+
+        It "should map other non-success statuses to Unknown in batch cache" {
+            Mock -CommandName "Invoke-GTGraphRequest" -MockWith {
+                param($Method, $Uri, $ErrorAction)
+                if ($Uri -like "*00000003-0000-0000-c000-000000000000*") {
+                    return [PSCustomObject]@{
+                        value = @([PSCustomObject]@{ id = "graph-sp-id"; appRoles = @() })
+                    }
+                }
+                return $null
+            }
+            Mock -CommandName "Invoke-GTGraphBatch" -MockWith {
+                param($Requests)
+                return @(
+                    [PSCustomObject]@{
+                        Id = "unknown-error-id"
+                        Status = 500
+                        Body = $null
+                    }
+                )
+            }
+            Mock -CommandName "Invoke-GTGraphPagedRequest" -MockWith {
+                param($Uri, $Headers)
+                if ($Uri -like "*servicePrincipals*") {
+                    return @(
+                        [PSCustomObject]@{
+                            id = "sp-delegated-err"
+                            appId = "app-delegated-err"
+                            displayName = "Delegated App Err"
+                            signInActivity = $null
+                        }
+                    )
+                }
+                if ($Uri -like "*oauth2PermissionGrants*") {
+                    return @(
+                        [PSCustomObject]@{
+                            clientId = "sp-delegated-err"
+                            scope = "Directory.ReadWrite.All"
+                            consentType = "Principal"
+                            startTime = (Get-Date)
+                            principalId = "unknown-error-id"
+                        }
+                    )
+                }
+                return @()
+            }
+
+            $result = Get-GTRiskyAppPermissionReport -PermissionType Delegated
+            $result | Should -Not -BeNullOrEmpty
+            $result.GrantedBy | Should -Be "Unknown"
         }
 
         It "should infer High risk for unmapped *.Manage.All scope via regex heuristics" {
