@@ -5,7 +5,7 @@ function Save-GTPersistedTokenCache
         Securely persists an OAuth 2.0 refresh token to disk using DPAPI encryption.
     .DESCRIPTION
         Stores the refresh token and metadata in the user's LocalApplicationData folder.
-        On Windows, payload is encrypted using Windows Data Protection API (DPAPI) via SecureString.
+        On Windows, payload is encrypted using Windows Data Protection API (DPAPI) via ProtectedData.
         On non-Windows, directory and file permissions are restricted to user-only (0700/0600).
         Short-lived access tokens are strictly excluded and never written to disk.
     .PARAMETER TenantId
@@ -21,7 +21,6 @@ function Save-GTPersistedTokenCache
     .OUTPUTS
         [bool] Returns $true on successful persistence.
     #>
-    [Diagnostics.CodeAnalysis.SuppressMessageAttribute('PSAvoidUsingConvertToSecureStringWithPlainText', '', Justification = 'Payload is in memory and must be converted to SecureString to encrypt with DPAPI via ConvertFrom-SecureString.')]
     [CmdletBinding()]
     [OutputType([bool])]
     param(
@@ -69,8 +68,11 @@ function Save-GTPersistedTokenCache
     $entry = $null
     if ($onWindows)
     {
-        $secureString = ConvertTo-SecureString -String $payloadJson -AsPlainText -Force
-        $encryptedString = ConvertFrom-SecureString -SecureString $secureString
+        Add-Type -AssemblyName System.Security
+        $payloadBytes = [System.Text.Encoding]::UTF8.GetBytes($payloadJson)
+        $encryptedBytes = [System.Security.Cryptography.ProtectedData]::Protect($payloadBytes, $null, [System.Security.Cryptography.DataProtectionScope]::CurrentUser)
+        $encryptedString = [Convert]::ToBase64String($encryptedBytes)
+
         $entry = [ordered]@{
             encrypted = $true
             data      = $encryptedString
