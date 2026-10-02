@@ -51,8 +51,16 @@ function Get-GTPersistedTokenCache
 
         if ($entry.encrypted)
         {
-            $secureString = ConvertTo-SecureString -String $entry.data
-            $payloadJson = [System.Net.NetworkCredential]::new('', $secureString).Password
+            $onWindows = [System.Environment]::OSVersion.Platform -eq [System.PlatformID]::Win32NT
+            if (-not $onWindows)
+            {
+                return $null
+            }
+
+            Add-Type -AssemblyName System.Security
+            $encryptedBytes = [Convert]::FromBase64String($entry.data)
+            $payloadBytes = [System.Security.Cryptography.ProtectedData]::Unprotect($encryptedBytes, $null, [System.Security.Cryptography.DataProtectionScope]::CurrentUser)
+            $payloadJson = [System.Text.Encoding]::UTF8.GetString($payloadBytes)
         }
         else
         {

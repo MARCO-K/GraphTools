@@ -21,7 +21,6 @@ function Save-GTPersistedTokenCache
     .OUTPUTS
         [bool] Returns $true on successful persistence.
     #>
-    [Diagnostics.CodeAnalysis.SuppressMessageAttribute('PSAvoidUsingConvertToSecureStringWithPlainText', '', Justification = 'Payload is in memory and must be converted to SecureString to encrypt with DPAPI via ConvertFrom-SecureString.')]
     [CmdletBinding()]
     [OutputType([bool])]
     param(
@@ -69,8 +68,11 @@ function Save-GTPersistedTokenCache
     $entry = $null
     if ($onWindows)
     {
-        $secureString = ConvertTo-SecureString -String $payloadJson -AsPlainText -Force
-        $encryptedString = ConvertFrom-SecureString -SecureString $secureString
+        Add-Type -AssemblyName System.Security
+        $payloadBytes = [System.Text.Encoding]::UTF8.GetBytes($payloadJson)
+        $encryptedBytes = [System.Security.Cryptography.ProtectedData]::Protect($payloadBytes, $null, [System.Security.Cryptography.DataProtectionScope]::CurrentUser)
+        $encryptedString = [Convert]::ToBase64String($encryptedBytes)
+
         $entry = [ordered]@{
             encrypted = $true
             data      = $encryptedString
