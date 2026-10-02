@@ -1,0 +1,3 @@
+## 2026-10-02 - Avoid Array Concatenation in PowerShell
+**Learning:** Using `+=` to accumulate items in an array inside loops (like a `process` block iterating over pipeline items) causes an O(N²) performance degradation because PowerShell creates a new array and copies all elements every time.
+**Action:** Replace `$array = @()` and `$array += $item` with `$list = [System.Collections.Generic.List[object]]::new()` and `$list.Add($item)`.
