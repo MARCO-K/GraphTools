@@ -117,7 +117,7 @@ function Get-GTInactiveUser
             {
                 $globalAdminTemplateId = '62e90394-69f5-4237-9190-012177145e10'
 
-                # Query directory role members directly by roleTemplateId to avoid preliminary role lookup
+                # Bolt Optimization: Query directory role members directly by roleTemplateId to eliminate the preliminary role ID lookup request.
                 $membersUri = "/v1.0/directoryRoles(roleTemplateId='$globalAdminTemplateId')/members?`$select=id,userPrincipalName"
 
                 try
