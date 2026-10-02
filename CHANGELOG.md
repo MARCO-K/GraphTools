@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- Added new tests to increase coverage for `Get-GTConnection` in `Get-GTConnection.Tests.ps1`.
+
 ## [0.27.0] - 2026-10-01
 
 ### Added
