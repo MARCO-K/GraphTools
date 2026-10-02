@@ -50,44 +50,91 @@ function Remove-GTPIMRoleEligibility
 
         if ($roleEligibilitySchedules)
         {
+            # Bolt Optimization: Replaced N+1 individual DELETE requests with chunked JSON batching via Invoke-GTGraphBatch
+            $batchRequests = [System.Collections.Generic.List[hashtable]]::new()
+            $processedSchedules = [System.Collections.Generic.List[object]]::new()
+
             foreach ($schedule in $roleEligibilitySchedules)
             {
                 $action = 'RemovePIMRoleEligibility'
-                $output = $OutputBase + @{
-                    ResourceName = $schedule.roleDefinition.displayName
-                    ResourceType = 'PIMRoleEligibility'
-                    ResourceId   = $schedule.id
-                    Action       = $action
+                if ($PSCmdlet.ShouldProcess($schedule.roleDefinition.displayName, $action))
+                {
+                    Write-PSFMessage -Level Verbose -Message "Queueing PIM role eligibility $($schedule.roleDefinition.displayName) removal for user $($User.UserPrincipalName)"
+                    $batchRequests.Add(@{
+                        id     = $schedule.id
+                        method = 'DELETE'
+                        url    = "beta/roleManagement/directory/roleEligibilitySchedules/$($schedule.id)"
+                    })
+                    $processedSchedules.Add($schedule)
                 }
+            }
 
+            if ($batchRequests.Count -gt 0)
+            {
+                $batchResponses = $null
                 try
                 {
-                    if ($PSCmdlet.ShouldProcess($schedule.roleDefinition.displayName, $action))
-                    {
-                        Write-PSFMessage -Level Verbose -Message "Removing PIM role eligibility $($schedule.roleDefinition.displayName) from user $($User.UserPrincipalName)"
-                        Invoke-GTGraphRequest -Method DELETE -Uri "beta/roleManagement/directory/roleEligibilitySchedules/$($schedule.id)" -ErrorAction Stop
-                        $output['Status'] = 'Success'
-                    }
+                    $batchResponses = Invoke-GTGraphBatch -Requests $batchRequests -ErrorAction Stop
                 }
                 catch
                 {
-                    # Use centralized error handling helper to parse Graph API exceptions
-                    $errorDetails = Get-GTGraphErrorDetails -Exception $_.Exception -ResourceType 'resource'
-                    
-                    # Log appropriate message based on error details
-                    if ($errorDetails.HttpStatus -in 404, 403) {
-                        Write-PSFMessage -Level $errorDetails.LogLevel -Message "Failed to remove PIM role eligibility $($schedule.roleDefinition.displayName) from user $($User.UserPrincipalName) - $($errorDetails.Reason)"
-                        Write-PSFMessage -Level Debug -Message "Detailed error ($($errorDetails.HttpStatus)): $($errorDetails.ErrorMessage)"
+                    $err = Get-GTGraphErrorDetails -Exception $_.Exception -ResourceType 'resource'
+                    Write-PSFMessage -Level $err.LogLevel -Message "Batch request failed: $($err.Reason)"
+
+                    foreach ($schedule in $processedSchedules)
+                    {
+                        $output = $OutputBase + @{
+                            ResourceName = $schedule.roleDefinition.displayName
+                            ResourceType = 'PIMRoleEligibility'
+                            ResourceId   = $schedule.id
+                            Action       = 'RemovePIMRoleEligibility'
+                            Status       = "Failed: $($err.Reason)"
+                        }
+                        $Results.Add([PSCustomObject]$output)
                     }
-                    elseif ($errorDetails.HttpStatus) {
-                        Write-PSFMessage -Level $errorDetails.LogLevel -Message "Failed to remove PIM role eligibility $($schedule.roleDefinition.displayName) from user $($User.UserPrincipalName) - $($errorDetails.Reason)"
-                    }
-                    else {
-                        Write-PSFMessage -Level Error -Message "Failed to remove PIM role eligibility $($schedule.roleDefinition.displayName) from user $($User.UserPrincipalName). $($errorDetails.ErrorMessage)"
-                    }
-                    $output['Status'] = "Failed: $($errorDetails.Reason)"
+                    return
                 }
-                $Results.Add([PSCustomObject]$output)
+
+                $responseLookup = @{}
+                if ($batchResponses)
+                {
+                    foreach ($resp in $batchResponses)
+                    {
+                        $responseLookup[$resp.Id] = $resp
+                    }
+                }
+
+                foreach ($schedule in $processedSchedules)
+                {
+                    $output = $OutputBase + @{
+                        ResourceName = $schedule.roleDefinition.displayName
+                        ResourceType = 'PIMRoleEligibility'
+                        ResourceId   = $schedule.id
+                        Action       = 'RemovePIMRoleEligibility'
+                    }
+
+                    if ($responseLookup.ContainsKey($schedule.id))
+                    {
+                        $resp = $responseLookup[$schedule.id]
+                        if ($resp.Status -in 200, 204)
+                        {
+                            Write-PSFMessage -Level Verbose -Message "Successfully removed PIM role eligibility $($schedule.roleDefinition.displayName) from user $($User.UserPrincipalName)"
+                            $output['Status'] = 'Success'
+                        }
+                        else
+                        {
+                            $reason = if ($resp.Body -and $resp.Body.error -and $resp.Body.error.message) { $resp.Body.error.message } else { "Batch subrequest returned HTTP $($resp.Status)" }
+                            Write-PSFMessage -Level Warning -Message "Failed to remove PIM role eligibility $($schedule.roleDefinition.displayName) from user $($User.UserPrincipalName) - $reason"
+                            $output['Status'] = "Failed: $reason"
+                        }
+                    }
+                    else
+                    {
+                        Write-PSFMessage -Level Error -Message "Failed to remove PIM role eligibility $($schedule.roleDefinition.displayName) from user $($User.UserPrincipalName) - Missing from batch response"
+                        $output['Status'] = 'Failed: Batch response missing'
+                    }
+                    $Results.Add([PSCustomObject]$output)
+                }
             }
         }
         else
