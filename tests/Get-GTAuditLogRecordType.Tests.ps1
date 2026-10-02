@@ -42,7 +42,7 @@ Describe "Get-GTAuditLogRecordType" {
                 }
             }
 
-            $result = Get-GTAuditLogRecordType
+            $result = @(Get-GTAuditLogRecordType)
             $result.Count | Should -Be 2
             $result[0].Name | Should -Be 'ExchangeAdmin'
             $result[0].Value | Should -Be '1'
@@ -69,7 +69,7 @@ Describe "Get-GTAuditLogRecordType" {
                 }
             }
 
-            $result = Get-GTAuditLogRecordTypes
+            $result = @(Get-GTAuditLogRecordTypes)
             $result.Count | Should -Be 1
             $result[0].Name | Should -Be 'AzureActiveDirectory'
         }
