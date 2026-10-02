@@ -53,7 +53,7 @@ function Import-DuckDBRecords
     {
         Write-PSFMessage -Level Verbose -Message "Starting import to table $TableName"
         # Initialize collection to hold records if processing multiple pipeline items
-        $records = @()
+        $records = [System.Collections.Generic.List[object]]::new()
 
         # Create output directory and connect to DB based on parameter set
         if ($PSCmdlet.ParameterSetName -eq 'newDB')
@@ -71,6 +71,7 @@ function Import-DuckDBRecords
         else
         {
             Write-PSFMessage -Level Verbose -Message "Using existing DuckDB connection"
+            $conn = $DBConn
         }
 
         # Initialize duplicate tracking
@@ -80,39 +81,37 @@ function Import-DuckDBRecords
 
     process
     {
-        if ($null -ne $InputObject)
-        {
-            # For single object input, add to records collection
-            $records += $InputObject
-            Write-PSFMessage -Level Verbose -Message "Added records to processing queue: $($records.count)"
-        }
-        else
+        if ($null -eq $InputObject)
         {
             Write-PSFMessage -Level Error -Message "Received null input object"
             throw "Null input object"
         }
 
 
-        # Process records and deduplicate
-        foreach ($record in $Records)
-        {
-            if (-not $record.ID)
-            {
-                Write-PSFMessage -Level Warning -Message "Skipping record: missing ID field"
-                continue
-            }
-
-            if ($seenIds.Add($record.ID))
-            {
-                $uniqueRecords.Add($record)
-            }
-        }
+        # Add records to processing queue
+        $records.AddRange(@($InputObject))
+        Write-PSFMessage -Level Verbose -Message "Added records to processing queue: $($records.count)"
     }
 
     end
     {
         try
         {
+            # Process records and deduplicate
+            foreach ($record in $records)
+            {
+                if (-not $record.ID)
+                {
+                    Write-PSFMessage -Level Warning -Message "Skipping record: missing ID field"
+                    continue
+                }
+
+                if ($seenIds.Add($record.ID))
+                {
+                    $uniqueRecords.Add($record)
+                }
+            }
+
             # Create dynamic table schema
             if ($uniqueRecords.Count -eq 0)
             {
@@ -195,7 +194,7 @@ INSERT INTO $TableName VALUES ($($values -join ', '))
         }
         finally
         {
-            if ($conn) { $conn.Close() }
+            if ($PSCmdlet.ParameterSetName -eq 'newDB' -and $conn) { $conn.Close() }
             Write-PSFMessage -Level Verbose -Message "Database connection closed"
         }
     }

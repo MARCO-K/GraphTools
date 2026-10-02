@@ -9,6 +9,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- **Performance Optimization (`Import-DuckDBRecords`)**:
+  - Replaced pipeline array concatenation (`+=`) with `[System.Collections.Generic.List[object]]` accumulation and moved dataset deduplication from the iterative `process` block into the `end` block to ensure single-pass $\mathcal{O}(N)$ processing.
+  - Fixed database connection management in `Import-DuckDBRecords` to preserve caller-provided `DBConn` instances upon completion.
 - **Performance Optimization (Generic List Accumulators)**:
   - Replaced inefficient array concatenation (`+=`) in iterative loops with `[System.Collections.Generic.List[T]]` in `Disable-GTUser`, `Get-GTBreakGlassPolicyReport`, `Get-GTInactiveUser`, and `Expand-GTNestedProperties`, reducing array reallocation complexity from $\mathcal{O}(N^2)$ to $\mathcal{O}(N)$.
 - **Performance Optimization (`Get-GTRiskyAppPermissionReport`)**:
