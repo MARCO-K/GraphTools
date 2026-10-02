@@ -1,6 +1,5 @@
 function Get-GTIpInfo
 {
-    [Alias('Get-Ipinfo')]
     <#
     .SYNOPSIS
     Retrieves IP information from IP addresses using the IPInfo API.
@@ -26,6 +25,7 @@ function Get-GTIpInfo
     #>
 
     [CmdletBinding()]
+    [Alias('Get-Ipinfo')]
     [OutputType([PSCustomObject])]
     param (
         [Parameter(Mandatory = $true, ValueFromPipeline = $true, ValueFromPipelineByPropertyName = $true)]

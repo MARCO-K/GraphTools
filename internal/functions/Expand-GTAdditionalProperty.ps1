@@ -1,6 +1,5 @@
 function Expand-GTAdditionalProperty
 {
-    [Alias('Expand-GTAdditionalProperties')]
     <#
     .SYNOPSIS
     Expands the 'AdditionalProperties' hash property to the main object (flattens object).
@@ -22,6 +21,7 @@ function Expand-GTAdditionalProperty
     Get-MgDirectoryObjectById -ids 8ec67d38-82df-4683-b286-4896a73b8a6a | Expand-GTAdditionalProperty -Force
     #>
     [CmdletBinding()]
+    [Alias('Expand-GTAdditionalProperties')]
     [OutputType([object])]
     param(
         [Parameter(ValueFromPipeline = $true, Mandatory = $true)]

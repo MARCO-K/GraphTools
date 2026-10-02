@@ -1,6 +1,5 @@
 function Get-GTUtcTime
 {
-    [Alias('Get-UTCTime')]
     <#
     .SYNOPSIS
     Gets the current UTC time as a DateTime object.
@@ -21,6 +20,7 @@ function Get-GTUtcTime
     Introduced in version 0.14.2 to standardize UTC time retrieval.
     Used by multiple internal and public module functions.
     #>
+    [Alias('Get-UTCTime')]
     [OutputType([DateTime])]
     param()
 

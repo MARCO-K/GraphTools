@@ -1,6 +1,5 @@
 function Get-GTUnusedApp
 {
-    [Alias('Get-GTUnusedApps')]
     <#
     .SYNOPSIS
     Identifies Service Principals that have not had any sign-ins for a specified period.
@@ -31,6 +30,7 @@ function Get-GTUnusedApp
     Slower. Finds inactive apps AND apps that have never logged in.
     #>
     [CmdletBinding()]
+    [Alias('Get-GTUnusedApps')]
     [OutputType([PSCustomObject])]
     param(
         [Parameter(Mandatory = $true)]

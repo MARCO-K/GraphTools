@@ -1,6 +1,5 @@
 function Test-GTGraphScope
 {
-    [Alias('Test-GTGraphScopes')]
     <#
     .SYNOPSIS
     Validates Microsoft Graph authentication context and required permissions
@@ -24,6 +23,7 @@ function Test-GTGraphScope
     Test-GTGraphScope -RequiredScopes "Directory.Read.All" -Quiet
     #>
     [CmdletBinding()]
+    [Alias('Test-GTGraphScopes')]
     param(
         [Parameter(Mandatory)]
         [string[]]$RequiredScopes,

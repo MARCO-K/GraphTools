@@ -1,6 +1,5 @@
 function Open-GTJsonFile
 {
-    [Alias('Open-JsonFile')]
     <#
     .SYNOPSIS
     Opens and parses JSON files with validation and error handling
@@ -18,6 +17,7 @@ function Open-GTJsonFile
     Open-GTJsonFile -InputObject "C:\data\settings.json"
     #>
     [CmdletBinding(SupportsShouldProcess, ConfirmImpact = 'Low')]
+    [Alias('Open-JsonFile')]
     [OutputType([PSCustomObject])]
     param(
         [Parameter(Mandatory, ValueFromPipeline)]

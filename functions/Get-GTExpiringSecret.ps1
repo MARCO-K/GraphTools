@@ -1,6 +1,5 @@
 function Get-GTExpiringSecret
 {
-    [Alias('Get-GTExpiringSecrets')]
     <#
     .SYNOPSIS
     Scans Applications and Service Principals for expired and expiring credentials with impact analysis.
@@ -60,6 +59,7 @@ function Get-GTExpiringSecret
     Audits all already-expired credentials across applications to identify unrotated technical debt.
     #>
     [CmdletBinding(DefaultParameterSetName = 'Default')]
+    [Alias('Get-GTExpiringSecrets')]
     [OutputType([PSCustomObject])]
     param(
         [Parameter(ParameterSetName = 'Legacy', Position = 0)]

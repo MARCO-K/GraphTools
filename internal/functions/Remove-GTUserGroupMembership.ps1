@@ -1,6 +1,5 @@
 function Remove-GTUserGroupMembership
 {
-    [Alias('Remove-GTUserGroupMemberships')]
     <#
     .SYNOPSIS
         Removes user from all group memberships
@@ -24,6 +23,7 @@ function Remove-GTUserGroupMembership
         Removes the user from all group memberships and adds results to the collection
     #>
     [CmdletBinding(SupportsShouldProcess)]
+    [Alias('Remove-GTUserGroupMemberships')]
     param(
         [Parameter(Mandatory = $true, ValueFromPipeline = $true)]
         [ValidateNotNullOrEmpty()]

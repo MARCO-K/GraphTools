@@ -1,6 +1,5 @@
 function Remove-GTUserLicense
 {
-    [Alias('Remove-GTUserLicenses')]
     <#
     .SYNOPSIS
         Removes all licenses from a user
@@ -27,6 +26,7 @@ function Remove-GTUserLicense
         Removes all licenses from the user and adds results to the collection
     #>
     [CmdletBinding(SupportsShouldProcess)]
+    [Alias('Remove-GTUserLicenses')]
     param(
         [Parameter(Mandatory = $true, ValueFromPipeline = $true)]
         [ValidateNotNullOrEmpty()]

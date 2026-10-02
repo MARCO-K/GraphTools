@@ -1,6 +1,5 @@
 function Remove-GTUserRoleAssignment
 {
-    [Alias('Remove-GTUserRoleAssignments')]
     <#
     .SYNOPSIS
         Removes all directory role assignments from a user (privileged roles)
@@ -22,6 +21,7 @@ function Remove-GTUserRoleAssignment
         Removes all directory role assignments from the user and adds results to the collection
     #>
     [CmdletBinding(SupportsShouldProcess)]
+    [Alias('Remove-GTUserRoleAssignments')]
     param(
         [Parameter(Mandatory = $true, ValueFromPipeline = $true)]
         [ValidateNotNullOrEmpty()]

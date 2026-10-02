@@ -1,6 +1,5 @@
 function Format-GTODataDateTime
 {
-    [Alias('Format-ODataDateTime')]
     <#
     .SYNOPSIS
     Formats a DateTime object to the ISO 8601 format required for Microsoft Graph OData filters.
@@ -20,6 +19,7 @@ function Format-GTODataDateTime
     .OUTPUTS
     [string]
     #>
+    [Alias('Format-ODataDateTime')]
     [OutputType([string])]
     param (
         [Parameter(Mandatory = $true)]

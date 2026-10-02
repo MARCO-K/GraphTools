@@ -1,6 +1,5 @@
 function Remove-GTUserServicePrincipalOwnership
 {
-    [Alias('Remove-GTUserServicePrincipalOwnerships')]
     <#
     .SYNOPSIS
         Removes user from service principal ownerships
@@ -27,6 +26,7 @@ function Remove-GTUserServicePrincipalOwnership
         Removes the user from service principal ownerships and adds results to the collection
     #>
     [CmdletBinding(SupportsShouldProcess)]
+    [Alias('Remove-GTUserServicePrincipalOwnerships')]
     param(
         [Parameter(Mandatory = $true, ValueFromPipeline = $true)]
         [ValidateNotNullOrEmpty()]

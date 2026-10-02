@@ -1,6 +1,5 @@
 function Remove-GTUserDelegatedPermissionGrant
 {
-    [Alias('Remove-GTUserDelegatedPermissionGrants')]
     <#
     .SYNOPSIS
         Removes OAuth2 delegated permission grants for a user
@@ -24,6 +23,7 @@ function Remove-GTUserDelegatedPermissionGrant
         Removes all OAuth2 permission grants (delegated permissions) for the specified user
     #>
     [CmdletBinding(SupportsShouldProcess)]
+    [Alias('Remove-GTUserDelegatedPermissionGrants')]
     param(
         [Parameter(Mandatory = $true, ValueFromPipeline = $true)]
         [ValidateNotNullOrEmpty()]

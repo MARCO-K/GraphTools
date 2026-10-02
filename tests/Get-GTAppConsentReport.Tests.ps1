@@ -26,7 +26,8 @@ Describe "Get-GTAppConsentReport" -Tag 'Unit' {
         Remove-Item Function:\Invoke-GTGraphRequest -Force -ErrorAction SilentlyContinue
         Remove-Item Function:\Format-ODataDateTime -Force -ErrorAction SilentlyContinue
         Remove-Item Function:\Get-GTConnection -Force -ErrorAction SilentlyContinue
-        Remove-Item Function:\Get-UTCTime -Force -ErrorAction SilentlyContinue
+        Remove-Item Function:\Get-GTUtcTime -Force -ErrorAction SilentlyContinue
+        Remove-Item Alias:\Get-UTCTime -Force -ErrorAction SilentlyContinue
         Remove-Item Function:\Get-GTPermissionDefinition -Force -ErrorAction SilentlyContinue
     }
 

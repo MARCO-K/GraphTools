@@ -1,6 +1,5 @@
 function Remove-GTUserAccessPackageAssignment
 {
-    [Alias('Remove-GTUserAccessPackageAssignments')]
     <#
     .SYNOPSIS
         Removes user's active access package assignments
@@ -26,6 +25,7 @@ function Remove-GTUserAccessPackageAssignment
         Removes all delivered access package assignments for the specified user
     #>
     [CmdletBinding(SupportsShouldProcess)]
+    [Alias('Remove-GTUserAccessPackageAssignments')]
     param(
         [Parameter(Mandatory = $true, ValueFromPipeline = $true)]
         [ValidateNotNullOrEmpty()]

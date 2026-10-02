@@ -1,6 +1,5 @@
 function Remove-GTUserAdministrativeUnitMembership
 {
-    [Alias('Remove-GTUserAdministrativeUnitMemberships')]
     <#
     .SYNOPSIS
         Removes user from all administrative unit memberships
@@ -23,6 +22,7 @@ function Remove-GTUserAdministrativeUnitMembership
         Removes the user from all administrative unit memberships and adds results to the collection
     #>
     [CmdletBinding(SupportsShouldProcess)]
+    [Alias('Remove-GTUserAdministrativeUnitMemberships')]
     param(
         [Parameter(Mandatory = $true, ValueFromPipeline = $true)]
         [ValidateNotNullOrEmpty()]

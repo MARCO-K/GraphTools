@@ -1,6 +1,5 @@
 function Remove-GTUserGroupOwnership
 {
-    [Alias('Remove-GTUserGroupOwnerships')]
     <#
     .SYNOPSIS
         Removes user from all group ownerships
@@ -27,6 +26,7 @@ function Remove-GTUserGroupOwnership
         Removes the user from all group ownerships and adds results to the collection
     #>
     [CmdletBinding(SupportsShouldProcess)]
+    [Alias('Remove-GTUserGroupOwnerships')]
     param(
         [Parameter(Mandatory = $true, ValueFromPipeline = $true)]
         [ValidateNotNullOrEmpty()]

@@ -440,6 +440,7 @@ Describe "Get-GTM365LicenseOverview" {
     AfterAll {
         Remove-Item Function:\Get-GTM365LicenseOverview -Force -ErrorAction SilentlyContinue
         Remove-Item Alias:\Get-M365LicenseOverview -Force -ErrorAction SilentlyContinue
-        Remove-Item Function:\Format-ODataDateTime -Force -ErrorAction SilentlyContinue
+        Remove-Item Function:\Format-GTODataDateTime -Force -ErrorAction SilentlyContinue
+        Remove-Item Alias:\Format-ODataDateTime -Force -ErrorAction SilentlyContinue
     }
 }

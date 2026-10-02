@@ -1,5 +1,4 @@
 function Remove-GTExpiredInvite {
-    [Alias('Remove-GTExpiredInvites')]
     <#
     .SYNOPSIS
     Removes guest users who have not accepted their invitation within a specified timeframe.
@@ -25,6 +24,7 @@ function Remove-GTExpiredInvite {
     Requires Microsoft Graph connection with User.ReadWrite.All permission.
     #>
     [CmdletBinding(SupportsShouldProcess, ConfirmImpact = 'High')]
+    [Alias('Remove-GTExpiredInvites')]
     param(
         [Parameter(Mandatory = $true)]
         [int]$DaysOlderThan,

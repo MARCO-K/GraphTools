@@ -1,6 +1,5 @@
 function Get-GTTokenClaim
 {
-    [Alias('Get-GTTokenClaims')]
     <#
     .SYNOPSIS
         Decodes a JWT access token payload without external dependencies.
@@ -16,6 +15,7 @@ function Get-GTTokenClaim
         $roles = $claims.roles
     #>
     [CmdletBinding()]
+    [Alias('Get-GTTokenClaims')]
     [OutputType([PSCustomObject])]
     param(
         [Parameter(Mandatory = $true)]

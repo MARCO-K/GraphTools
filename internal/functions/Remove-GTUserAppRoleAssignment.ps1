@@ -1,6 +1,5 @@
 function Remove-GTUserAppRoleAssignment
 {
-    [Alias('Remove-GTUserAppRoleAssignments')]
     <#
     .SYNOPSIS
         Removes all app role assignments from a user
@@ -22,6 +21,7 @@ function Remove-GTUserAppRoleAssignment
         Removes all app role assignments from the user and adds results to the collection
     #>
     [CmdletBinding(SupportsShouldProcess)]
+    [Alias('Remove-GTUserAppRoleAssignments')]
     param(
         [Parameter(Mandatory = $true, ValueFromPipeline = $true)]
         [ValidateNotNullOrEmpty()]

@@ -1,6 +1,5 @@
 function Get-GTMissingScope
 {
-    [Alias('Get-GTMissingScopes')]
     <#
     .SYNOPSIS
     Compares required scopes against current scopes to find missing permissions
@@ -23,6 +22,7 @@ function Get-GTMissingScope
     This function normalizes all scope names to lowercase for comparison.
     #>
     [CmdletBinding()]
+    [Alias('Get-GTMissingScopes')]
     param(
         [Parameter(Mandatory)]
         [string[]]$RequiredScopes,
