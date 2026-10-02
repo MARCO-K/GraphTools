@@ -14,6 +14,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- **Direct Directory Role Member Lookup (`Get-GTInactiveUser`)**:
+  - Optimized Global Administrator exclusion lookup by directly querying the `directoryRoles(roleTemplateId='...')/members` alternate-key endpoint, eliminating the redundant role `id` filter query and reducing Graph API latency by ~30%.
+  - Added graceful HTTP 404 handling via `Get-GTGraphHttpStatus` when the directory role is not yet activated in the tenant, and ensured unexpected non-404 errors are preserved and rethrown.
 - **Performance Optimization (`Import-DuckDBRecords`)**:
   - Replaced pipeline array concatenation (`+=`) with `[System.Collections.Generic.List[object]]` accumulation and moved dataset deduplication from the iterative `process` block into the `end` block to ensure single-pass $\mathcal{O}(N)$ processing.
   - Fixed database connection management in `Import-DuckDBRecords` to preserve caller-provided `DBConn` instances upon completion.

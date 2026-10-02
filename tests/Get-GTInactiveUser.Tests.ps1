@@ -51,6 +51,7 @@ Describe "Get-GTInactiveUser" {
         . "$PSScriptRoot/../internal/functions/Format-ODataDateTime.ps1"
         . "$PSScriptRoot/../internal/functions/Invoke-GTGraphPagedRequest.ps1"
         . "$PSScriptRoot/../internal/functions/Get-UTCTime.ps1"
+        . "$PSScriptRoot/../internal/functions/Get-GTGraphHttpStatus.ps1"
 
         # Dot-source the function under test
         . "$PSScriptRoot/../functions/Get-GTInactiveUser.ps1"
@@ -162,6 +163,47 @@ Describe "Get-GTInactiveUser" {
             $result = Get-GTInactiveUser -ExcludeGlobalAdministrators
             $result.UserPrincipalName | Should -Not -Contain 'admin@contoso.com'
             $result.UserPrincipalName | Should -Contain 'user@contoso.com'
+        }
+
+        It "handles 404 response gracefully when Global Administrator role is not activated in tenant" {
+            Mock -CommandName Invoke-GTGraphRequest -MockWith {
+                param($Method, $Uri, $Body, $ContentType, $ErrorAction, [switch]$All)
+
+                if ($Uri -like '*users*') {
+                    $script:LastUsersRequestUri = [string]$Uri
+                    if ($All) { return @($script:CurrentUsers) }
+                    return [PSCustomObject]@{ value = @($script:CurrentUsers) }
+                }
+
+                if ($Uri -like '*/directoryRoles*') {
+                    throw [System.Exception]::new("404 Not Found")
+                }
+
+                return [PSCustomObject]@{ value = @() }
+            }
+
+            $result = Get-GTInactiveUser -ExcludeGlobalAdministrators
+            $result.UserPrincipalName | Should -Contain 'admin@contoso.com'
+            $result.UserPrincipalName | Should -Contain 'user@contoso.com'
+        }
+
+        It "rethrows unexpected non-404 errors during directory role lookup" {
+            Mock -CommandName Invoke-GTGraphRequest -MockWith {
+                param($Method, $Uri, $Body, $ContentType, $ErrorAction, [switch]$All)
+
+                if ($Uri -like '*users*') {
+                    if ($All) { return @($script:CurrentUsers) }
+                    return [PSCustomObject]@{ value = @($script:CurrentUsers) }
+                }
+
+                if ($Uri -like '*/directoryRoles*') {
+                    throw [System.Exception]::new("500 Internal Server Error")
+                }
+
+                return [PSCustomObject]@{ value = @() }
+            }
+
+            { Get-GTInactiveUser -ExcludeGlobalAdministrators -ErrorAction Stop } | Should -Throw "*Failed to resolve Global Administrator membership for exclusion: 500 Internal Server Error*"
         }
     }
 
