@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.28.0] - 2026-10-02
+
 ### Added
 
 - **Connection State Unit Test Suite (`tests/Get-GTConnection.Tests.ps1`)**:
@@ -719,7 +721,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
-[Unreleased]: https://github.com/MARCO-K/GraphTools/compare/v0.27.0...main
+[Unreleased]: https://github.com/MARCO-K/GraphTools/compare/v0.28.0...main
+[0.28.0]: https://github.com/MARCO-K/GraphTools/compare/v0.27.0...v0.28.0
 [0.27.0]: https://github.com/MARCO-K/GraphTools/compare/v0.26.0...v0.27.0
 [0.26.0]: https://github.com/MARCO-K/GraphTools/compare/v0.25.0...v0.26.0
 [0.25.0]: https://github.com/MARCO-K/GraphTools/compare/v0.24.1...v0.25.0
