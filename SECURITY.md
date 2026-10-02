@@ -10,8 +10,8 @@ Security patches and bug fixes are provided for the latest minor version release
 
 | Version | Supported          | Runtime Environment | Notes |
 | :--- | :---: | :--- | :--- |
-| **0.26.x** | :white_check_mark: | Windows PowerShell 5.1, PowerShell 7.x | Current stable release line |
-| **< 0.26.0** | :x: | Any | Deprecated. Please upgrade to latest. |
+| **0.27.x** | :white_check_mark: | Windows PowerShell 5.1, PowerShell 7.x | Current stable release line |
+| **< 0.27.0** | :x: | Any | Deprecated. Please upgrade to latest. |
 
 ---
 

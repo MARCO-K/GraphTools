@@ -81,7 +81,10 @@ function Invoke-GTGraphRequest
 
         [string]$Token,
 
-        [switch]$Raw
+        [switch]$Raw,
+
+        # Security Guardrail: Timeout limit in seconds to prevent unhandled socket/thread hangs
+        [int]$TimeoutSeconds = 30
     )
 
     if (-not (Get-Command -Name Get-GTGraphHttpStatus -ErrorAction SilentlyContinue))
@@ -175,6 +178,13 @@ function Invoke-GTGraphRequest
                 {
                     $restParams['Body']        = $serializedBody
                     $restParams['ContentType'] = $ContentType
+                }
+
+                # Security Guardrail: Enforce API request timeout to prevent socket exhaustion and hanging worker threads.
+                # TimeoutSec is natively supported in Windows PowerShell 5.1 and is an alias for ConnectionTimeoutSeconds across all PowerShell 7.x releases.
+                if ($TimeoutSeconds -gt 0)
+                {
+                    $restParams['TimeoutSec'] = $TimeoutSeconds
                 }
 
                 $response = Invoke-RestMethod @restParams

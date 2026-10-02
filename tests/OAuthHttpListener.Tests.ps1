@@ -2,6 +2,8 @@ if (-not (Get-Command Write-PSFMessage -ErrorAction SilentlyContinue)) { functio
 
 Describe "OAuth HttpListener & PKCE" -Tag 'Unit' {
     BeforeAll {
+        Add-Type -AssemblyName System.Net.Http -ErrorAction SilentlyContinue
+
         $helperPath = Join-Path $PSScriptRoot '..\internal\functions\Invoke-GTOAuthHttpListener.ps1'
         if (Test-Path $helperPath) { . $helperPath }
 

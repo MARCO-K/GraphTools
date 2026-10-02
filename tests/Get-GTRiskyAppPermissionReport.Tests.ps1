@@ -151,6 +151,21 @@ Describe "Get-GTRiskyAppPermissionReport" {
                 return $null
             }
 
+            Mock -CommandName "Invoke-GTGraphBatch" -MockWith {
+                param($Requests)
+                $results = @()
+                foreach ($req in $Requests) {
+                    if ($req.url -like "*users/*") {
+                        $results += [PSCustomObject]@{
+                            Id     = $req.id
+                            Status = 200
+                            Body   = [PSCustomObject]@{ userPrincipalName = "user@contoso.com" }
+                        }
+                    }
+                }
+                return $results
+            }
+
             Mock -CommandName "Invoke-GTGraphPagedRequest" -MockWith {
                 param($Uri, $Headers)
                 if ($Uri -like "*servicePrincipals*") {
