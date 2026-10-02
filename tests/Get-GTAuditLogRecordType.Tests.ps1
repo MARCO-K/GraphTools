@@ -1,4 +1,8 @@
 BeforeAll {
+    if (-not (Get-Command Write-PSFMessage -ErrorAction SilentlyContinue)) {
+        function global:Write-PSFMessage { param($Level, $Message, $ErrorRecord) }
+    }
+
     $functionPath = "$PSScriptRoot/../internal/functions/Get-GTAuditLogRecordType.ps1"
     . $functionPath
 }
@@ -6,6 +10,7 @@ BeforeAll {
 AfterAll {
     Remove-Item Function:\Get-GTAuditLogRecordType -Force -ErrorAction SilentlyContinue
     Remove-Item Alias:\Get-GTAuditLogRecordTypes -Force -ErrorAction SilentlyContinue
+    Remove-Item Function:\global:Write-PSFMessage -Force -ErrorAction SilentlyContinue
 }
 
 Describe "Get-GTAuditLogRecordType" {
