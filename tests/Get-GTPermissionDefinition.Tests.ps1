@@ -29,7 +29,7 @@ Describe "Get-GTPermissionDefinition" {
 
     Context "Custom Permissions File" {
         BeforeAll {
-            $testTempFile = Join-Path ([System.IO.Path]::GetTempPath()) "test-permissions-$(Get-Random).json"
+            $testTempFile = Join-Path ([System.IO.Path]::GetTempPath()) "test-permissions-$([guid]::NewGuid().ToString().Substring(0, 8)).json"
             @{
                 "Custom.Perm.One" = @{
                     appPrivilegeLevel = 4
