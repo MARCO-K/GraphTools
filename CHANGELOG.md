@@ -9,6 +9,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- **Performance Optimization (Generic List Accumulators)**:
+  - Replaced inefficient array concatenation (`+=`) in iterative loops with `[System.Collections.Generic.List[T]]` in `Disable-GTUser`, `Get-GTBreakGlassPolicyReport`, `Get-GTInactiveUser`, and `Expand-GTNestedProperties`, reducing array reallocation complexity from $\mathcal{O}(N^2)$ to $\mathcal{O}(N)$.
 - **Performance Optimization (`Get-GTRiskyAppPermissionReport`)**:
   - Replaced N+1 individual synchronous user queries with bulk batch resolution via `Invoke-GTGraphBatch` for delegated permission grants, reducing roundtrips by up to ~95%.
   - Improved error status mapping during batch resolution to only classify HTTP 404 responses as deleted users while correctly falling back to `Unknown` for authorization (403) or transient (500) failures.

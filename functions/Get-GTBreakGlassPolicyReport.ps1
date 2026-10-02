@@ -54,17 +54,17 @@ function Get-GTBreakGlassPolicyReport
 
         # 3. Resolve UPNs to IDs
         Write-PSFMessage -Level Verbose -Message "Resolving Break Glass UPNs to Object IDs..."
-        $bgAccounts = @()
+        $bgAccounts = [System.Collections.Generic.List[psobject]]::new()
         
         foreach ($upn in $BreakGlassUpn)
         {
             try
             {
                 $resp = Invoke-GTGraphRequest -Method GET -Uri "v1.0/users/$($upn)?`$select=id,userPrincipalName" -ErrorAction Stop
-                $bgAccounts += [PSCustomObject]@{
+                $bgAccounts.Add([PSCustomObject]@{
                     Id  = $resp.id
                     Upn = $resp.userPrincipalName
-                }
+                })
                 Write-PSFMessage -Level Verbose -Message "Resolved $upn to $($resp.id)"
             }
             catch
