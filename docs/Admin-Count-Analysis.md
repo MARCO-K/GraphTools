@@ -187,13 +187,13 @@ The function includes comprehensive error handling:
 ```powershell
 # Combine with user analysis
 $adminUsers = Get-GTAdminCountReport -ShowMembers | Select-Object -ExpandProperty Members | Where-Object { $_.Type -eq 'User' }
-$adminUsers.UserPrincipalName | Get-MFAReport
+$adminUsers.UserPrincipalName | Get-GTMFAReport
 
 # Check for inactive administrators
-$adminUsers.UserPrincipalName | Get-GTInactiveUsers -InactiveDaysOlderThan 90
+$adminUsers.UserPrincipalName | Get-GTInactiveUser -InactiveDaysOlderThan 90
 
 # Audit recent role changes
-Invoke-AuditLogQuery -Operations 'Add member to role', 'Remove member from role' -StartDays 30
+Invoke-GTAuditLogQuery -Operations 'Add member to role', 'Remove member from role' -StartDays 30
 ```
 
 ## Output Examples
@@ -256,4 +256,4 @@ Get-MgDirectoryRole -Filter "displayName eq 'Global Administrator'"
 - `Get-GTPIMRoleReport`: Analyze Privileged Identity Management role assignments
 - `Get-GTConditionalAccessPolicyReport`: Review Conditional Access policies
 - `Get-GTBreakGlassPolicyReport`: Audit emergency access accounts
-- `Remove-GTUserEntitlements`: Remove administrative role assignments
+- `Remove-GTUserEntitlement`: Remove administrative role assignments

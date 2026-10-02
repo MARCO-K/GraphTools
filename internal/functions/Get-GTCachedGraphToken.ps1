@@ -171,17 +171,17 @@ function Get-GTCachedGraphToken
             [string]$RefreshToken
         )
 
-        $claims = if (Get-Command Get-GTTokenClaims -ErrorAction SilentlyContinue)
+        $claims = if (Get-Command Get-GTTokenClaim -ErrorAction SilentlyContinue)
         {
-            Get-GTTokenClaims -Token $Token
+            Get-GTTokenClaim -Token $Token
         }
         else
         {
-            $claimsFile = Join-Path $PSScriptRoot 'Get-GTTokenClaims.ps1'
+            $claimsFile = Join-Path $PSScriptRoot 'Get-GTTokenClaim.ps1'
             if (Test-Path $claimsFile)
             {
                 . $claimsFile
-                Get-GTTokenClaims -Token $Token
+                Get-GTTokenClaim -Token $Token
             }
             else
             {

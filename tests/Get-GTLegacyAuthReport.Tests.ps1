@@ -6,7 +6,7 @@ if (-not (Get-Command Write-PSFMessage -ErrorAction SilentlyContinue)) { functio
 if (-not (Get-Command Get-GTGraphErrorDetails -ErrorAction SilentlyContinue)) { function Get-GTGraphErrorDetails { param($Exception, $ResourceType) return @{ LogLevel = 'Error'; Reason = 'Mock Error'; ErrorMessage = 'Mock Error Message' } } }
 if (-not (Get-Command Get-UTCTime -ErrorAction SilentlyContinue)) { function Get-UTCTime { return [DateTime]::UtcNow } }
 if (-not (Get-Command Format-ODataDateTime -ErrorAction SilentlyContinue)) {
-    $formatDateFile = "$PSScriptRoot/../internal/functions/Format-ODataDateTime.ps1"
+    $formatDateFile = "$PSScriptRoot/../internal/functions/Format-GTODataDateTime.ps1"
     if (Test-Path $formatDateFile) { . $formatDateFile }
 }
 
@@ -25,7 +25,7 @@ Describe "Get-GTLegacyAuthReport" {
         function global:Get-UTCTime { return [DateTime]::UtcNow }
         function global:Invoke-GTGraphPagedRequest { param($Uri, [switch]$All) return @() }
 
-        $formatDateFile = "$PSScriptRoot/../internal/functions/Format-ODataDateTime.ps1"
+        $formatDateFile = "$PSScriptRoot/../internal/functions/Format-GTODataDateTime.ps1"
         if (Test-Path $formatDateFile) { . $formatDateFile }
 
         $script:GTValidationRegex = @{

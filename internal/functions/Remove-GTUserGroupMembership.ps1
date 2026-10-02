@@ -1,0 +1,77 @@
+function Remove-GTUserGroupMembership
+{
+    <#
+    .SYNOPSIS
+        Removes user from all group memberships
+    .DESCRIPTION
+        Removes the user from all group memberships (excluding dynamic groups which cannot be manually managed).
+        This is typically used during offboarding or security incident response to revoke access granted through group membership.
+        
+        This is an internal helper function used by Remove-GTUserEntitlement.
+    .PARAMETER User
+        The user object (must have Id and UserPrincipalName properties)
+    .PARAMETER OutputBase
+        Base output object for logging
+    .PARAMETER Results
+        Results collection to add output to
+    .EXAMPLE
+        $user = Get-MgBetaUser -UserId 'user@contoso.com'
+        $outputBase = @{ UserPrincipalName = $user.UserPrincipalName }
+        $results = [System.Collections.Generic.List[PSObject]]::new()
+        Remove-GTUserGroupMembership -User $user -OutputBase $outputBase -Results $results
+        
+        Removes the user from all group memberships and adds results to the collection
+    #>
+    [CmdletBinding(SupportsShouldProcess)]
+    [Alias('Remove-GTUserGroupMemberships')]
+    param(
+        [Parameter(Mandatory = $true, ValueFromPipeline = $true)]
+        [ValidateNotNullOrEmpty()]
+        [ValidateScript({ Test-GTUserObject -User $_ })]
+        [object]$User,
+        [Parameter(Mandatory = $true)]
+        [hashtable]$OutputBase,
+        [Parameter(Mandatory = $true)]
+        [System.Collections.Generic.List[PSObject]]$Results
+    )
+
+    $Groups = Invoke-GTGraphPagedRequest -Uri "v1.0/users/$($User.Id)/transitiveMemberOf/microsoft.graph.group?`$select=id,displayName,groupTypes" | Where-Object { $_.groupTypes -ne 'DynamicMembership' }
+    foreach ($Group in $Groups)
+    {
+        $action = 'RemoveGroupMembership'
+        $output = $OutputBase + @{
+            ResourceName = $Group.displayName
+            ResourceType = 'Group'
+            ResourceId   = $Group.id
+            Action       = $action
+        }
+
+        try
+        {
+            if ($PSCmdlet.ShouldProcess($Group.DisplayName, $action))
+            {
+                Write-PSFMessage -Level Verbose -Message "Removing user $($User.UserPrincipalName) from group $($Group.displayName)"
+                Invoke-GTGraphRequest -Method DELETE -Uri "v1.0/groups/$($Group.id)/members/$($User.Id)/`$ref" -ErrorAction Stop
+                $output['Status'] = 'Success'
+            }
+        }
+        catch
+        {
+            # Use centralized error handling helper to parse Graph API exceptions
+            $errorDetails = Get-GTGraphErrorDetails -Exception $_.Exception -ResourceType 'resource'
+            
+            # Log appropriate message based on error details
+            if ($errorDetails.HttpStatus) {
+                Write-PSFMessage -Level $errorDetails.LogLevel -Message "Failed to remove user $($User.UserPrincipalName) from group $($Group.DisplayName). $($errorDetails.Reason)"
+                if ($errorDetails.HttpStatus -in 404, 403) {
+                    Write-PSFMessage -Level Debug -Message "Detailed error ($($errorDetails.HttpStatus)): $($errorDetails.ErrorMessage)"
+                }
+            }
+            else {
+                Write-PSFMessage -Level Error -Message "Failed to remove user $($User.UserPrincipalName) from group $($Group.DisplayName). $($errorDetails.ErrorMessage)"
+            }
+            $output['Status'] = "Failed: $($errorDetails.Reason)"
+        }
+        $Results.Add([PSCustomObject]$output)
+    }
+}

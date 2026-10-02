@@ -70,7 +70,7 @@ Respond to security incidents with purpose-built cmdlets:
 | `Disable-GTUser` | Block account sign-ins | Prevent unauthorized access |
 | `Reset-GTUserPassword` | Force password reset | Terminate CAE-enabled sessions |
 | `Disable-GTUserDevice` | Disable registered devices | Block device-based access |
-| `Remove-GTUserEntitlements` | Remove access rights | Complete privilege revocation |
+| `Remove-GTUserEntitlement` | Remove access rights | Complete privilege revocation |
 
 ### Identity & Access Management
 
@@ -100,17 +100,17 @@ Respond to security incidents with purpose-built cmdlets:
 
 | Function | Description |
 | ---------- | ------------- |
-| `Get-MFAReport` | MFA registration status and authentication methods |
-| `Get-M365LicenseOverview` | License and service plan utilization |
-| `Invoke-AuditLogQuery` | Query unified audit logs with filtering |
-| `Get-GTInactiveUsers` | Identify dormant accounts by last sign-in |
+| `Get-GTMFAReport` | MFA registration status and authentication methods |
+| `Get-GTM365LicenseOverview` | License and service plan utilization |
+| `Invoke-GTAuditLogQuery` | Query unified audit logs with filtering |
+| `Get-GTInactiveUser` | Identify dormant accounts by last sign-in |
 | `Get-GTRecentUser` | Find recently created user accounts |
 | `Get-GTOrphanedServicePrincipal` | Identify orphaned or insecure Service Principals |
 | `Get-GTGuestUserReport` | Report on guest users and invitation status |
-| `Remove-GTExpiredInvites` | Remove expired pending guest invitations |
-| [`Get-GTExpiringSecrets`](docs/Get-GTExpiringSecrets.md) | Audit expired & expiring credentials with Single Point of Failure (SPOF) impact analysis |
-| `Get-GTUnusedApps` | Identify unused Service Principals |
-| `Get-GTInactiveDevices` | Identify inactive devices |
+| `Remove-GTExpiredInvite` | Remove expired pending guest invitations |
+| [`Get-GTExpiringSecret`](docs/Get-GTExpiringSecret.md) | Audit expired & expiring credentials with Single Point of Failure (SPOF) impact analysis |
+| `Get-GTUnusedApp` | Identify unused Service Principals |
+| `Get-GTInactiveDevice` | Identify inactive devices |
 | `Get-GTPIMRoleReport` | Report on eligible and active PIM role assignments |
 | `Get-GTPolicyControlGapReport` | Analyze Conditional Access policies for security gaps |
 | `Get-GTBreakGlassPolicyReport` | Audit CA policies against emergency access accounts |
@@ -194,10 +194,10 @@ Get-GTConnection
 
 ```powershell
 # Get users without MFA (excluding guests)
-Get-MFAReport -UsersWithoutMFA -NoGuestUser
+Get-GTMFAReport -UsersWithoutMFA -NoGuestUser
 
 # Check specific users
-'user1@contoso.com', 'user2@contoso.com' | Get-MFAReport
+'user1@contoso.com', 'user2@contoso.com' | Get-GTMFAReport
 ```
 
 #### Find Inactive Accounts
@@ -220,10 +220,10 @@ Get-GTInactiveUser -DisabledUsersOnly -ExternalUsersOnly
 
 ```powershell
 # All licenses for a user
-Get-M365LicenseOverview -FilterUser 'john.doe@contoso.com'
+Get-GTM365LicenseOverview -FilterUser 'john.doe@contoso.com'
 
 # Filter by license SKU
-Get-M365LicenseOverview -FilterLicenseSKU 'ENTERPRISEPACK'
+Get-GTM365LicenseOverview -FilterLicenseSKU 'ENTERPRISEPACK'
 ```
 
 ## 🚨 Security Incident Response
@@ -260,7 +260,7 @@ Reset-GTUserPassword -UPN $compromisedUser
 Disable-GTUserDevice -UPN $compromisedUser
 
 # Step 5: Remove all entitlements
-Remove-GTUserEntitlements -UserUPNs $compromisedUser -removeAll
+Remove-GTUserEntitlement -UserUPNs $compromisedUser -removeAll
 ```
 
 ### Selective Entitlement Removal
@@ -269,12 +269,12 @@ Remove specific privileges while maintaining basic access:
 
 ```powershell
 # Remove groups and licenses only
-Remove-GTUserEntitlements -UserUPNs 'user@contoso.com' `
+Remove-GTUserEntitlement -UserUPNs 'user@contoso.com' `
     -removeGroups `
     -removeLicenses
 
 # Remove privileged access (including PIM eligibilities)
-Remove-GTUserEntitlements -UserUPNs 'admin@contoso.com' `
+Remove-GTUserEntitlement -UserUPNs 'admin@contoso.com' `
     -removeRoleAssignments `
     -removePIMRoleEligibility `
     -removeAdministrativeUnitMemberships `
@@ -299,7 +299,7 @@ $compromisedAccounts | Reset-GTUserPassword
 $compromisedAccounts | Disable-GTUserDevice
 
 # Or use pipeline for entitlements
-$compromisedAccounts | Remove-GTUserEntitlements -removeAll
+$compromisedAccounts | Remove-GTUserEntitlement -removeAll
 ```
 
 ## 📊 Reporting & Analysis
@@ -308,39 +308,39 @@ $compromisedAccounts | Remove-GTUserEntitlements -removeAll
 
 ```powershell
 # Admins with MFA status
-Get-MFAReport -AdminsOnly -MarkMethods
+Get-GTMFAReport -AdminsOnly -MarkMethods
 
 # Users without MFA registration
-Get-MFAReport -UsersWithoutMFA -NoGuestUser
+Get-GTMFAReport -UsersWithoutMFA -NoGuestUser
 
 # Users capable of MFA
-Get-MFAReport -MFACapable
+Get-GTMFAReport -MFACapable
 ```
 
 ### Audit Log Queries
 
 ```powershell
 # File deletions in the last 7 days
-Invoke-AuditLogQuery -Operations 'FileDeleted'
+Invoke-GTAuditLogQuery -Operations 'FileDeleted'
 
 # Specific user activity over 30 days
-Invoke-AuditLogQuery -UserIds 'admin@contoso.com' -StartDays 30
+Invoke-GTAuditLogQuery -UserIds 'admin@contoso.com' -StartDays 30
 
 # Filter by source IP address
-Invoke-AuditLogQuery -IpAddresses '192.168.1.100' -StartDays 14
+Invoke-GTAuditLogQuery -IpAddresses '192.168.1.100' -StartDays 14
 ```
 
 ### License Reporting
 
 ```powershell
 # Service plan details for a user
-Get-M365LicenseOverview -FilterUser 'john@contoso.com'
+Get-GTM365LicenseOverview -FilterUser 'john@contoso.com'
 
 # Users with Exchange licenses
-Get-M365LicenseOverview -FilterServicePlan 'EXCHANGE'
+Get-GTM365LicenseOverview -FilterServicePlan 'EXCHANGE'
 
 # Inactive users with licenses
-Get-M365LicenseOverview -FilterUser 'user@contoso.com' -LastLogin 90
+Get-GTM365LicenseOverview -FilterUser 'user@contoso.com' -LastLogin 90
 ```
 
 ### Administrative Role Analysis
@@ -555,24 +555,24 @@ All user-supplied parameters are validated before being used in API calls or fil
 
 ```powershell
 # UPN validation: Must be valid email format
-Invoke-AuditLogQuery -UserIds 'user@contoso.com'  # ✅ Valid
-Invoke-AuditLogQuery -UserIds 'invalid-user'      # ❌ Blocked
+Invoke-GTAuditLogQuery -UserIds 'user@contoso.com'  # ✅ Valid
+Invoke-GTAuditLogQuery -UserIds 'invalid-user'      # ❌ Blocked
 ```
 
 #### Operations and Record Types
 
 ```powershell
 # Operations/RecordType: Alphanumeric, hyphens, underscores only
-Invoke-AuditLogQuery -Operations 'FileDeleted','User_Logon'  # ✅ Valid
-Invoke-AuditLogQuery -Operations "File'; DROP TABLE--"       # ❌ Blocked: Injection attempt
+Invoke-GTAuditLogQuery -Operations 'FileDeleted','User_Logon'  # ✅ Valid
+Invoke-GTAuditLogQuery -Operations "File'; DROP TABLE--"       # ❌ Blocked: Injection attempt
 ```
 
 #### Properties
 
 ```powershell
 # Properties: Alphanumeric, dots (for nested properties), underscores only
-Invoke-AuditLogQuery -Properties 'Id','UserId','auditData.property'  # ✅ Valid
-Invoke-AuditLogQuery -Properties "property' OR '1'='1"               # ❌ Blocked: Injection attempt
+Invoke-GTAuditLogQuery -Properties 'Id','UserId','auditData.property'  # ✅ Valid
+Invoke-GTAuditLogQuery -Properties "property' OR '1'='1"               # ❌ Blocked: Injection attempt
 ```
 
 #### GUID Validation
@@ -589,10 +589,10 @@ Test-GTGuid -InputObject $userId  # Validates before filter interpolation
 The following functions have built-in GUID validation for filter safety:
 
 - `Disable-GTUserDevice` - Validates user IDs before device queries
-- `Remove-GTUserRoleAssignments` - Validates principal IDs
-- `Remove-GTUserDelegatedPermissionGrants` - Validates OAuth grant principals
+- `Remove-GTUserRoleAssignment` - Validates principal IDs
+- `Remove-GTUserDelegatedPermissionGrant` - Validates OAuth grant principals
 - `Remove-GTPIMRoleEligibility` - Validates PIM role principals
-- `Remove-GTUserAccessPackageAssignments` - Validates access package assignments
+- `Remove-GTUserAccessPackageAssignment` - Validates access package assignments
 
 ### Security Best Practices
 
@@ -600,7 +600,7 @@ When using GraphTools in production:
 
 1. **Use Least Privilege**: Grant only the minimum required Graph API permissions
 2. **Validate Input**: The module validates parameters, but verify user input before passing to cmdlets
-3. **Audit Operations**: Use `Invoke-AuditLogQuery` to track administrative actions
+3. **Audit Operations**: Use `Invoke-GTAuditLogQuery` to track administrative actions
 4. **Test First**: Use `-WhatIf` with cmdlets that support it (e.g., `Disable-GTUser -WhatIf`)
 5. **Review Output**: Check Status field in results for failed operations
 

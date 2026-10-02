@@ -86,10 +86,10 @@ GraphTools has completely eliminated external runtime dependencies on the `Micro
 ```powershell
 # Functions with built-in GUID validation
 - Disable-GTUserDevice
-- Remove-GTUserRoleAssignments
-- Remove-GTUserDelegatedPermissionGrants
+- Remove-GTUserRoleAssignment
+- Remove-GTUserDelegatedPermissionGrant
 - Remove-GTPIMRoleEligibility
-- Remove-GTUserAccessPackageAssignments
+- Remove-GTUserAccessPackageAssignment
 ```
 
 ### Error Handling Architecture

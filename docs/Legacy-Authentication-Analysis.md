@@ -204,7 +204,7 @@ $criticalUsers | Get-GTLegacyAuthReport -ClientAppUsed "POP3"
 $legacyUsers = Get-GTLegacyAuthReport -SuccessOnly |
     Select-Object -ExpandProperty UserPrincipalName -Unique
 
-Get-MFAReport -UserPrincipalName $legacyUsers -UsersWithoutMFA
+Get-GTMFAReport -UserPrincipalName $legacyUsers -UsersWithoutMFA
 ```
 
 ### Incident Response Workflow
@@ -231,7 +231,7 @@ $legacyEvents = Get-GTLegacyAuthReport -UserPrincipalName "user@contoso.com"
 
 foreach ($event in $legacyEvents) {
     # Query audit logs around the same time
-    Invoke-AuditLogQuery -UserIds $event.UserPrincipalName `
+    Invoke-GTAuditLogQuery -UserIds $event.UserPrincipalName `
         -StartDate $event.CreatedDateTime.AddMinutes(-5) `
         -EndDate $event.CreatedDateTime.AddMinutes(5)
 }
@@ -326,9 +326,9 @@ Get-GTLegacyAuthReport | Where-Object { $_.Status -eq "Failure" } | Select-Objec
 
 ## Related Functions
 
-- `Get-MFAReport` - Check MFA status of users using legacy protocols
+- `Get-GTMFAReport` - Check MFA status of users using legacy protocols
 - `Get-GTPolicyControlGapReport` - Analyze Conditional Access policies for legacy auth blocking
-- `Invoke-AuditLogQuery` - Correlate with detailed audit log information
+- `Invoke-GTAuditLogQuery` - Correlate with detailed audit log information
 - `Disable-GTUser` - Respond to compromised accounts identified through legacy auth analysis
 
 ## Security Recommendations

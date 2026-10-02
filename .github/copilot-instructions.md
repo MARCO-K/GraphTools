@@ -47,13 +47,13 @@ GraphTools/
 -   `Disable-GTUser` - Block account sign-ins
 -   `Reset-GTUserPassword` - Force password reset
 -   `Disable-GTUserDevice` - Disable registered devices
--   `Remove-GTUserEntitlements` - Remove all access rights
+-   `Remove-GTUserEntitlement` - Remove all access rights
 
 **Reporting & Analytics** (representative cmdlets):
 
--   `Get-MFAReport` - MFA status and methods
--   `Get-M365LicenseOverview` - License utilization
--   `Invoke-AuditLogQuery` - Audit log queries
+-   `Get-GTMFAReport` - MFA status and methods
+-   `Get-GTM365LicenseOverview` - License utilization
+-   `Invoke-GTAuditLogQuery` - Audit log queries
 -   `Get-GTInactiveUser` - Dormant accounts
 -   `Get-GTRecentUser` - Recently created accounts
 -   `Get-GTConditionalAccessPolicyReport` - CA policy analysis

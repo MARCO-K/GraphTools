@@ -1,0 +1,144 @@
+function Get-GTUnusedApp
+{
+    <#
+    .SYNOPSIS
+    Identifies Service Principals that have not had any sign-ins for a specified period.
+
+    .DESCRIPTION
+    This function retrieves Service Principals and analyzes their sign-in activity.
+    
+    PERFORMANCE:
+    - By default, uses Server-Side filtering for high performance.
+    - If -IncludeNeverUsed is specified, it performs a full directory scan (slower).
+
+    .PARAMETER DaysSinceLastSignIn
+    The number of days of inactivity to check for.
+
+    .PARAMETER IncludeNeverUsed
+    Switch to include apps that have never had a recorded sign-in.
+    WARNING: Using this switch forces a full download of all Service Principals.
+
+    .PARAMETER NewSession
+    If specified, creates a new Microsoft Graph session by disconnecting any existing session first.
+
+    .EXAMPLE
+    Get-GTUnusedApp -DaysSinceLastSignIn 90
+    Fast. Finds apps inactive for more than 90 days.
+
+    .EXAMPLE
+    Get-GTUnusedApp -DaysSinceLastSignIn 90 -IncludeNeverUsed
+    Slower. Finds inactive apps AND apps that have never logged in.
+    #>
+    [CmdletBinding()]
+    [Alias('Get-GTUnusedApps')]
+    [OutputType([PSCustomObject])]
+    param(
+        [Parameter(Mandatory = $true)]
+        [int]$DaysSinceLastSignIn,
+
+        [switch]$IncludeNeverUsed,
+        [switch]$NewSession
+    )
+
+    begin
+    {
+        # 1. Connection Initialization
+        # Application.Read.All is required to list SPs. AuditLog.Read.All is required for signInActivity.
+        $requiredScopes = @('Application.Read.All', 'AuditLog.Read.All')
+        if (-not (Initialize-GTGraphConnection -Scopes $requiredScopes -NewSession:$NewSession))
+        {
+            Write-Error "Failed to initialize session."
+            return
+        }
+
+        # 2. Scopes Validation
+        if (-not (Test-GTGraphScopes -RequiredScopes $requiredScopes -Quiet))
+        {
+            Write-Error "Failed to acquire required permissions ($($requiredScopes -join ', ')). Aborting."
+            return
+        }
+    }
+
+    process
+    {
+        $utcNow = Get-UTCTime
+        $thresholdDate = $utcNow.AddDays(-$DaysSinceLastSignIn)
+        
+        # Format for OData: yyyy-MM-ddTHH:mm:ssZ
+        $filterDateString = Format-ODataDateTime -DateTime $thresholdDate
+
+        try
+        {
+            # 3. Build URI with Hybrid Filtering Strategy
+            # beta required: signInActivity is not available on servicePrincipals in v1.0
+            $baseUri = "beta/servicePrincipals?`$select=id,appId,displayName,signInActivity"
+
+            if ($IncludeNeverUsed)
+            {
+                Write-PSFMessage -Level Verbose -Message "Fetching ALL Service Principals (IncludeNeverUsed active)..."
+                $uri = $baseUri
+            }
+            else
+            {
+                # Optimization: Server-Side Filter
+                Write-PSFMessage -Level Verbose -Message "Fetching inactive Service Principals (Server-Side Filter)..."
+                $uri = "$baseUri&`$filter=$([Uri]::EscapeDataString("signInActivity/lastSignInDateTime le $filterDateString"))"
+                Write-PSFMessage -Level Verbose -Message "Using Filter: signInActivity/lastSignInDateTime le $filterDateString"
+            }
+
+            # 4. Collect and Process
+            $sps = Invoke-GTGraphPagedRequest -Uri $uri
+            foreach ($sp in $sps) {
+                $lastSignIn = $sp.signInActivity.lastSignInDateTime
+                
+                # Logic A: App has signed in, check if it's old
+                if ($lastSignIn)
+                {
+                    # Note: If we used the Server-Side filter, we technically don't need to check dates again,
+                    # but it doesn't hurt to double-check, especially if IncludeNeverUsed triggered a full scan.
+                    
+                    # Ensure we parse UTC correctly
+                    $lastSignInUtc = $lastSignIn
+                    if ($lastSignIn -is [string]) { $lastSignInUtc = [DateTime]::Parse($lastSignIn) }
+                    
+                    $daysInactive = (New-TimeSpan -Start $lastSignInUtc -End $utcNow).Days
+
+                    if ($daysInactive -ge $DaysSinceLastSignIn)
+                    {
+                        [PSCustomObject]@{
+                            DisplayName        = $sp.displayName
+                            AppId              = $sp.appId
+                            Id                 = $sp.id
+                            LastSignInDateTime = $lastSignIn
+                            DaysInactive       = $daysInactive
+                            Status             = 'Inactive'
+                        }
+                    }
+                }
+                # Logic B: App has NEVER signed in
+                elseif ($IncludeNeverUsed)
+                {
+                    [PSCustomObject]@{
+                        DisplayName        = $sp.displayName
+                        AppId              = $sp.appId
+                        Id                 = $sp.id
+                        LastSignInDateTime = $null
+                        DaysInactive       = 'Never'
+                        Status             = 'Never Used'
+                    }
+                }
+            }
+        }
+        catch
+        {
+            # Gold Standard Error Handling
+            $err = Get-GTGraphErrorDetails -Exception $_.Exception -ResourceType 'Service Principals'
+            Write-PSFMessage -Level $err.LogLevel -Message "Failed to retrieve unused apps: $($err.Reason)"
+        }
+    }
+        end
+    {
+        # No cleanup required currently; placeholder for future finalization logic.
+        Write-PSFMessage -Level Verbose -Message "Get-GTUnusedApps completed."
+    }
+}

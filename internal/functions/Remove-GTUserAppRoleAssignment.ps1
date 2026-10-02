@@ -1,0 +1,110 @@
+function Remove-GTUserAppRoleAssignment
+{
+    <#
+    .SYNOPSIS
+        Removes all app role assignments from a user
+    .DESCRIPTION
+        Explicitly removes any direct or group-based application role assignments to ensure
+        the user loses access to specific applications and their functionalities.
+    .PARAMETER User
+        The user object (must have Id and UserPrincipalName properties)
+    .PARAMETER OutputBase
+        Base output object for logging
+    .PARAMETER Results
+        Results collection to add output to
+    .EXAMPLE
+        $user = Get-MgBetaUser -UserId 'user@contoso.com'
+        $outputBase = @{ UserPrincipalName = $user.UserPrincipalName }
+        $results = [System.Collections.Generic.List[PSObject]]::new()
+        Remove-GTUserAppRoleAssignment -User $user -OutputBase $outputBase -Results $results
+        
+        Removes all app role assignments from the user and adds results to the collection
+    #>
+    [CmdletBinding(SupportsShouldProcess)]
+    [Alias('Remove-GTUserAppRoleAssignments')]
+    param(
+        [Parameter(Mandatory = $true, ValueFromPipeline = $true)]
+        [ValidateNotNullOrEmpty()]
+        [ValidateScript({ Test-GTUserObject -User $_ })]
+        [object]$User,
+        [Parameter(Mandatory = $true)]
+        [hashtable]$OutputBase,
+        [Parameter(Mandatory = $true)]
+        [System.Collections.Generic.List[PSObject]]$Results
+    )
+
+    try
+    {
+        $AppRoleAssignments = Invoke-GTGraphPagedRequest -Uri "v1.0/users/$($User.Id)/appRoleAssignments"
+
+        if ($null -ne $AppRoleAssignments)
+        {
+            $AppRoleAssignments | ForEach-Object {
+                $action = 'RemoveUserAppRoleAssignments'
+                $output = $OutputBase + @{
+                    ResourceName = $_.resourceDisplayName
+                    ResourceType = 'UserAppRoleAssignment'
+                    ResourceId   = $_.id
+                    Action       = $action
+                }
+
+                try
+                {
+                    if ($PSCmdlet.ShouldProcess($_.ResourceDisplayName, $action))
+                    {
+                        Write-PSFMessage -Level Verbose -Message "Removing user $($User.UserPrincipalName) from AppRoleAssignments $($_.resourceDisplayName)"
+                        Invoke-GTGraphRequest -Method DELETE -Uri "v1.0/users/$($User.Id)/appRoleAssignments/$($_.id)" -ErrorAction Stop
+                        $output['Status'] = 'Success'
+                    }
+                }
+                catch
+                {
+                    # Use centralized error handling helper to parse Graph API exceptions
+                    $errorDetails = Get-GTGraphErrorDetails -Exception $_.Exception -ResourceType 'resource'
+                    
+                    # Log appropriate message based on error details
+                    if ($errorDetails.HttpStatus) {
+                        Write-PSFMessage -Level $errorDetails.LogLevel -Message "Failed to remove user $($User.UserPrincipalName) from AppRoleAssignments $($_.ResourceDisplayName). $($errorDetails.Reason)"
+                        if ($errorDetails.HttpStatus -in 404, 403) {
+                            Write-PSFMessage -Level Debug -Message "Detailed error ($($errorDetails.HttpStatus)): $($errorDetails.ErrorMessage)"
+                        }
+                    }
+                    else {
+                        Write-PSFMessage -Level Error -Message "Failed to remove user $($User.UserPrincipalName) from AppRoleAssignments $($_.ResourceDisplayName). $($errorDetails.ErrorMessage)"
+                    }
+                    $output['Status'] = "Failed: $($errorDetails.Reason)"
+                }
+                $Results.Add([PSCustomObject]$output)
+            }
+        }
+        else
+        {
+            Write-PSFMessage -Level Verbose -Message "No app role assignments found for user $($User.UserPrincipalName)"
+        }
+    }
+    catch
+    {
+        # Use centralized error handling helper to parse Graph API exceptions
+        $errorDetails = Get-GTGraphErrorDetails -Exception $_.Exception -ResourceType 'user'
+        
+        # Log appropriate message based on error details
+        if ($errorDetails.HttpStatus) {
+            Write-PSFMessage -Level $errorDetails.LogLevel -Message "Failed to retrieve app role assignments for user $($User.UserPrincipalName). $($errorDetails.Reason)"
+            if ($errorDetails.HttpStatus -in 404, 403) {
+                Write-PSFMessage -Level Debug -Message "Detailed error ($($errorDetails.HttpStatus)): $($errorDetails.ErrorMessage)"
+            }
+        }
+        else {
+            Write-PSFMessage -Level Error -Message "Failed to retrieve app role assignments for user $($User.UserPrincipalName). $($errorDetails.ErrorMessage)"
+        }
+        
+        $output = $OutputBase + @{
+            ResourceName = 'AppRoleAssignments'
+            ResourceType = 'UserAppRoleAssignment'
+            ResourceId   = $null
+            Action       = 'RemoveUserAppRoleAssignments'
+            Status       = "Failed: $($errorDetails.Reason)"
+        }
+        $Results.Add([PSCustomObject]$output)
+    }
+}

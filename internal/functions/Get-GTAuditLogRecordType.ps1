@@ -6,13 +6,14 @@
 .PARAMETER DocUrl
     URL of the documentation page (default: Office 365 Management API schema)
 .EXAMPLE
-    Get-GTAuditLogRecordTypes | Format-Table
+    Get-GTAuditLogRecordType | Format-Table
 .EXAMPLE
-    Get-GTAuditLogRecordTypes -Verbose | Export-Csv AuditLogRecordTypes.csv
+    Get-GTAuditLogRecordType -Verbose | Export-Csv AuditLogRecordTypes.csv
 #>
-function Get-GTAuditLogRecordTypes
+function Get-GTAuditLogRecordType
 {
     [CmdletBinding()]
+    [Alias('Get-GTAuditLogRecordTypes')]
     [OutputType([PSObject[]])]
     param(
         [string]$DocUrl = "https://learn.microsoft.com/en-us/office/office-365-management-api/office-365-management-activity-api-schema#auditlogrecordtype"

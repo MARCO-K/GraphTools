@@ -48,9 +48,9 @@ Describe "Get-GTInactiveUser" {
 
         . "$PSScriptRoot/../internal/functions/Initialize-GTBeginBlock.ps1"
         . "$PSScriptRoot/../internal/functions/New-GTODataFilter.ps1"
-        . "$PSScriptRoot/../internal/functions/Format-ODataDateTime.ps1"
+        . "$PSScriptRoot/../internal/functions/Format-GTODataDateTime.ps1"
         . "$PSScriptRoot/../internal/functions/Invoke-GTGraphPagedRequest.ps1"
-        . "$PSScriptRoot/../internal/functions/Get-UTCTime.ps1"
+        . "$PSScriptRoot/../internal/functions/Get-GTUtcTime.ps1"
 
         . "$PSScriptRoot/../internal/functions/Get-GTGraphHttpStatus.ps1"
 

@@ -19,7 +19,7 @@ Describe "Disable-GTUserDevice" -Tag 'Unit' {
         $errorHelperFile = Join-Path $PSScriptRoot '..\internal\functions\Get-GTGraphErrorDetails.ps1'
         if (Test-Path $errorHelperFile) { . $errorHelperFile }
 
-        $utcHelper = Join-Path $PSScriptRoot '..\internal\functions\Get-UTCTime.ps1'
+        $utcHelper = Join-Path $PSScriptRoot '..\internal\functions\Get-GTUtcTime.ps1'
         if (Test-Path $utcHelper) { . $utcHelper }
 
         $installHelper = Join-Path $PSScriptRoot '..\internal\functions\Install-GTRequiredModule.ps1'

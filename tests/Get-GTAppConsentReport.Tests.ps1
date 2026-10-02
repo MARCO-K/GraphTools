@@ -10,7 +10,7 @@ Describe "Get-GTAppConsentReport" -Tag 'Unit' {
         function global:Format-ODataDateTime { param([DateTime]$DateTime) return $DateTime.ToUniversalTime().ToString("yyyy-MM-ddTHH:mm:ssZ") }
         function global:Get-GTConnection { return [PSCustomObject]@{ TenantId = 'tenant-local-001' } }
 
-        . "$PSScriptRoot/../internal/functions/Get-UTCTime.ps1"
+        . "$PSScriptRoot/../internal/functions/Get-GTUtcTime.ps1"
         . "$PSScriptRoot/../internal/functions/Get-GTPermissionDefinition.ps1"
         . "$PSScriptRoot/../functions/Get-GTAppConsentReport.ps1"
     }
@@ -26,7 +26,8 @@ Describe "Get-GTAppConsentReport" -Tag 'Unit' {
         Remove-Item Function:\Invoke-GTGraphRequest -Force -ErrorAction SilentlyContinue
         Remove-Item Function:\Format-ODataDateTime -Force -ErrorAction SilentlyContinue
         Remove-Item Function:\Get-GTConnection -Force -ErrorAction SilentlyContinue
-        Remove-Item Function:\Get-UTCTime -Force -ErrorAction SilentlyContinue
+        Remove-Item Function:\Get-GTUtcTime -Force -ErrorAction SilentlyContinue
+        Remove-Item Alias:\Get-UTCTime -Force -ErrorAction SilentlyContinue
         Remove-Item Function:\Get-GTPermissionDefinition -Force -ErrorAction SilentlyContinue
     }
 

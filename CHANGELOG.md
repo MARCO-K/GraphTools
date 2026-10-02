@@ -14,6 +14,41 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- **PowerShell Naming Convention Normalization (Singular Nouns & `GT` Module Prefix)**:
+  - Standardized public cmdlets to enforce singular nouns and the canonical `GT` module prefix:
+    - `Get-MFAReport` &rarr; `Get-GTMFAReport` (legacy alias `Get-MFAReport` preserved)
+    - `Get-M365LicenseOverview` &rarr; `Get-GTM365LicenseOverview` (legacy alias `Get-M365LicenseOverview` preserved)
+    - `Invoke-AuditLogQuery` &rarr; `Invoke-GTAuditLogQuery` (legacy alias `Invoke-AuditLogQuery` preserved)
+    - `Get-GTInactiveDevices` &rarr; `Get-GTInactiveDevice` (legacy alias `Get-GTInactiveDevices` preserved)
+    - `Get-GTExpiringSecrets` &rarr; `Get-GTExpiringSecret` (legacy alias `Get-GTExpiringSecrets` preserved)
+    - `Get-GTUnusedApps` &rarr; `Get-GTUnusedApp` (legacy alias `Get-GTUnusedApps` preserved)
+    - `Remove-GTExpiredInvites` &rarr; `Remove-GTExpiredInvite` (legacy alias `Remove-GTExpiredInvites` preserved)
+    - `Remove-GTUserEntitlements` &rarr; `Remove-GTUserEntitlement` (legacy alias `Remove-GTUserEntitlements` preserved)
+  - Normalized internal helper functions to enforce singular nouns and standard `GT` prefix:
+    - `Format-ODataDateTime` &rarr; `Format-GTODataDateTime` (legacy alias `Format-ODataDateTime` preserved)
+    - `Get-GTAuditLogRecordTypes` &rarr; `Get-GTAuditLogRecordType` (legacy alias `Get-GTAuditLogRecordTypes` preserved)
+    - `Get-Ipinfo` &rarr; `Get-GTIpInfo` (legacy alias `Get-Ipinfo` preserved)
+    - `Get-UTCTime` &rarr; `Get-GTUtcTime` (legacy alias `Get-UTCTime` preserved)
+    - `Import-DuckDBRecords` &rarr; `Import-GTDuckDBRecord` (legacy alias `Import-DuckDBRecords` preserved)
+    - `Import-GitHubCsvToDuckDB` &rarr; `Import-GTGitHubCsvToDuckDB` (legacy alias `Import-GitHubCsvToDuckDB` preserved)
+    - `Open-JsonFile` &rarr; `Open-GTJsonFile` (legacy alias `Open-JsonFile` preserved)
+    - `Expand-GTAdditionalProperties` &rarr; `Expand-GTAdditionalProperty` (legacy alias `Expand-GTAdditionalProperties` preserved)
+    - `Expand-GTNestedProperties` &rarr; `Expand-GTNestedProperty` (legacy alias `Expand-GTNestedProperties` preserved)
+    - `Get-GTMissingScopes` &rarr; `Get-GTMissingScope` (legacy alias `Get-GTMissingScopes` preserved)
+    - `Get-GTTokenClaims` &rarr; `Get-GTTokenClaim` (legacy alias `Get-GTTokenClaims` preserved)
+    - `Test-GTGraphScopes` &rarr; `Test-GTGraphScope` (legacy alias `Test-GTGraphScopes` preserved)
+    - `Remove-GTUserAccessPackageAssignments` &rarr; `Remove-GTUserAccessPackageAssignment` (legacy alias preserved)
+    - `Remove-GTUserAdministrativeUnitMemberships` &rarr; `Remove-GTUserAdministrativeUnitMembership` (legacy alias preserved)
+    - `Remove-GTUserAppRoleAssignments` &rarr; `Remove-GTUserAppRoleAssignment` (legacy alias preserved)
+    - `Remove-GTUserDelegatedPermissionGrants` &rarr; `Remove-GTUserDelegatedPermissionGrant` (legacy alias preserved)
+    - `Remove-GTUserGroupMemberships` &rarr; `Remove-GTUserGroupMembership` (legacy alias preserved)
+    - `Remove-GTUserGroupOwnerships` &rarr; `Remove-GTUserGroupOwnership` (legacy alias preserved)
+    - `Remove-GTUserLicenses` &rarr; `Remove-GTUserLicense` (legacy alias preserved)
+    - `Remove-GTUserRoleAssignments` &rarr; `Remove-GTUserRoleAssignment` (legacy alias preserved)
+    - `Remove-GTUserServicePrincipalOwnerships` &rarr; `Remove-GTUserServicePrincipalOwnership` (legacy alias preserved)
+  - Maintained 100% backward compatibility via `[Alias('<LegacyName>')]` on all renamed functions, allowing existing caller scripts and pipeline invocations to execute seamlessly.
+  - Renamed all matching `.ps1` function files and `.Tests.ps1` Pester test suites.
+  - Updated all documentation, internal links, and guidance across `README.md`, `docs/*.md`, and `.github/`.
 - **Performance Optimization (`Remove-GTUserEnterpriseAppOwnership`)**:
   - Replaced N+1 individual synchronous owner count queries for owned applications and service principals with bulk batch resolution via `Invoke-GTGraphBatch`.
   - Added resilient fallback to individual requests if batch retrieval fails or subrequests return errors.
