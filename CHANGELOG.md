@@ -17,6 +17,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Security
 
+- **Cryptographic Randomness in Test Harness (`tests/`)**:
+  - Replaced non-cryptographic `Get-Random` pseudo-random number generator with collision-resistant `[guid]::NewGuid()` in temporary fixture naming across test suites to prevent static security analysis warnings.
 - **External API Call Timeout Hardening (`-TimeoutSec`)**:
   - Enforced explicit timeouts on all `Invoke-RestMethod` and `Invoke-WebRequest` invocations across authentication, token acquisition, and web scraping utilities to eliminate indefinite socket blocking and mitigate denial-of-service / resource exhaustion risks (5s for local IMDS queries, 30s for OAuth endpoints and documentation scraping, 120s default for the Graph REST engine).
 
