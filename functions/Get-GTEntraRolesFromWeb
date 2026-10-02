@@ -32,7 +32,7 @@ function Get-GTEntraRolesFromWeb
     Write-Verbose "Downloading Entra roles information from $Url"
     try
     {
-        $response = Invoke-WebRequest -Uri $Url -UseBasicParsing -ErrorAction Stop
+        $response = Invoke-WebRequest -Uri $Url -UseBasicParsing -TimeoutSec 30 -ErrorAction Stop
     }
     catch
     {

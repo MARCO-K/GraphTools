@@ -58,7 +58,7 @@ function Update-GTRiskyPermissionData
         try
         {
             Write-PSFMessage -Level Verbose -Message "Fetching DevX permissions from $SourceUri..."
-            $rawPayload = Invoke-RestMethod -Uri $SourceUri -ErrorAction Stop
+            $rawPayload = Invoke-RestMethod -Uri $SourceUri -TimeoutSec 30 -ErrorAction Stop
 
             $parsedJson = if ($rawPayload -is [System.Collections.IDictionary])
             {
