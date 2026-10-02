@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Security
+
+- **CSPRNG Hardening in Tests**: Replaced all `Get-Random` usages in Pester test fixtures (`Get-GTRiskyAppPermissionReport`, `Update-GTRiskyPermissionData`, `Get-GTPermissionDefinition`) with `[guid]::NewGuid().ToString().Substring(0, 8)` to strictly adhere to the zero-PRNG security standard and eliminate static analysis noise.
+
 ## [0.27.0] - 2026-10-01
 
 ### Added

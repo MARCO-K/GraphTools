@@ -269,7 +269,7 @@ Describe "Get-GTRiskyAppPermissionReport" {
         }
 
         It "should map privilege level 5 to Critical with score 10" {
-            $tempFixture = Join-Path ([System.IO.Path]::GetTempPath()) "test-priv5-$(Get-Random).json"
+            $tempFixture = Join-Path ([System.IO.Path]::GetTempPath()) "test-priv5-$([guid]::NewGuid().ToString().Substring(0, 8)).json"
             @{
                 "Ultra.HighPriv.Role" = @{
                     appPrivilegeLevel       = 5
