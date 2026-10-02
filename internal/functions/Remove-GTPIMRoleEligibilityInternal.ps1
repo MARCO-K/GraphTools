@@ -50,7 +50,7 @@ function Remove-GTPIMRoleEligibility
 
         if ($roleEligibilitySchedules)
         {
-            # Batch role eligibility removal requests via Invoke-GTGraphBatch to eliminate N+1 latency
+            # Bolt Optimization: Replaced N+1 individual DELETE requests with chunked JSON batching via Invoke-GTGraphBatch
             $batchRequests = [System.Collections.Generic.List[hashtable]]::new()
             $processedSchedules = [System.Collections.Generic.List[object]]::new()
 

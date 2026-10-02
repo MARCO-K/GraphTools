@@ -7,19 +7,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-### Added
-
-- **Connection State Unit Test Suite (`tests/Get-GTConnection.Tests.ps1`)**:
-  - Added dedicated Pester test coverage for `Get-GTConnection` verifying connection status, config-versus-cache precedence resolution, and token expiration handling.
-
 ### Changed
-
-- **Performance Optimization (`Remove-GTPIMRoleEligibilityInternal`)**:
-  - Replaced individual N+1 `DELETE` requests for role eligibility schedules with chunked JSON batching via `Invoke-GTGraphBatch`, eliminating round-trip latency during user entitlement offboarding.
-  - Added structured per-subrequest error mapping and failure capture for batch-level exceptions.
-- **Performance Optimization (`Get-GTInactiveUser`)**:
-  - Optimized directory role member lookup to skip the preliminary internal ID query. `Get-GTInactiveUser` now directly queries directory role members using `roleTemplateId`.
-  - Added robust error handling to gracefully capture and suppress HTTP 404 responses for uninstantiated directory roles, ensuring identical functionality while dramatically reducing network round trips.
 
 - **Performance Optimization (`Import-DuckDBRecords`)**:
   - Replaced pipeline array concatenation (`+=`) with `[System.Collections.Generic.List[object]]` accumulation and moved dataset deduplication from the iterative `process` block into the `end` block to ensure single-pass $\mathcal{O}(N)$ processing.
