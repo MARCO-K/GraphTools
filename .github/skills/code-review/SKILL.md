@@ -47,7 +47,7 @@ Check for duplicate logic and enforce the reuse of centralized internal helpers:
 - **Cryptographic Randomness**: Use `Get-GTSecureRandomInt` for random numbers, retry backoff jitter, or password character indexing. Avoid `Get-Random` for security-sensitive logic.
 - **HTTP Status Extraction**: Use `Get-GTGraphHttpStatus -Exception $ex` instead of custom regex or status code parsing.
 - **Retry-After Header Parsing**: Use `Get-GTGraphRetryAfterSeconds` to extract retry delay seconds from headers or exceptions across single-request and batch operations.
-- **OData Date Formatting**: Use `Format-ODataDateTime -DateTime $date` instead of raw `.ToString('yyyy-MM-ddTHH:mm:ssZ')`.
+- **OData Date Formatting**: Use `Format-GTODataDateTime -DateTime $date` instead of raw `.ToString('yyyy-MM-ddTHH:mm:ssZ')`.
 - **User Object Validation**: Use `Test-GTUserObject -User $user` (or `[ValidateScript({ Test-GTUserObject -User $_ })]`) to validate mandatory `Id` and `UserPrincipalName` properties.
 - **GUID Validation**: Use `Test-GTGuid -InputObject $id` to validate canonical GUIDs before interpolating into OData filters.
 

@@ -267,14 +267,14 @@ Ideal for security analysts, automated compliance auditing, and posture assessme
 
 | Permission (Scope) | Type | Purpose / Associated Cmdlets |
 | :--- | :--- | :--- |
-| `AuditLog.Read.All` | Application | Audit and sign-in log analysis (`Get-GTLegacyAuthReport`, `Get-GTInactiveUser`, `Get-GTUnusedApps`, `Invoke-AuditLogQuery`) |
-| `User.Read.All` | Application | User profile and activity auditing (`Get-MFAReport`, `Get-GTInactiveUser`, `Get-GTRecentUser`, `Get-GTGuestUserReport`) |
-| `Reports.Read.All` | Application | Credential and MFA registration reporting (`Get-MFAReport`) |
-| `Application.Read.All` | Application | Service Principal audits (`Get-GTOrphanedServicePrincipal`, `Get-GTExpiringSecrets`, `Get-GTUnusedApps`, `Get-GTRiskyAppPermissionReport`) |
-| `Device.Read.All` | Application | Device hygiene audits (`Get-GTInactiveDevices`) |
+| `AuditLog.Read.All` | Application | Audit and sign-in log analysis (`Get-GTLegacyAuthReport`, `Get-GTInactiveUser`, `Get-GTUnusedApp`, `Invoke-GTAuditLogQuery`) |
+| `User.Read.All` | Application | User profile and activity auditing (`Get-GTMFAReport`, `Get-GTInactiveUser`, `Get-GTRecentUser`, `Get-GTGuestUserReport`) |
+| `Reports.Read.All` | Application | Credential and MFA registration reporting (`Get-GTMFAReport`) |
+| `Application.Read.All` | Application | Service Principal audits (`Get-GTOrphanedServicePrincipal`, `Get-GTExpiringSecret`, `Get-GTUnusedApp`, `Get-GTRiskyAppPermissionReport`) |
+| `Device.Read.All` | Application | Device hygiene audits (`Get-GTInactiveDevice`) |
 | `RoleManagement.Read.Directory` | Application | Role governance (`Get-GTAdminCountReport`, `Get-GTPIMRoleReport`, `Get-GTRiskyAppPermissionReport`) |
 | `Policy.Read.All` | Application | Conditional Access audits (`Get-GTPolicyControlGapReport`, `Get-GTBreakGlassPolicyReport`) |
-| `Organization.Read.All` | Application | Tenant metadata & license auditing (`Get-M365LicenseOverview`, `Get-GTLicenseCostReport`) |
+| `Organization.Read.All` | Application | Tenant metadata & license auditing (`Get-GTM365LicenseOverview`, `Get-GTLicenseCostReport`) |
 | `Directory.Read.All` | Application | Directory fallback reading (`Get-GTAdminCountReport`, `Get-GTPIMRoleReport`) |
 
 ---
@@ -294,7 +294,7 @@ Executes session invalidation, account disabling, password rotation, and device 
 
 #### Full Destructive Containment Profile (Entitlement Stripping)
 
-Required only if invoking `Invoke-GTUserContainment -FullContainment`, `-StripEntitlements`, or `Remove-GTUserEntitlements`:
+Required only if invoking `Invoke-GTUserContainment -FullContainment`, `-StripEntitlements`, or `Remove-GTUserEntitlement`:
 
 | Permission (Scope) | Type | Purpose / Associated Cmdlets |
 | :--- | :--- | :--- |
@@ -315,8 +315,8 @@ Targeted at directory lifecycle management, guest offboarding, and application h
 
 | Permission (Scope) | Type | Purpose / Associated Cmdlets |
 | :--- | :--- | :--- |
-| `User.Invite.All` | Application | Remove expired pending guest invitations (`Remove-GTExpiredInvites`) |
-| `User.ReadWrite.All` | Application | Update guest user lifecycle status (`Remove-GTExpiredInvites`) |
+| `User.Invite.All` | Application | Remove expired pending guest invitations (`Remove-GTExpiredInvite`) |
+| `User.ReadWrite.All` | Application | Update guest user lifecycle status (`Remove-GTExpiredInvite`) |
 | `Application.ReadWrite.All` | Application | Remove orphaned enterprise app ownerships (`Remove-GTUserEnterpriseAppOwnership`) |
 | `RoleEligibilitySchedule.ReadWrite.Directory` | Application | Clean up expired PIM eligibilities (`Remove-GTPIMRoleEligibility`) |
 
@@ -393,7 +393,7 @@ Connect-GTGraph -TenantId "aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee" `
 Get-GTConnection
 
 # 3. Test permission acquisition (e.g. for User Audit Profile)
-Test-GTGraphScopes -RequiredScopes 'AuditLog.Read.All', 'User.Read.All'
+Test-GTGraphScope -RequiredScopes 'AuditLog.Read.All', 'User.Read.All'
 
 # 4. Execute test cmdlet
 Get-GTRecentUser -Top 5

@@ -72,7 +72,7 @@ Check for redundant code and ensure reuse of centralized helpers:
 
 - `Get-GTGraphHttpStatus` for error status code resolution.
 - `Get-GTGraphRetryAfterSeconds` for rate-limit backoff.
-- `Format-ODataDateTime` for ISO-8601 Graph timestamps.
+- `Format-GTODataDateTime` for ISO-8601 Graph timestamps.
 - `Test-GTUserObject` for identity payload validation (`Id`, `UserPrincipalName`).
 - `Test-GTGuid` for canonical GUID verification.
 

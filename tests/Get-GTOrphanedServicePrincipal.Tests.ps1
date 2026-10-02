@@ -9,7 +9,7 @@ Describe "Get-GTOrphanedServicePrincipal" {
         function global:Get-UTCTime { return [DateTime]::UtcNow }
         function global:Invoke-GTGraphPagedRequest { param($Uri, [switch]$All) return @() }
 
-        . "$PSScriptRoot/../internal/functions/Get-UTCTime.ps1"
+        . "$PSScriptRoot/../internal/functions/Get-GTUtcTime.ps1"
         . "$PSScriptRoot/../functions/Get-GTOrphanedServicePrincipal.ps1"
     }
 

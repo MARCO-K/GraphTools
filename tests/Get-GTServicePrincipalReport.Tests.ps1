@@ -24,7 +24,7 @@ Describe "Get-GTServicePrincipalReport" {
         Mock -CommandName Test-GTGraphScopes -MockWith { return $true } -Verifiable
         Mock -CommandName Invoke-GTGraphPagedRequest -MockWith { return @() }
         
-        $formatFile = "$PSScriptRoot/../internal/functions/Format-ODataDateTime.ps1"
+        $formatFile = "$PSScriptRoot/../internal/functions/Format-GTODataDateTime.ps1"
         if (Test-Path $formatFile) { . $formatFile }
         
         # Load the function under test

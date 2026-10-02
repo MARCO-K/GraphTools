@@ -102,8 +102,8 @@ Get-GTLicenseCostReport -PriceList $price -SkuNameFile .\data\sku-names.json
 
 ## Related functions
 
-- `Get-M365LicenseOverview` — per-user license details and service plans
-- `Remove-GTUserEntitlements` — remove licenses for remediation
+- `Get-GTM365LicenseOverview` — per-user license details and service plans
+- `Remove-GTUserEntitlement` — remove licenses for remediation
 
 ---
 

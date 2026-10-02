@@ -38,11 +38,11 @@ Remove-GTPIMRoleEligibility -UserId '00000000-0000-0000-0000-000000000000' -Verb
 
 ## 3. Integration with User Offboarding
 
-The `Remove-GTUserEntitlements` function has been updated to include PIM removal.
+The `Remove-GTUserEntitlement` function has been updated to include PIM removal.
 
 ```powershell
 # Complete user offboarding including PIM roles
-Remove-GTUserEntitlements -UserUPNs 'user@contoso.com' -removePIMRoleEligibility -Verbose
+Remove-GTUserEntitlement -UserUPNs 'user@contoso.com' -removePIMRoleEligibility -Verbose
 ```
 
 ## Verification

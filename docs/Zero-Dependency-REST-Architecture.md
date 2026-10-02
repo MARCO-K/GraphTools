@@ -194,7 +194,7 @@ flowchart TD
 ### A. Token Manager ([`Get-GTCachedGraphToken.ps1`](../internal/functions/Get-GTCachedGraphToken.ps1))
 
 - **In-Memory Cache:** `$script:GTTokenCache` maintains the active `AccessToken`, `ExpiresAt`, `TenantId`, `ClientId`, `AuthType`, `Claims`, `Roles`, and `Permissions`.
-- **Token Introspection & Claims Extraction ([`Get-GTTokenClaims.ps1`](../internal/functions/Get-GTTokenClaims.ps1)):** Automatically decodes base64url JWT access token payloads to extract granted `roles` (App-Only application permissions) and `scp` (Delegated scopes), storing them in the cache and surfacing them via [`Get-GTConnection`](../functions/Get-GTConnection.ps1) for strict client-side permission validation.
+- **Token Introspection & Claims Extraction ([`Get-GTTokenClaim.ps1`](../internal/functions/Get-GTTokenClaim.ps1)):** Automatically decodes base64url JWT access token payloads to extract granted `roles` (App-Only application permissions) and `scp` (Delegated scopes), storing them in the cache and surfacing them via [`Get-GTConnection`](../functions/Get-GTConnection.ps1) for strict client-side permission validation.
 - **Sliding Refresh Buffer (`$BufferMinutes = 5`):** Standard Entra tokens expire after 60 minutes (3599 seconds). When remaining validity drops below 5 minutes, a fresh token is requested proactively to avoid in-flight request expiration.
 - **Authentication Fallbacks:**
   1. RFC 7523 Certificate thumbprint or direct `X509Certificate2` object.

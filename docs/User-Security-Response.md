@@ -13,7 +13,7 @@ When a user account is compromised or needs to be secured, GraphTools provides a
 2. **Disable-GTUser** - Disable the user account
 3. **Reset-GTUserPassword** - Reset the user's password
 4. **Disable-GTUserDevice** - Disable user's registered devices
-5. **Remove-GTUserEntitlements** - Remove access rights and privileges (including PIM role eligibilities)
+5. **Remove-GTUserEntitlement** - Remove access rights and privileges (including PIM role eligibilities)
 
 ## Functions
 
@@ -91,7 +91,7 @@ Disables all devices registered to a user in Microsoft Entra ID.
 Disable-GTUserDevice -UPN 'user@contoso.com'
 ```
 
-### 5. Remove-GTUserEntitlements
+### 5. Remove-GTUserEntitlement
 
 Removes all user entitlements including group memberships, licenses, role assignments, PIM role eligibilities, and application access.
 
@@ -103,15 +103,15 @@ Removes all user entitlements including group memberships, licenses, role assign
 
 ```powershell
 # Remove all entitlements (including PIM role eligibilities)
-Remove-GTUserEntitlements -UserUPNs 'user@contoso.com' -removeAll
+Remove-GTUserEntitlement -UserUPNs 'user@contoso.com' -removeAll
 
 # Remove only privileged access
-Remove-GTUserEntitlements -UserUPNs 'admin@contoso.com' `
+Remove-GTUserEntitlement -UserUPNs 'admin@contoso.com' `
     -removeRoleAssignments `
     -removePIMRoleEligibility
 
 # Remove specific entitlements
-Remove-GTUserEntitlements -UserUPNs 'user@contoso.com' `
+Remove-GTUserEntitlement -UserUPNs 'user@contoso.com' `
     -removeGroups `
     -removeLicenses `
     -removePIMRoleEligibility
@@ -149,7 +149,7 @@ Reset-GTUserPassword -UPN $compromisedUser
 Disable-GTUserDevice -UPN $compromisedUser
 
 # 5. Remove all entitlements (including PIM role eligibilities)
-Remove-GTUserEntitlements -UserUPNs $compromisedUser -removeAll
+Remove-GTUserEntitlement -UserUPNs $compromisedUser -removeAll
 ```
 
 ### Multiple Users
@@ -163,7 +163,7 @@ $compromisedUsers | Revoke-GTSignOutFromAllSessions
 $compromisedUsers | Disable-GTUser
 $compromisedUsers | Reset-GTUserPassword
 $compromisedUsers | Disable-GTUserDevice
-$compromisedUsers | Remove-GTUserEntitlements -removeAll
+$compromisedUsers | Remove-GTUserEntitlement -removeAll
 ```
 
 ## Common Parameters
@@ -186,9 +186,9 @@ To improve usability and reduce confusion, the GraphTools module supports multip
 | `-UPN` | `-UserPrincipalName`, `-Users`, `-UserName`, `-UPNName` | Pipeline-style commands accepting multiple users (string[]) | Reset-GTUserPassword, Disable-GTUserDevice |
 | `-UPN` | `-UserPrincipalName`, `-Users`, `-UserName`, `-UPNName` | Single user commands (string) | Revoke-GTSignOutFromAllSessions |
 | `-UserPrincipalName` | `-UPN`, `-UserName`, `-UPNName` | Single user lookup commands (string) | Get-GTRecentUser |
-| `-UserPrincipalName` | `-UPN`, `-Users`, `-User`, `-UserName`, `-UPNName` | Report generation accepting multiple users (string[]) | Get-MFAReport |
-| `-FilterUser` | `-User`, `-UPN`, `-UserPrincipalName`, `-UserName`, `-UPNName` | Filter parameters for license queries | Get-M365LicenseOverview |
-| `-UserIds` | `-Users`, `-UPN`, `-UserPrincipalName`, `-UserName`, `-UPNName` | Audit log queries accepting user arrays | Invoke-AuditLogQuery |
+| `-UserPrincipalName` | `-UPN`, `-Users`, `-User`, `-UserName`, `-UPNName` | Report generation accepting multiple users (string[]) | Get-GTMFAReport |
+| `-FilterUser` | `-User`, `-UPN`, `-UserPrincipalName`, `-UserName`, `-UPNName` | Filter parameters for license queries | Get-GTM365LicenseOverview |
+| `-UserIds` | `-Users`, `-UPN`, `-UserPrincipalName`, `-UserName`, `-UPNName` | Audit log queries accepting user arrays | Invoke-GTAuditLogQuery |
 
 #### When to Use Which Parameter
 
@@ -214,14 +214,14 @@ Disable-GTUser -Users 'user1@contoso.com', 'user2@contoso.com'
 Disable-GTUser -UPN 'user1@contoso.com', 'user2@contoso.com'
 
 # For filtering license queries:
-Get-M365LicenseOverview -FilterUser 'john@contoso.com'
-Get-M365LicenseOverview -UPN 'john@contoso.com'
-Get-M365LicenseOverview -UserName 'john@contoso.com'
+Get-GTM365LicenseOverview -FilterUser 'john@contoso.com'
+Get-GTM365LicenseOverview -UPN 'john@contoso.com'
+Get-GTM365LicenseOverview -UserName 'john@contoso.com'
 
 # For audit log queries:
-Invoke-AuditLogQuery -UserIds 'user@contoso.com'
-Invoke-AuditLogQuery -Users 'user@contoso.com'
-Invoke-AuditLogQuery -UPN 'user@contoso.com'
+Invoke-GTAuditLogQuery -UserIds 'user@contoso.com'
+Invoke-GTAuditLogQuery -Users 'user@contoso.com'
+Invoke-GTAuditLogQuery -UPN 'user@contoso.com'
 ```
 
 ## Security & Input Validation
@@ -258,34 +258,34 @@ Internal functions that build OData filters with user/device IDs validate GUIDs 
 Protected functions:
 
 - `Disable-GTUserDevice` - Validates user IDs before device filter queries
-- `Remove-GTUserRoleAssignments` - Validates principal IDs in role queries
-- `Remove-GTUserDelegatedPermissionGrants` - Validates OAuth grant principals
+- `Remove-GTUserRoleAssignment` - Validates principal IDs in role queries
+- `Remove-GTUserDelegatedPermissionGrant` - Validates OAuth grant principals
 - `Remove-GTPIMRoleEligibility` - Validates PIM role schedule principals
-- `Remove-GTUserAccessPackageAssignments` - Validates access package assignment targets
+- `Remove-GTUserAccessPackageAssignment` - Validates access package assignment targets
 
 ### Audit Log Parameter Validation
 
-`Invoke-AuditLogQuery` implements strict character whitelisting for all filter parameters:
+`Invoke-GTAuditLogQuery` implements strict character whitelisting for all filter parameters:
 
 **Operations Parameter**: Only alphanumeric, hyphens, and underscores
 
 ```powershell
-Invoke-AuditLogQuery -Operations 'FileDeleted','User_Logon'  # ✅ Valid
-Invoke-AuditLogQuery -Operations "File'; DROP TABLE--"       # ❌ Blocked
+Invoke-GTAuditLogQuery -Operations 'FileDeleted','User_Logon'  # ✅ Valid
+Invoke-GTAuditLogQuery -Operations "File'; DROP TABLE--"       # ❌ Blocked
 ```
 
 **RecordType Parameter**: Only alphanumeric, hyphens, and underscores
 
 ```powershell
-Invoke-AuditLogQuery -RecordType 'Exchange','SharePoint'     # ✅ Valid
-Invoke-AuditLogQuery -RecordType "Type' OR 1=1--"            # ❌ Blocked
+Invoke-GTAuditLogQuery -RecordType 'Exchange','SharePoint'     # ✅ Valid
+Invoke-GTAuditLogQuery -RecordType "Type' OR 1=1--"            # ❌ Blocked
 ```
 
 **Properties Parameter**: Only alphanumeric, dots (for nested properties), and underscores
 
 ```powershell
-Invoke-AuditLogQuery -Properties 'Id','auditData.property'   # ✅ Valid
-Invoke-AuditLogQuery -Properties "prop' OR '1'='1"           # ❌ Blocked
+Invoke-GTAuditLogQuery -Properties 'Id','auditData.property'   # ✅ Valid
+Invoke-GTAuditLogQuery -Properties "prop' OR '1'='1"           # ❌ Blocked
 ```
 
 ### Why This Matters
@@ -321,8 +321,8 @@ These validations prevent:
 
 **v0.9.0+ closes this security gap** by removing both active role assignments AND PIM role eligibilities when using:
 
-- `Remove-GTUserEntitlements -removeAll`
-- `Remove-GTUserEntitlements -removePIMRoleEligibility`
+- `Remove-GTUserEntitlement -removeAll`
+- `Remove-GTUserEntitlement -removePIMRoleEligibility`
 
 Always use the `-removePIMRoleEligibility` parameter or `-removeAll` when offboarding privileged users to ensure they cannot activate eligible roles.
 

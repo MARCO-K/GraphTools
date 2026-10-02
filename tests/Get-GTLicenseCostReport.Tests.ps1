@@ -9,8 +9,8 @@ Describe "Get-GTLicenseCostReport" {
         function global:Invoke-GTGraphRequest { param($Method, $Uri, $Headers, $ErrorAction, [switch]$All) }
 
         # Provide a UTC time helper used by the function under test
-        . "$PSScriptRoot/../internal/functions/Get-UTCTime.ps1"
-        . "$PSScriptRoot/../internal/functions/Format-ODataDateTime.ps1"
+        . "$PSScriptRoot/../internal/functions/Get-GTUtcTime.ps1"
+        . "$PSScriptRoot/../internal/functions/Format-GTODataDateTime.ps1"
 
         # Dot-source the function under test AFTER stubs
         . "$PSScriptRoot/../functions/Get-GTLicenseCostReport.ps1"

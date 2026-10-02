@@ -168,7 +168,7 @@ These functions complement existing GraphTools capabilities:
 
 ## Related Functions
 
-- `Get-MFAReport` - MFA status and methods analysis
+- `Get-GTMFAReport` - MFA status and methods analysis
 - `Get-GTConditionalAccessPolicyReport` - General CA policy reporting
 - `Disable-GTUser` - User account management during incidents
 - `Revoke-GTSignOutFromAllSessions` - Session termination

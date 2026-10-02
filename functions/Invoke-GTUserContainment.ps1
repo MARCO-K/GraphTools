@@ -11,7 +11,7 @@
     2. Disable the user account to block future authentication attempts (Disable-GTUser)
     3. Reset the account password to terminate Continuous Access Evaluation (CAE) sessions (Reset-GTUserPassword)
     4. Disable all registered and workplace-joined devices to block token replay (Disable-GTUserDevice)
-    5. Optionally strip all directory entitlements, group memberships, and role assignments (Remove-GTUserEntitlements)
+    5. Optionally strip all directory entitlements, group memberships, and role assignments (Remove-GTUserEntitlement)
 
     By default, standard containment executes steps 1-4. Step 5 (StripEntitlements) is destructive
     and is only executed when -StripEntitlements or -FullContainment is explicitly specified.
@@ -389,7 +389,7 @@ function Invoke-GTUserContainment
                 try
                 {
                     Write-PSFMessage -Level Verbose -Message "$targetUser - Stripping all entitlements..."
-                    Remove-GTUserEntitlements -UserUPNs $targetUser -removeAll -ErrorAction Stop
+                    Remove-GTUserEntitlement -UserUPNs $targetUser -removeAll -ErrorAction Stop
                     $entitlementsStrippedResult = 'Stripped'
                     Write-PSFMessage -Level Verbose -Message "$targetUser - Entitlements stripped successfully."
                 }

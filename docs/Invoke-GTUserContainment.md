@@ -28,7 +28,7 @@ It coordinates the 5-step containment lifecycle:
 2. **Disable Account (`Disable-GTUser`)**: Sets `accountEnabled = $false` via Microsoft Graph REST API to block new authentication requests.
 3. **Reset Password (`Reset-GTUserPassword`)**: Generates a high-entropy temporary password to trigger Continuous Access Evaluation (CAE) token revocation in supporting applications.
 4. **Disable Devices (`Disable-GTUserDevice`)**: Queries all registered and workplace-joined devices owned by the user and sets their status to disabled.
-5. **Strip Entitlements (`Remove-GTUserEntitlements`)**: Revokes group memberships, directory roles, licenses, app role assignments, and Privileged Identity Management (PIM) eligibility schedules.
+5. **Strip Entitlements (`Remove-GTUserEntitlement`)**: Revokes group memberships, directory roles, licenses, app role assignments, and Privileged Identity Management (PIM) eligibility schedules.
 
 ### Default Behavior
 By default, standard safe containment executes steps 1 through 4. Step 5 (`StripEntitlements`) is destructive and is only executed when `-StripEntitlements` or `-FullContainment` is explicitly requested.
@@ -150,5 +150,5 @@ Displays planned containment actions without executing them against Microsoft Gr
 - [`Disable-GTUser`](../functions/Disable-GTUser.ps1)
 - [`Reset-GTUserPassword`](../functions/Reset-GTUserPassword.ps1)
 - [`Disable-GTUserDevice`](../functions/Disable-GTUserDevice.ps1)
-- [`Remove-GTUserEntitlements`](../functions/Remove-GTUserEntitlements.ps1)
+- [`Remove-GTUserEntitlement`](../functions/Remove-GTUserEntitlement.ps1)
 - [User Security Response Guide](User-Security-Response.md)

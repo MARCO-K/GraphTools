@@ -52,7 +52,7 @@ GET /v1.0/oauth2PermissionGrants?$filter=resourceId eq '{graphServicePrincipalOb
 Filtering by `resourceId` at the API level eliminates downloading grants targeted at third-party applications, Exchange Online, SharePoint Online, or custom enterprise APIs, significantly reducing bandwidth and processing time in large directories.
 
 ### 3. Dormancy & Activity Tracking
-The cmdlet calculates account activity by evaluating `signInActivity.lastSignInDateTime` against `(Get-UTCTime)`:
+The cmdlet calculates account activity by evaluating `signInActivity.lastSignInDateTime` against `(Get-GTUtcTime)`:
 - If `lastSignInDateTime` is within the last 90 days, `IsActive` is set to `$true`.
 - If older than 90 days (or if the application has never signed in), `IsActive` is `$false`.
 *Note*: Querying `signInActivity` requires the `beta` endpoint and `AuditLog.Read.All` privileges.

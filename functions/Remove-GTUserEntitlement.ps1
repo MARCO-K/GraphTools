@@ -1,0 +1,248 @@
+<#
+.SYNOPSIS
+    Removes all user entitlements including group memberships, ownerships, licenses, role assignments, and service principal relationships
+.DESCRIPTION
+    Comprehensive removal of user access across multiple Microsoft 365 components including:
+    - Group memberships
+    - Group ownerships
+    - Licenses
+    - Service principal ownerships (deprecated - use removeEnterpriseAppOwnership)
+    - Enterprise Applications and App Registrations ownerships
+    - User app role assignments (application access)
+    - Directory role assignments (privileged roles)
+    - PIM role eligibility schedules (eligible privileged roles)
+    - Administrative unit memberships (scoped administrative rights)
+    - Access package assignments (Entitlement Management)
+    - Delegated permission grants (OAuth2 permissions granted to apps on behalf of user)
+.PARAMETER UserUPNs
+    Array of user principal names to process. Must be valid email format (e.g., user@domain.com)
+
+    Note: This parameter does not have aliases since it's specifically named to distinguish between
+    user UPNs (input) and internal User objects used by helper functions.
+.PARAMETER removeGroups
+    Remove user from all group memberships
+.PARAMETER removeGroupOwners
+    Remove user from all group ownerships
+.PARAMETER removeLicenses
+    Remove all licenses from the user
+.PARAMETER removeServicePrincipals
+    Remove user from service principal ownerships (deprecated - use removeEnterpriseAppOwnership)
+.PARAMETER removeEnterpriseAppOwnership
+    Remove user from Enterprise Applications and App Registrations ownerships (recommended)
+.PARAMETER removeUserAppRoleAssignments
+    Remove all user app role assignments to revoke access to specific applications
+.PARAMETER removeRoleAssignments
+    Remove all directory role assignments (privileged roles like Global Administrator)
+.PARAMETER removePIMRoleEligibility
+    Remove all PIM role eligibility schedules to prevent activation of eligible privileged roles
+.PARAMETER removeAdministrativeUnitMemberships
+    Remove all administrative unit memberships to revoke scoped administrative rights
+.PARAMETER removeAccessPackageAssignments
+    Remove all access package assignments to revoke access granted through Entitlement Management
+.PARAMETER removeDelegatedPermissionGrants
+    Remove all delegated permission grants (OAuth2 permissions) granted to applications on behalf of the user
+.PARAMETER removeAll
+    Remove all types of entitlements
+.PARAMETER NewSession
+    If specified, creates a new Microsoft Graph session by disconnecting any existing session first.
+.EXAMPLE
+    Remove-GTUserEntitlement -UserUPNs 'user1@contoso.com' -removeAll
+
+    Removes all entitlements from the specified user
+.EXAMPLE
+    Remove-GTUserEntitlement -UserUPNs 'user1@contoso.com','user2@contoso.com' -removeGroups -removeLicenses
+
+    Removes group memberships and licenses from multiple users
+.EXAMPLE
+    Remove-GTUserEntitlement -UserUPNs 'admin@contoso.com' -removeRoleAssignments -removePIMRoleEligibility
+
+    Removes both active role assignments and PIM role eligibilities from an admin account
+#>
+function Remove-GTUserEntitlement {
+    [Alias('Remove-GTUserEntitlements')]
+    [CmdletBinding(SupportsShouldProcess, ConfirmImpact = 'High')]
+    param(
+        [Parameter(Mandatory = $true, ValueFromPipeline = $true)]
+        [ValidateScript({ $_ -match $script:GTValidationRegex.UPN })]
+        [string[]]$UserUPNs,
+        [switch]$removeGroups,
+        [switch]$removeGroupOwners,
+        [switch]$removeLicenses,
+        [switch]$removeServicePrincipals,
+        [switch]$removeEnterpriseAppOwnership,
+        [switch]$removeUserAppRoleAssignments,
+        [switch]$removeRoleAssignments,
+        [switch]$removePIMRoleEligibility,
+        [switch]$removeAdministrativeUnitMemberships,
+        [switch]$removeAccessPackageAssignments,
+        [switch]$removeDelegatedPermissionGrants,
+        [switch]$removeAll,
+        [switch]$NewSession
+    )
+
+    begin {
+        $results = [System.Collections.Generic.List[PSObject]]::new()
+
+        $selectedOperations = @()
+        if ($removeGroups) { $selectedOperations += 'removeGroups' }
+        if ($removeGroupOwners) { $selectedOperations += 'removeGroupOwners' }
+        if ($removeLicenses) { $selectedOperations += 'removeLicenses' }
+        if ($removeServicePrincipals) { $selectedOperations += 'removeServicePrincipals' }
+        if ($removeEnterpriseAppOwnership) { $selectedOperations += 'removeEnterpriseAppOwnership' }
+        if ($removeUserAppRoleAssignments) { $selectedOperations += 'removeUserAppRoleAssignments' }
+        if ($removeRoleAssignments) { $selectedOperations += 'removeRoleAssignments' }
+        if ($removePIMRoleEligibility) { $selectedOperations += 'removePIMRoleEligibility' }
+        if ($removeAdministrativeUnitMemberships) { $selectedOperations += 'removeAdministrativeUnitMemberships' }
+        if ($removeAccessPackageAssignments) { $selectedOperations += 'removeAccessPackageAssignments' }
+        if ($removeDelegatedPermissionGrants) { $selectedOperations += 'removeDelegatedPermissionGrants' }
+
+        if (-not $removeAll -and $selectedOperations.Count -eq 0)
+        {
+            throw "No entitlement action selected. Specify at least one remove* switch or use -removeAll."
+        }
+
+        $scopeSet = [System.Collections.Generic.HashSet[string]]::new([System.StringComparer]::OrdinalIgnoreCase)
+        if ($removeAll -or $removeGroups) { [void]$scopeSet.Add('GroupMember.ReadWrite.All') }
+        if ($removeAll -or $removeGroupOwners) { [void]$scopeSet.Add('Group.ReadWrite.All') }
+        if ($removeAll -or $removeLicenses) { [void]$scopeSet.Add('Directory.ReadWrite.All') }
+        if ($removeAll -or $removeServicePrincipals -or $removeEnterpriseAppOwnership -or $removeUserAppRoleAssignments) { [void]$scopeSet.Add('Directory.ReadWrite.All') }
+        if ($removeAll -or $removeRoleAssignments) { [void]$scopeSet.Add('RoleManagement.ReadWrite.Directory') }
+        if ($removeAll -or $removePIMRoleEligibility) { [void]$scopeSet.Add('RoleEligibilitySchedule.ReadWrite.Directory') }
+        if ($removeAll -or $removeAdministrativeUnitMemberships) { [void]$scopeSet.Add('AdministrativeUnit.ReadWrite.All') }
+        if ($removeAll -or $removeAccessPackageAssignments) { [void]$scopeSet.Add('EntitlementManagement.ReadWrite.All') }
+        if ($removeAll -or $removeDelegatedPermissionGrants) { [void]$scopeSet.Add('DelegatedPermissionGrant.ReadWrite.All') }
+
+        # Resolving user UPNs via GET /v1.0/users/{upn} requires User.Read.All unless Directory.ReadWrite.All is already included
+        if (-not $scopeSet.Contains('Directory.ReadWrite.All'))
+        {
+            [void]$scopeSet.Add('User.Read.All')
+        }
+
+        $RequiredScopes = @($scopeSet)
+
+        # 1. Connection Initialization
+        if (-not (Initialize-GTGraphConnection -Scopes $RequiredScopes -NewSession:$NewSession))
+        {
+            throw "Failed to initialize Microsoft Graph session."
+        }
+
+        # 2. Scope Validation
+        $conn = Get-GTConnection
+        $currentScopes = if ($conn.Scopes) { [string[]]$conn.Scopes } elseif ($conn.Scope) { $conn.Scope -split ' ' } else { @() }
+        $effectiveCurrentScopes = [System.Collections.Generic.HashSet[string]]::new([System.StringComparer]::OrdinalIgnoreCase)
+        foreach ($scope in $currentScopes)
+        {
+            if (-not [string]::IsNullOrWhiteSpace($scope))
+            {
+                [void]$effectiveCurrentScopes.Add($scope)
+            }
+        }
+        if ($effectiveCurrentScopes.Contains('Directory.ReadWrite.All') -or $effectiveCurrentScopes.Contains('Directory.Read.All'))
+        {
+            [void]$effectiveCurrentScopes.Add('User.Read.All')
+        }
+        $missingScopes = Get-GTMissingScope -RequiredScopes $RequiredScopes -CurrentScopes @($effectiveCurrentScopes)
+        if ($missingScopes -and $missingScopes.Count -gt 0)
+        {
+            throw "Required scopes are missing: $($missingScopes -join ', ')"
+        }
+        Write-PSFMessage -Level Verbose -Message "All required scopes are present"
+    }
+
+    process {
+        foreach ($UPN in $UserUPNs) {
+            try {
+                $userResp = Invoke-GTGraphRequest -Method GET -Uri "v1.0/users/$($UPN)?`$select=id,userPrincipalName" -ErrorAction Stop
+                $User = [PSCustomObject]@{ Id = $userResp.id; UserPrincipalName = $userResp.userPrincipalName }
+                $outputBase = @{
+                    UPN       = $UPN
+                    UserId    = $User.Id
+                    Timestamp = [datetime]::UtcNow
+                }
+
+                # 1. Remove Group Memberships
+                if ($removeGroups -or $removeAll) {
+                    Remove-GTUserGroupMembership -User $User -OutputBase $outputBase -Results $results
+                }
+
+                # 2. Remove Group Ownerships
+                if ($removeGroupOwners -or $removeAll) {
+                    Remove-GTUserGroupOwnership -User $User -OutputBase $outputBase -Results $results
+                }
+
+                # 3. Remove Licenses
+                if ($removeLicenses -or $removeAll) {
+                    Remove-GTUserLicense -User $User -OutputBase $outputBase -Results $results
+                }
+
+                # 4. Remove Service Principal Ownerships (deprecated)
+                if ($removeServicePrincipals -or $removeAll) {
+                    Remove-GTUserServicePrincipalOwnership -User $User -OutputBase $outputBase -Results $results
+                }
+
+                # 5. Remove Enterprise Applications and App Registrations Ownerships
+                if ($removeEnterpriseAppOwnership -or $removeAll) {
+                    Remove-GTUserEnterpriseAppOwnership -User $User -OutputBase $outputBase -Results $results
+                }
+
+                # 6. Remove UserAppRoleAssignment
+                if ($removeUserAppRoleAssignments -or $removeAll) {
+                    Remove-GTUserAppRoleAssignment -User $User -OutputBase $outputBase -Results $results
+                }
+
+                # 7. Remove Role Assignments (Privileged Roles)
+                if ($removeRoleAssignments -or $removeAll) {
+                    Remove-GTUserRoleAssignment -User $User -OutputBase $outputBase -Results $results
+                }
+
+                # 8. Remove PIM Role Eligibility Schedules
+                if ($removePIMRoleEligibility -or $removeAll) {
+                    Remove-GTPIMRoleEligibilityInternal -User $User -OutputBase $outputBase -Results $results
+                }
+
+                # 9. Remove Administrative Unit Memberships
+                if ($removeAdministrativeUnitMemberships -or $removeAll) {
+                    Remove-GTUserAdministrativeUnitMembership -User $User -OutputBase $outputBase -Results $results
+                }
+
+                # 10. Remove Access Package Assignments
+                if ($removeAccessPackageAssignments -or $removeAll) {
+                    Remove-GTUserAccessPackageAssignment -User $User -OutputBase $outputBase -Results $results
+                }
+
+                # 11. Remove Delegated Permission Grants
+                if ($removeDelegatedPermissionGrants -or $removeAll) {
+                    Remove-GTUserDelegatedPermissionGrant -User $User -OutputBase $outputBase -Results $results
+                }
+            }
+            catch {
+                # Use centralized error handling helper to parse Graph API exceptions
+                $errorDetails = Get-GTGraphErrorDetails -Exception $_.Exception -ResourceType 'user'
+                
+                # Log appropriate message based on error details
+                if ($errorDetails.HttpStatus -in 404, 403) {
+                    Write-PSFMessage -Level $errorDetails.LogLevel -Message "$UPN - User retrieval failed - $($errorDetails.Reason)"
+                    Write-PSFMessage -Level Debug -Message "Detailed error ($($errorDetails.HttpStatus)): $($errorDetails.ErrorMessage)"
+                }
+                elseif ($errorDetails.HttpStatus) {
+                    Write-PSFMessage -Level $errorDetails.LogLevel -Message "$UPN - User retrieval failed - $($errorDetails.Reason)"
+                }
+                else {
+                    Write-PSFMessage -Level Error -Message "$UPN - User retrieval failed. $($errorDetails.ErrorMessage)"
+                }
+                
+                $results.Add([PSCustomObject]($outputBase + @{
+                            ResourceName = 'UserLookup'
+                            ResourceType = 'User'
+                            ResourceId   = $null
+                            Action       = 'UserRetrieval'
+                            Status       = "Failed: $($errorDetails.Reason)"
+                        }))
+            }
+        }
+    }
+
+    end {
+        return $results
+    }
+}

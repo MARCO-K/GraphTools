@@ -18,7 +18,7 @@ Describe "Invoke-GTUserContainment" {
         if (-not (Get-Command Disable-GTUser -ErrorAction SilentlyContinue)) { function Disable-GTUser { param($UPN, [switch]$Force, [switch]$NewSession) return @([PSCustomObject]@{ User = $UPN; Status = 'Disabled'; Reason = 'User disabled' }) } }
         if (-not (Get-Command Reset-GTUserPassword -ErrorAction SilentlyContinue)) { function Reset-GTUserPassword { param($UPN, [switch]$NewSession) } }
         if (-not (Get-Command Disable-GTUserDevice -ErrorAction SilentlyContinue)) { function Disable-GTUserDevice { param($UPN, [switch]$Force, [switch]$NewSession) return @([PSCustomObject]@{ User = $UPN; DeviceId = 'dev-1'; Status = 'Disabled' }) } }
-        if (-not (Get-Command Remove-GTUserEntitlements -ErrorAction SilentlyContinue)) { function Remove-GTUserEntitlements { param($UserUPNs, [switch]$removeAll, [switch]$NewSession) return @() } }
+        if (-not (Get-Command Remove-GTUserEntitlement -ErrorAction SilentlyContinue)) { function Remove-GTUserEntitlement { [Alias('Remove-GTUserEntitlements')] param($UserUPNs, [switch]$removeAll, [switch]$NewSession) return @() } }
 
         # 2. Load Function Under Test
         $functionPath = Join-Path $PSScriptRoot '..\functions\Invoke-GTUserContainment.ps1'
@@ -72,7 +72,7 @@ Describe "Invoke-GTUserContainment" {
             Mock -CommandName "Disable-GTUser" -MockWith { return @([PSCustomObject]@{ User = 'victim@contoso.com'; Status = 'Disabled' }) }
             Mock -CommandName "Reset-GTUserPassword" -MockWith { }
             Mock -CommandName "Disable-GTUserDevice" -MockWith { return @([PSCustomObject]@{ User = 'victim@contoso.com'; Status = 'Disabled' }) }
-            Mock -CommandName "Remove-GTUserEntitlements" -MockWith { }
+            Mock -CommandName "Remove-GTUserEntitlement" -MockWith { }
         }
 
         It "executes steps 1-4 but defers entitlement stripping by default" {
@@ -91,7 +91,7 @@ Describe "Invoke-GTUserContainment" {
             Assert-MockCalled -CommandName "Disable-GTUser" -Times 1 -Exactly
             Assert-MockCalled -CommandName "Reset-GTUserPassword" -Times 1 -Exactly
             Assert-MockCalled -CommandName "Disable-GTUserDevice" -Times 1 -Exactly
-            Assert-MockCalled -CommandName "Remove-GTUserEntitlements" -Times 0 -Exactly
+            Assert-MockCalled -CommandName "Remove-GTUserEntitlement" -Times 0 -Exactly
         }
 
         It "handles users with no registered devices" {
@@ -109,7 +109,7 @@ Describe "Invoke-GTUserContainment" {
             Mock -CommandName "Disable-GTUser" -MockWith { return @([PSCustomObject]@{ User = 'target@contoso.com'; Status = 'Disabled' }) }
             Mock -CommandName "Reset-GTUserPassword" -MockWith { }
             Mock -CommandName "Disable-GTUserDevice" -MockWith { }
-            Mock -CommandName "Remove-GTUserEntitlements" -MockWith { }
+            Mock -CommandName "Remove-GTUserEntitlement" -MockWith { }
         }
 
         It "executes only requested actions when specific switches are provided" {
@@ -126,7 +126,7 @@ Describe "Invoke-GTUserContainment" {
             Assert-MockCalled -CommandName "Reset-GTUserPassword" -Times 1 -Exactly
             Assert-MockCalled -CommandName "Disable-GTUser" -Times 0 -Exactly
             Assert-MockCalled -CommandName "Disable-GTUserDevice" -Times 0 -Exactly
-            Assert-MockCalled -CommandName "Remove-GTUserEntitlements" -Times 0 -Exactly
+            Assert-MockCalled -CommandName "Remove-GTUserEntitlement" -Times 0 -Exactly
         }
     }
 
@@ -136,7 +136,7 @@ Describe "Invoke-GTUserContainment" {
             Mock -CommandName "Disable-GTUser" -MockWith { return @([PSCustomObject]@{ User = 'all@contoso.com'; Status = 'Disabled' }) }
             Mock -CommandName "Reset-GTUserPassword" -MockWith { }
             Mock -CommandName "Disable-GTUserDevice" -MockWith { return @([PSCustomObject]@{ User = 'all@contoso.com'; Status = 'Disabled' }) }
-            Mock -CommandName "Remove-GTUserEntitlements" -MockWith { }
+            Mock -CommandName "Remove-GTUserEntitlement" -MockWith { }
         }
 
         It "executes all 5 actions when FullContainment is specified" {
@@ -149,7 +149,7 @@ Describe "Invoke-GTUserContainment" {
             $report.DevicesDisabled | Should -Be 'Disabled (1 device(s))'
             $report.EntitlementsStripped | Should -Be 'Stripped'
 
-            Assert-MockCalled -CommandName "Remove-GTUserEntitlements" -Times 1 -Exactly
+            Assert-MockCalled -CommandName "Remove-GTUserEntitlement" -Times 1 -Exactly
         }
     }
 
@@ -159,7 +159,7 @@ Describe "Invoke-GTUserContainment" {
             Mock -CommandName "Disable-GTUser" -MockWith { }
             Mock -CommandName "Reset-GTUserPassword" -MockWith { }
             Mock -CommandName "Disable-GTUserDevice" -MockWith { }
-            Mock -CommandName "Remove-GTUserEntitlements" -MockWith { }
+            Mock -CommandName "Remove-GTUserEntitlement" -MockWith { }
         }
 
         It "respects WhatIf and does not execute containment actions" {
@@ -265,7 +265,7 @@ Describe "Invoke-GTUserContainment" {
         It "enforces least-privilege by excluding User.ReadWrite.All and Device.ReadWrite.All when only -StripEntitlements is requested" {
             Mock -CommandName "Initialize-GTGraphConnection" -MockWith { return $true }
             Mock -CommandName "Test-GTGraphScopes" -MockWith { return $true }
-            Mock -CommandName "Remove-GTUserEntitlements" -MockWith { return @() }
+            Mock -CommandName "Remove-GTUserEntitlement" -MockWith { return @() }
 
             $null = Invoke-GTUserContainment -UPN 'entitlementsonly@contoso.com' -StripEntitlements
 

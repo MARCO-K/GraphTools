@@ -1,0 +1,80 @@
+function Remove-GTUserLicense
+{
+    [Alias('Remove-GTUserLicenses')]
+    <#
+    .SYNOPSIS
+        Removes all licenses from a user
+    .DESCRIPTION
+        Removes all Microsoft 365 licenses assigned to a user. This revokes access to
+        licensed services such as Exchange Online, SharePoint, Teams, and other
+        Microsoft 365 applications.
+        
+        This is typically used during offboarding or security incident response.
+        
+        This is an internal helper function used by Remove-GTUserEntitlement.
+    .PARAMETER User
+        The user object (must have Id and UserPrincipalName properties)
+    .PARAMETER OutputBase
+        Base output object for logging
+    .PARAMETER Results
+        Results collection to add output to
+    .EXAMPLE
+        $user = Get-MgBetaUser -UserId 'user@contoso.com'
+        $outputBase = @{ UserPrincipalName = $user.UserPrincipalName }
+        $results = [System.Collections.Generic.List[PSObject]]::new()
+        Remove-GTUserLicense -User $user -OutputBase $outputBase -Results $results
+        
+        Removes all licenses from the user and adds results to the collection
+    #>
+    [CmdletBinding(SupportsShouldProcess)]
+    param(
+        [Parameter(Mandatory = $true, ValueFromPipeline = $true)]
+        [ValidateNotNullOrEmpty()]
+        [ValidateScript({ Test-GTUserObject -User $_ })]
+        [object]$User,
+        [Parameter(Mandatory = $true)]
+        [hashtable]$OutputBase,
+        [Parameter(Mandatory = $true)]
+        [System.Collections.Generic.List[PSObject]]$Results
+    )
+
+    $licenses = Invoke-GTGraphPagedRequest -Uri "v1.0/users/$($User.Id)/licenseDetails?`$select=id,skuId,skuPartNumber"
+    if ($licenses)
+    {
+        $action = 'RemoveLicenses'
+        $output = $OutputBase + @{
+            ResourceName = 'Licenses'
+            ResourceType = 'License'
+            ResourceId   = ($licenses.skuPartNumber -join ', ')
+            Action       = $action
+        }
+
+        try
+        {
+            if ($PSCmdlet.ShouldProcess($User.UserPrincipalName, $action))
+            {
+                Write-PSFMessage -Level Verbose -Message "Removing licenses from user $($User.UserPrincipalName)"
+                Invoke-GTGraphRequest -Method POST -Uri "v1.0/users/$($User.Id)/assignLicense" -Body @{ addLicenses = @(); removeLicenses = @($licenses.skuId) } -ContentType 'application/json' -ErrorAction Stop
+                $output['Status'] = 'Success'
+            }
+        }
+        catch
+        {
+            # Use centralized error handling helper to parse Graph API exceptions
+            $errorDetails = Get-GTGraphErrorDetails -Exception $_.Exception -ResourceType 'user'
+            
+            # Log appropriate message based on error details
+            if ($errorDetails.HttpStatus) {
+                Write-PSFMessage -Level $errorDetails.LogLevel -Message "Failed to remove licenses from user $($User.UserPrincipalName). $($errorDetails.Reason)"
+                if ($errorDetails.HttpStatus -in 404, 403) {
+                    Write-PSFMessage -Level Debug -Message "Detailed error ($($errorDetails.HttpStatus)): $($errorDetails.ErrorMessage)"
+                }
+            }
+            else {
+                Write-PSFMessage -Level Error -Message "Failed to remove licenses from user $($User.UserPrincipalName). $($errorDetails.ErrorMessage)"
+            }
+            $output['Status'] = "Failed: $($errorDetails.Reason)"
+        }
+        $Results.Add([PSCustomObject]$output)
+    }
+}
