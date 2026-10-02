@@ -35,7 +35,7 @@ function Get-GTAuditLogRecordTypes
         {
             # Retrieve documentation page
             Write-PSFMessage -Level Verbose -Message "Fetching documentation from: $DocUrl"
-            $response = Invoke-WebRequest -Uri $DocUrl -UseBasicParsing -ErrorAction Stop
+            $response = Invoke-WebRequest -Uri $DocUrl -UseBasicParsing -TimeoutSec 30 -ErrorAction Stop
 
             if ($response.StatusCode -ne 200)
             {

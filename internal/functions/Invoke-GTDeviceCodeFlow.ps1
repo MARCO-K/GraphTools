@@ -50,6 +50,7 @@ function Invoke-GTDeviceCodeFlow
                                                 -Uri $deviceCodeEndpoint `
                                                 -ContentType 'application/x-www-form-urlencoded' `
                                                 -Body $initBody `
+                                                -TimeoutSec 30 `
                                                 -ErrorAction Stop
     }
     catch
@@ -88,6 +89,7 @@ function Invoke-GTDeviceCodeFlow
                                                -Uri $tokenEndpoint `
                                                -ContentType 'application/x-www-form-urlencoded' `
                                                -Body $pollBody `
+                                               -TimeoutSec 30 `
                                                -ErrorAction Stop
 
             if ($tokenResponse.access_token)

@@ -49,6 +49,7 @@ function Invoke-GTRefreshTokenRenewal
                                       -Uri $tokenEndpoint `
                                       -ContentType 'application/x-www-form-urlencoded' `
                                       -Body $body `
+                                      -TimeoutSec 30 `
                                       -ErrorAction Stop
 
         if (-not $response.access_token)

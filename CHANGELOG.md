@@ -13,6 +13,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Replaced N+1 individual synchronous user queries with bulk batch resolution via `Invoke-GTGraphBatch` for delegated permission grants, reducing roundtrips by up to ~95%.
   - Improved error status mapping during batch resolution to only classify HTTP 404 responses as deleted users while correctly falling back to `Unknown` for authorization (403) or transient (500) failures.
 
+### Security
+
+- **External API Call Timeout Hardening (`-TimeoutSec`)**:
+  - Enforced explicit timeouts on all `Invoke-RestMethod` and `Invoke-WebRequest` invocations across authentication, token acquisition, and web scraping utilities to eliminate indefinite socket blocking and mitigate denial-of-service / resource exhaustion risks (5s for local IMDS queries, 30s for OAuth endpoints and documentation scraping, 120s default for the Graph REST engine).
+
 ## [0.27.0] - 2026-10-01
 
 ### Added

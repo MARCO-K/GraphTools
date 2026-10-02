@@ -215,5 +215,18 @@ Describe "Invoke-GTGraphRequest" -Tag 'Unit' {
 
             $script:capturedTimeout | Should -Be 45
         }
+
+        It "defaults to 30 seconds timeout when TimeoutSeconds is omitted" {
+            $script:capturedTimeout = $null
+
+            Mock -CommandName Invoke-RestMethod -MockWith {
+                $script:capturedTimeout = if ($null -ne $TimeoutSec) { $TimeoutSec } else { $ConnectionTimeoutSeconds }
+                return @{ value = @() }
+            }
+
+            $null = Invoke-GTGraphRequest -Uri "v1.0/users"
+
+            $script:capturedTimeout | Should -Be 30
+        }
     }
 }

@@ -63,17 +63,17 @@ function Get-M365LicenseOverview
                 # Note: Microsoft rotates these URLs, so the scraping fallback is essential.
                 $csvUrl = 'https://download.microsoft.com/download/e/3/e/e3e9faf2-f28b-490a-9ada-c6089a1fc5b0/Product%20names%20and%20service%20plan%20identifiers%20for%20licensing.csv'
                 try {
-                    $csvPayload = Invoke-RestMethod -Uri $csvUrl -ErrorAction Stop
+                    $csvPayload = Invoke-RestMethod -Uri $csvUrl -TimeoutSec 30 -ErrorAction Stop
                     $skuTable = if ($csvPayload -is [string]) { $csvPayload | ConvertFrom-Csv } else { @($csvPayload) }
                 }
                 catch {
                     Write-PSFMessage -Level Verbose -Message "Direct CSV download failed, attempting to scrape documentation page..."
                     $pageUrl = 'https://learn.microsoft.com/en-us/entra/identity/users/licensing-service-plan-reference'
-                    $pageContent = Invoke-WebRequest -Uri $pageUrl -UseBasicParsing -ErrorAction Stop
+                    $pageContent = Invoke-WebRequest -Uri $pageUrl -UseBasicParsing -TimeoutSec 30 -ErrorAction Stop
                     $csvLink = $pageContent.Links | Where-Object href -match '\.csv' | Select-Object -First 1 -ExpandProperty href
 
                     if (-not $csvLink) { throw "Could not find CSV link on Microsoft documentation page." }
-                    $csvPayload = Invoke-RestMethod -Uri $csvLink -ErrorAction Stop
+                    $csvPayload = Invoke-RestMethod -Uri $csvLink -TimeoutSec 30 -ErrorAction Stop
                     $skuTable = if ($csvPayload -is [string]) { $csvPayload | ConvertFrom-Csv } else { @($csvPayload) }
                 }
                 
