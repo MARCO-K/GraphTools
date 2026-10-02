@@ -26,8 +26,8 @@ function Expand-GTNestedProperties
     {
         # Initialize collection variables at the function scope
         $allColumns = [ordered]@{}
-        $processedData = @()
-        $standardizedData = @()
+        $processedData = [System.Collections.Generic.List[object]]::new()
+        $standardizedData = [System.Collections.Generic.List[object]]::new()
     }
 
     process
@@ -75,7 +75,7 @@ function Expand-GTNestedProperties
                     }
 
                 }
-                $processedData += $output
+                $processedData.Add($output)
                 # Collect all possible columns across all items
                 foreach ($key in $output.Keys)
                 {

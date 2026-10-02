@@ -7,6 +7,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+- Replaced inefficient array concatenation (`+=`) with `System.Collections.Generic.List[T]` inside loops across multiple files to improve performance:
+  - `Disable-GTUser.ps1`
+  - `Get-GTBreakGlassPolicyReport.ps1`
+  - `Get-GTInactiveUser.ps1`
+  - `Expand-GTNestedProperties.ps1`
+
 ## [0.27.0] - 2026-10-01
 
 ### Added

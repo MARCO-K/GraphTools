@@ -140,16 +140,16 @@ Function Disable-GTUser
         }
         elseif ($approvedUsers.Count -gt 1)
         {
-            $batchRequests = @()
+            $batchRequests = [System.Collections.Generic.List[hashtable]]::new()
             foreach ($User in $approvedUsers)
             {
-                $batchRequests += @{
+                $batchRequests.Add(@{
                     id      = $User
                     method  = 'PATCH'
                     url     = "/users/$([System.Uri]::EscapeDataString($User))"
                     body    = @{ accountEnabled = $false }
                     headers = @{ 'Content-Type' = 'application/json' }
-                }
+                })
             }
 
             Write-PSFMessage -Level Verbose -Message "Disabling $($approvedUsers.Count) users via JSON batch processing..."
