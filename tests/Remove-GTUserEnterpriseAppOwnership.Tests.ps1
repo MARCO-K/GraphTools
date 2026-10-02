@@ -21,6 +21,11 @@ Describe "Remove-GTUserEnterpriseAppOwnership" {
         . "$PSScriptRoot/../internal/functions/Remove-GTUserEnterpriseAppOwnership.ps1"
     }
 
+    # Define empty dependencies for the new mocks so they are found inside tests
+    function global:Invoke-GTGraphRequest { param($Uri, $Method) }
+    function global:Invoke-GTGraphBatch { param($Requests) }
+    function global:Invoke-GTGraphPagedRequest { param($Uri) }
+
     AfterAll {
         Remove-Item Function:\Remove-GTUserEnterpriseAppOwnership -Force -ErrorAction SilentlyContinue
         Remove-Item Function:\Test-GTUserObject -Force -ErrorAction SilentlyContinue
@@ -45,6 +50,122 @@ Describe "Remove-GTUserEnterpriseAppOwnership" {
             $results = [System.Collections.Generic.List[PSObject]]::new()
             
             { Remove-GTUserEnterpriseAppOwnership -User $invalidUser -OutputBase $outputBase -Results $results } | Should -Throw
+        }
+    }
+
+    Context "Batch fetching owners (Bolt Optimization)" {
+        BeforeEach {
+            # Write-PSFMessage is globally mocked in BeforeAll
+            Mock Invoke-GTGraphRequest { param($Uri, $Method) return $null }
+            Mock Invoke-GTGraphBatch { param($Requests) return @() }
+
+            # Basic setup
+            $global:mockUser = [PSCustomObject]@{
+                Id = 'user-1'
+                UserPrincipalName = 'test@example.com'
+            }
+            $global:mockOutputBase = @{ UserPrincipalName = 'test@example.com' }
+        }
+
+        It "should use Invoke-GTGraphBatch to fetch owner counts for apps and service principals" {
+            # Mock the initial ownedObjects call
+            Mock Invoke-GTGraphPagedRequest {
+                param($Uri)
+                if ($Uri -match "ownedObjects") {
+                    return @(
+                        [PSCustomObject]@{
+                            id = "app-123"
+                            displayName = "Test App"
+                            '@odata.type' = '#microsoft.graph.application'
+                        },
+                        [PSCustomObject]@{
+                            id = "sp-456"
+                            displayName = "Test SP"
+                            '@odata.type' = '#microsoft.graph.servicePrincipal'
+                        }
+                    )
+                }
+            } -ParameterFilter { $Uri -match "ownedObjects" }
+
+            # Mock batch request
+            Mock Invoke-GTGraphBatch {
+                param($Requests)
+
+                $responses = @()
+                foreach ($req in $Requests) {
+                    # Simulate finding >1 owners so they can be deleted
+                    $responses += [PSCustomObject]@{
+                        Id = $req.id
+                        Status = 200
+                        Body = @{
+                            value = @( @{id="owner-1"}, @{id="owner-2"} )
+                        }
+                    }
+                }
+                return $responses
+            }
+
+            # Run function
+            $results = [System.Collections.Generic.List[PSObject]]::new()
+            $results.Add([PSCustomObject]@{ Placeholder = $true })
+            Remove-GTUserEnterpriseAppOwnership -User $global:mockUser -OutputBase $global:mockOutputBase -Results $results -Confirm:$false
+            $results.RemoveAt(0)
+
+            # Verification
+            Assert-MockCalled Invoke-GTGraphBatch -Times 1 -Exactly
+
+            # Verify that individual PagedRequest calls for owners were NOT made because batch provided data
+            Assert-MockCalled Invoke-GTGraphPagedRequest -Times 0 -ParameterFilter { $Uri -match "/owners\?" }
+
+            # And verify deletion occurred
+            $results.Count | Should -Be 2
+            $results[0].Action | Should -Be 'RemoveAppRegistrationOwnership'
+            $results[0].Status | Should -Be 'Success'
+            $results[1].Action | Should -Be 'RemoveEnterpriseAppOwnership'
+            $results[1].Status | Should -Be 'Success'
+        }
+
+        It "should fall back to Invoke-GTGraphPagedRequest if batch request fails or doesn't return data" {
+            Mock Invoke-GTGraphPagedRequest {
+                param($Uri)
+                if ($Uri -match "ownedObjects") {
+                    return @(
+                        [PSCustomObject]@{
+                            id = "app-123"
+                            displayName = "Test App"
+                            '@odata.type' = '#microsoft.graph.application'
+                        }
+                    )
+                } else {
+                    return @( [PSCustomObject]@{id="owner-1"}, [PSCustomObject]@{id="owner-2"} )
+                }
+            }
+
+            # Mock batch request to return 500 error
+            Mock Invoke-GTGraphBatch {
+                param($Requests)
+                $responses = @()
+                foreach ($req in $Requests) {
+                    $responses += [PSCustomObject]@{
+                        Id = $req.id
+                        Status = 500
+                        Body = $null
+                    }
+                }
+                return $responses
+            }
+
+            $results = [System.Collections.Generic.List[PSObject]]::new()
+            $results.Add([PSCustomObject]@{ Placeholder = $true })
+            Remove-GTUserEnterpriseAppOwnership -User $global:mockUser -OutputBase $global:mockOutputBase -Results $results -Confirm:$false
+            $results.RemoveAt(0)
+
+            Assert-MockCalled Invoke-GTGraphBatch -Times 1 -Exactly
+            # Because batch failed, it falls back to the individual call
+            Assert-MockCalled Invoke-GTGraphPagedRequest -Times 1 -ParameterFilter { $Uri -match "/owners\?" }
+
+            $results.Count | Should -Be 1
+            $results[0].Status | Should -Be 'Success'
         }
     }
 }
