@@ -7,6 +7,7 @@ Describe "Get-GTRiskyAppPermissionReport" {
         function global:Get-UTCTime { return [DateTime]::UtcNow }
         function global:Invoke-GTGraphPagedRequest { param($Uri, $Headers) return @() }
         function global:Invoke-GTGraphRequest { param($Method, $Uri, $Body, $ContentType, $ErrorAction, [switch]$All) return $null }
+        function global:Invoke-GTGraphBatch { param($Requests, $BatchSize, $MaxSubrequestRetries, $RetryBaseDelaySeconds) return @() }
         function global:Get-GTGraphErrorDetails { param($Exception, $ResourceType) return [PSCustomObject]@{ LogLevel = 'Error'; Reason = 'Error'; ErrorMessage = 'Error' } }
 
         $helperPath = "$PSScriptRoot/../internal/functions/Get-GTPermissionDefinition.ps1"
@@ -14,6 +15,19 @@ Describe "Get-GTRiskyAppPermissionReport" {
 
         $functionPath = "$PSScriptRoot/../functions/Get-GTRiskyAppPermissionReport.ps1"
         if (Test-Path $functionPath) { . $functionPath } else { Throw "Function not found: $functionPath" }
+    }
+
+    AfterAll {
+        Remove-Item Function:\Install-GTRequiredModule -Force -ErrorAction SilentlyContinue
+        Remove-Item Function:\Initialize-GTGraphConnection -Force -ErrorAction SilentlyContinue
+        Remove-Item Function:\Test-GTGraphScopes -Force -ErrorAction SilentlyContinue
+        Remove-Item Function:\Write-PSFMessage -Force -ErrorAction SilentlyContinue
+        Remove-Item Function:\Get-UTCTime -Force -ErrorAction SilentlyContinue
+        Remove-Item Function:\Invoke-GTGraphPagedRequest -Force -ErrorAction SilentlyContinue
+        Remove-Item Function:\Invoke-GTGraphRequest -Force -ErrorAction SilentlyContinue
+        Remove-Item Function:\Invoke-GTGraphBatch -Force -ErrorAction SilentlyContinue
+        Remove-Item Function:\Get-GTGraphErrorDetails -Force -ErrorAction SilentlyContinue
+        Remove-Item Function:\Get-GTRiskyAppPermissionReport -Force -ErrorAction SilentlyContinue
     }
 
     Context "Parameter Validation" {
@@ -146,6 +160,21 @@ Describe "Get-GTRiskyAppPermissionReport" {
                 return $null
             }
 
+            Mock -CommandName "Invoke-GTGraphBatch" -MockWith {
+                param($Requests)
+                $results = @()
+                foreach ($req in $Requests) {
+                    if ($req.url -like "*users/*") {
+                        $results += [PSCustomObject]@{
+                            Id     = $req.id
+                            Status = 200
+                            Body   = [PSCustomObject]@{ userPrincipalName = "user@contoso.com" }
+                        }
+                    }
+                }
+                return $results
+            }
+
             Mock -CommandName "Invoke-GTGraphPagedRequest" -MockWith {
                 param($Uri, $Headers)
                 if ($Uri -like "*servicePrincipals*") {
@@ -211,6 +240,46 @@ Describe "Get-GTRiskyAppPermissionReport" {
             $result = Get-GTRiskyAppPermissionReport -PermissionType Delegated
             $result.Type | Should -Match "Delegated.*User"
             $result.GrantedBy | Should -Contain "user@contoso.com"
+        }
+
+        It "should label 404 batch response as deleted user" {
+            Mock -CommandName "Invoke-GTGraphPagedRequest" -MockWith {
+                param($Uri, $Headers)
+                if ($Uri -like "*servicePrincipals*") {
+                    return @([PSCustomObject]@{ id = "sp-1"; appId = "app-1"; displayName = "Test App" })
+                }
+                if ($Uri -like "*oauth2PermissionGrants*") {
+                    return @([PSCustomObject]@{ clientId = "sp-1"; scope = "Mail.Read"; consentType = "Principal"; principalId = "deleted-user-id" })
+                }
+                return @()
+            }
+            Mock -CommandName "Invoke-GTGraphBatch" -MockWith {
+                param($Requests)
+                return @([PSCustomObject]@{ Id = "deleted-user-id"; Status = 404; Body = $null })
+            }
+
+            $result = Get-GTRiskyAppPermissionReport -PermissionType Delegated
+            $result.GrantedBy | Should -Be "Deleted User (deleted-user-id)"
+        }
+
+        It "should fallback to Unknown for non-404 batch failure statuses" {
+            Mock -CommandName "Invoke-GTGraphPagedRequest" -MockWith {
+                param($Uri, $Headers)
+                if ($Uri -like "*servicePrincipals*") {
+                    return @([PSCustomObject]@{ id = "sp-1"; appId = "app-1"; displayName = "Test App" })
+                }
+                if ($Uri -like "*oauth2PermissionGrants*") {
+                    return @([PSCustomObject]@{ clientId = "sp-1"; scope = "Mail.Read"; consentType = "Principal"; principalId = "forbidden-user-id" })
+                }
+                return @()
+            }
+            Mock -CommandName "Invoke-GTGraphBatch" -MockWith {
+                param($Requests)
+                return @([PSCustomObject]@{ Id = "forbidden-user-id"; Status = 403; Body = $null })
+            }
+
+            $result = Get-GTRiskyAppPermissionReport -PermissionType Delegated
+            $result.GrantedBy | Should -Be "Unknown"
         }
 
         It "should filter by risk level" {

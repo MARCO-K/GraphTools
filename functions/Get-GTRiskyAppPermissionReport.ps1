@@ -424,9 +424,13 @@ function Get-GTRiskyAppPermissionReport
                         {
                             $UserCache[$resp.Id] = $resp.Body.userPrincipalName
                         }
-                        else
+                        elseif ($resp.Status -eq 404)
                         {
                             $UserCache[$resp.Id] = "Deleted User ($($resp.Id))"
+                        }
+                        else
+                        {
+                            $UserCache[$resp.Id] = "Unknown"
                         }
                     }
                 }
