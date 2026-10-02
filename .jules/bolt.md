@@ -1,7 +1,8 @@
 ## 2026-10-02 - Avoid Array Concatenation in PowerShell
 **Learning:** Using `+=` to accumulate items in an array inside loops (like a `process` block iterating over pipeline items) causes an O(N²) performance degradation because PowerShell creates a new array and copies all elements every time.
 **Action:** Replace `$array = @()` and `$array += $item` with `$list = [System.Collections.Generic.List[object]]::new()` and `$list.Add($item)`.
-## Performance Optimization: Direct Directory Role Member Retrieval
+
+## 2026-10-02 - Direct Directory Role Member Retrieval
 
 ### The Bottleneck
 Previously, the `Get-GTInactiveUser` function made an unnecessary network call to resolve the internal `id` of a directory role (such as Global Administrator) by querying with a filter on `roleTemplateId`. Only after obtaining that internal ID did it execute a second API call to fetch the role's members. In an architecture governed by latency, a synchronous graph API operation constitutes a significant performance penalty.
