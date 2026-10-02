@@ -35,6 +35,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Security
 
+- **Direct DPAPI Refresh Token Encryption (`Save-GTPersistedTokenCache`, `Get-GTPersistedTokenCache`)**:
+  - Replaced `ConvertTo-SecureString -AsPlainText` and `ConvertFrom-SecureString` with direct Windows DPAPI calls via `[System.Security.Cryptography.ProtectedData]::Protect` and `Unprotect` with Base64 encoding.
+  - Eliminated plaintext-in-SecureString memory exposure and associated PSScriptAnalyzer suppressions.
+  - Added graceful fallback returning `$null` on malformed or legacy ciphertext to prompt clean re-authentication.
 - **Cryptographic Randomness in Test Harness (`tests/`)**:
   - Replaced non-cryptographic `Get-Random` pseudo-random number generator with collision-resistant `[guid]::NewGuid()` in temporary fixture naming across test suites to prevent static security analysis warnings.
 - **External API Call Timeout Hardening (`-TimeoutSec`)**:

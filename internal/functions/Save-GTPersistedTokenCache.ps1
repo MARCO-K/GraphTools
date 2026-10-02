@@ -5,7 +5,7 @@ function Save-GTPersistedTokenCache
         Securely persists an OAuth 2.0 refresh token to disk using DPAPI encryption.
     .DESCRIPTION
         Stores the refresh token and metadata in the user's LocalApplicationData folder.
-        On Windows, payload is encrypted using Windows Data Protection API (DPAPI) via SecureString.
+        On Windows, payload is encrypted using Windows Data Protection API (DPAPI) via ProtectedData.
         On non-Windows, directory and file permissions are restricted to user-only (0700/0600).
         Short-lived access tokens are strictly excluded and never written to disk.
     .PARAMETER TenantId

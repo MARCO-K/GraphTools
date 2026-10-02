@@ -76,6 +76,40 @@ Describe "Persisted Token Cache" -Tag 'Unit' {
             $entry = Get-GTPersistedTokenCache -TenantId 'non-existent' -ClientId 'non-existent'
             $entry | Should -BeNullOrEmpty
         }
+
+        It "encrypts data using DPAPI on Windows without leaking plaintext" {
+            $onWindows = [System.Environment]::OSVersion.Platform -eq [System.PlatformID]::Win32NT
+            if (-not $onWindows) { return }
+
+            $saveResult = Save-GTPersistedTokenCache -TenantId 'dpapi-tenant' `
+                                                    -ClientId 'dpapi-client' `
+                                                    -RefreshToken 'dpapi-secret-123' `
+                                                    -AuthType 'Interactive'
+
+            $saveResult | Should -Be $true
+            $rawJson = Get-Content -Path $script:cacheFile -Raw -Encoding UTF8 | ConvertFrom-Json
+            $entry = $rawJson.'dpapi-tenant|dpapi-client|Interactive'
+            $entry.encrypted | Should -Be $true
+            { [Convert]::FromBase64String($entry.data) } | Should -Not -Throw
+            (Get-Content -Path $script:cacheFile -Raw) | Should -Not -Match 'dpapi-secret-123'
+
+            # Ensure it round-trips correctly
+            $retrieved = Get-GTPersistedTokenCache -TenantId 'dpapi-tenant' -ClientId 'dpapi-client' -AuthType 'Interactive'
+            $retrieved.RefreshToken | Should -Be 'dpapi-secret-123'
+        }
+
+        It "returns null gracefully when encrypted data cannot be decrypted or is malformed" {
+            $rawJson = @{
+                "test-tenant|test-client|Interactive" = @{
+                    encrypted = $true
+                    data      = "invalid-corrupted-or-legacy-hex-base64"
+                }
+            } | ConvertTo-Json -Depth 5
+            Set-Content -Path $script:cacheFile -Value $rawJson -Encoding UTF8
+
+            $entry = Get-GTPersistedTokenCache -TenantId 'test-tenant' -ClientId 'test-client' -AuthType 'Interactive'
+            $entry | Should -BeNullOrEmpty
+        }
     }
 
     Context "Clear" {
