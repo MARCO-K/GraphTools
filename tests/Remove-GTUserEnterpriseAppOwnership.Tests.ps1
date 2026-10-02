@@ -1,7 +1,7 @@
 Describe "Remove-GTUserEnterpriseAppOwnership" {
     BeforeAll {
         # Mock PSFramework logging
-        function Write-PSFMessage { }
+        function global:Write-PSFMessage { param($Level, $Message, $ErrorRecord) }
 
         $statusHelper = Join-Path $PSScriptRoot '..\internal\functions\Get-GTGraphHttpStatus.ps1'
         if (Test-Path $statusHelper) { . $statusHelper }
@@ -17,18 +17,22 @@ Describe "Remove-GTUserEnterpriseAppOwnership" {
         $validationFile = Join-Path $PSScriptRoot '..\internal\functions\GTValidation.ps1'
         if (Test-Path $validationFile) { . $validationFile }
         
+        # Define empty dependencies for the new mocks so they are found inside tests
+        function global:Invoke-GTGraphRequest { param($Uri, $Method = 'GET', $Body, $Headers, $ContentType, [switch]$All, [int]$MaxRetries, [int]$RetryBaseDelaySeconds, $Token, [switch]$Raw, $ErrorAction) }
+        function global:Invoke-GTGraphBatch { param($Requests, $ErrorAction) }
+        function global:Invoke-GTGraphPagedRequest { param($Uri, $Headers, $ErrorAction) }
+
         # Import the internal function for testing
         . "$PSScriptRoot/../internal/functions/Remove-GTUserEnterpriseAppOwnership.ps1"
     }
 
-    # Define empty dependencies for the new mocks so they are found inside tests
-    function global:Invoke-GTGraphRequest { param($Uri, $Method) }
-    function global:Invoke-GTGraphBatch { param($Requests) }
-    function global:Invoke-GTGraphPagedRequest { param($Uri) }
-
     AfterAll {
         Remove-Item Function:\Remove-GTUserEnterpriseAppOwnership -Force -ErrorAction SilentlyContinue
         Remove-Item Function:\Test-GTUserObject -Force -ErrorAction SilentlyContinue
+        Remove-Item Function:\global:Write-PSFMessage -Force -ErrorAction SilentlyContinue
+        Remove-Item Function:\global:Invoke-GTGraphRequest -Force -ErrorAction SilentlyContinue
+        Remove-Item Function:\global:Invoke-GTGraphBatch -Force -ErrorAction SilentlyContinue
+        Remove-Item Function:\global:Invoke-GTGraphPagedRequest -Force -ErrorAction SilentlyContinue
     }
     
     Context "Parameter Validation" {
@@ -53,7 +57,7 @@ Describe "Remove-GTUserEnterpriseAppOwnership" {
         }
     }
 
-    Context "Batch fetching owners (Bolt Optimization)" {
+    Context "Batch fetching owners" {
         BeforeEach {
             # Write-PSFMessage is globally mocked in BeforeAll
             Mock Invoke-GTGraphRequest { param($Uri, $Method) return $null }
@@ -115,7 +119,7 @@ Describe "Remove-GTUserEnterpriseAppOwnership" {
             Assert-MockCalled Invoke-GTGraphBatch -Times 1 -Exactly
 
             # Verify that individual PagedRequest calls for owners were NOT made because batch provided data
-            Assert-MockCalled Invoke-GTGraphPagedRequest -Times 0 -ParameterFilter { $Uri -match "/owners\?" }
+            Assert-MockCalled Invoke-GTGraphPagedRequest -Times 0 -Exactly -ParameterFilter { $Uri -match "/owners\?" }
 
             # And verify deletion occurred
             $results.Count | Should -Be 2

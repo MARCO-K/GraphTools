@@ -14,6 +14,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- **Performance Optimization (`Remove-GTUserEnterpriseAppOwnership`)**:
+  - Replaced N+1 individual synchronous owner count queries for owned applications and service principals with bulk batch resolution via `Invoke-GTGraphBatch`.
+  - Added resilient fallback to individual requests if batch retrieval fails or subrequests return errors.
 - **Performance Optimization (`Remove-GTPIMRoleEligibilityInternal`)**:
   - Replaced individual N+1 `DELETE` requests for role eligibility schedules with chunked JSON batching via `Invoke-GTGraphBatch`, eliminating round-trip latency during user entitlement offboarding.
   - Added structured per-subrequest error mapping and failure capture for batch-level exceptions.

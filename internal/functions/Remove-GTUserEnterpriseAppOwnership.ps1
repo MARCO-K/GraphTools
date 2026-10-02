@@ -72,7 +72,7 @@ function Remove-GTUserEnterpriseAppOwnership
         return
     }
 
-    # Bolt Optimization: Batch fetch owners to eliminate N+1 queries.
+    # Batch fetch owners to eliminate N+1 queries.
     $allOwnersCountMap = @{}
     $batchRequests = [System.Collections.Generic.List[hashtable]]::new()
 
@@ -81,7 +81,7 @@ function Remove-GTUserEnterpriseAppOwnership
             $batchRequests.Add(@{
                 id     = "app_$($app.id)"
                 method = 'GET'
-                # Use $count=true and $top=1 to minimize data transfer if supported, or just select=id
+                # Query only owner IDs to minimize payload size while allowing accurate owner count detection
                 url    = "v1.0/applications/$($app.id)/owners?`$select=id"
             })
         }
