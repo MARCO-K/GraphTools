@@ -7,6 +7,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- **Connection State Unit Test Suite (`tests/Get-GTConnection.Tests.ps1`)**:
+  - Added dedicated Pester test coverage for `Get-GTConnection` verifying connection status, config-versus-cache precedence resolution, and token expiration handling.
+
 ### Changed
 
 - **Performance Optimization (`Import-DuckDBRecords`)**:
