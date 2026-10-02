@@ -20,7 +20,7 @@ function Remove-GTUserEnterpriseAppOwnership
         $outputBase = @{ UserPrincipalName = $user.UserPrincipalName }
         $results = [System.Collections.Generic.List[PSObject]]::new()
         Remove-GTUserEnterpriseAppOwnership -User $user -OutputBase $outputBase -Results $results
-        
+
         Removes the user from Enterprise Applications and App Registrations ownerships and adds results to the collection
     #>
     [CmdletBinding(SupportsShouldProcess)]
@@ -49,7 +49,7 @@ function Remove-GTUserEnterpriseAppOwnership
         # Handle failure to get any owned objects
         # Use centralized error handling helper to parse Graph API exceptions
         $errorDetails = Get-GTGraphErrorDetails -Exception $_.Exception -ResourceType 'user'
-        
+
         # Log appropriate message based on error details
         if ($errorDetails.HttpStatus -in 404, 403) {
             Write-PSFMessage -Level $errorDetails.LogLevel -Message "Failed to retrieve owned objects for user $($User.UserPrincipalName) - $($errorDetails.Reason)"
@@ -72,6 +72,45 @@ function Remove-GTUserEnterpriseAppOwnership
         return
     }
 
+    # Batch fetch owners to eliminate N+1 queries.
+    $allOwnersCountMap = @{}
+    $batchRequests = [System.Collections.Generic.List[hashtable]]::new()
+
+    if ($ownedApplications) {
+        foreach ($app in $ownedApplications) {
+            $batchRequests.Add(@{
+                id     = "app_$($app.id)"
+                method = 'GET'
+                # Query only owner IDs to minimize payload size while allowing accurate owner count detection
+                url    = "v1.0/applications/$($app.id)/owners?`$select=id"
+            })
+        }
+    }
+
+    if ($ownedServicePrincipals) {
+        foreach ($sp in $ownedServicePrincipals) {
+            $batchRequests.Add(@{
+                id     = "sp_$($sp.id)"
+                method = 'GET'
+                url    = "v1.0/servicePrincipals/$($sp.id)/owners?`$select=id"
+            })
+        }
+    }
+
+    if ($batchRequests.Count -gt 0) {
+        try {
+            $batchResponses = Invoke-GTGraphBatch -Requests $batchRequests
+            foreach ($response in $batchResponses) {
+                if ($response.Status -ge 200 -and $response.Status -lt 300 -and $null -ne $response.Body.value) {
+                    $allOwnersCountMap[$response.Id] = $response.Body.value.Count
+                }
+            }
+        }
+        catch {
+            Write-PSFMessage -Level Warning -Message "Batch fetching owners failed. Falling back to individual requests. Details: $($_.Exception.Message)"
+        }
+    }
+
     # Process App Registrations (Applications)
     if ($ownedApplications)
     {
@@ -88,8 +127,16 @@ function Remove-GTUserEnterpriseAppOwnership
             try
             {
                 # Check if user is the last owner
-                $owners = Invoke-GTGraphPagedRequest -Uri "v1.0/applications/$($app.id)/owners?`$select=id"
-                if ($owners.Count -eq 1)
+                $ownerCount = 0
+                if ($allOwnersCountMap.ContainsKey("app_$($app.id)")) {
+                    $ownerCount = $allOwnersCountMap["app_$($app.id)"]
+                } else {
+                    # Fallback to single API call if batch failed for some reason
+                    $owners = Invoke-GTGraphPagedRequest -Uri "v1.0/applications/$($app.id)/owners?`$select=id"
+                    $ownerCount = $owners.Count
+                }
+
+                if ($ownerCount -eq 1)
                 {
                     Write-PSFMessage -Level Warning -Message "Skipping last owner ($($User.UserPrincipalName)) of App Registration: $($app.displayName). Transfer ownership first."
                     $output['Status'] = 'Skipped: Last owner - transfer ownership first'
@@ -108,7 +155,7 @@ function Remove-GTUserEnterpriseAppOwnership
             {
                 # Use centralized error handling helper to parse Graph API exceptions
                 $errorDetails = Get-GTGraphErrorDetails -Exception $_.Exception -ResourceType 'resource'
-                
+
                 # Log appropriate message based on error details
                 if ($errorDetails.HttpStatus -in 404, 403) {
                     Write-PSFMessage -Level $errorDetails.LogLevel -Message "Failed to remove user $($User.UserPrincipalName) from App Registration: $($app.displayName) - $($errorDetails.Reason)"
@@ -146,8 +193,16 @@ function Remove-GTUserEnterpriseAppOwnership
             try
             {
                 # Check if user is the last owner
-                $owners = Invoke-GTGraphPagedRequest -Uri "v1.0/servicePrincipals/$($sp.id)/owners?`$select=id"
-                if ($owners.Count -eq 1)
+                $ownerCount = 0
+                if ($allOwnersCountMap.ContainsKey("sp_$($sp.id)")) {
+                    $ownerCount = $allOwnersCountMap["sp_$($sp.id)"]
+                } else {
+                    # Fallback to single API call if batch failed for some reason
+                    $owners = Invoke-GTGraphPagedRequest -Uri "v1.0/servicePrincipals/$($sp.id)/owners?`$select=id"
+                    $ownerCount = $owners.Count
+                }
+
+                if ($ownerCount -eq 1)
                 {
                     Write-PSFMessage -Level Warning -Message "Skipping last owner ($($User.UserPrincipalName)) of Enterprise Application: $($sp.displayName). Transfer ownership first."
                     $output['Status'] = 'Skipped: Last owner - transfer ownership first'
@@ -166,7 +221,7 @@ function Remove-GTUserEnterpriseAppOwnership
             {
                 # Use centralized error handling helper to parse Graph API exceptions
                 $errorDetails = Get-GTGraphErrorDetails -Exception $_.Exception -ResourceType 'resource'
-                
+
                 # Log appropriate message based on error details
                 if ($errorDetails.HttpStatus -in 404, 403) {
                     Write-PSFMessage -Level $errorDetails.LogLevel -Message "Failed to remove user $($User.UserPrincipalName) from Enterprise Application: $($sp.displayName) - $($errorDetails.Reason)"
