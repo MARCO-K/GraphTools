@@ -71,6 +71,7 @@ function Import-DuckDBRecords
         else
         {
             Write-PSFMessage -Level Verbose -Message "Using existing DuckDB connection"
+            $conn = $DBConn
         }
 
         # Initialize duplicate tracking
@@ -193,7 +194,7 @@ INSERT INTO $TableName VALUES ($($values -join ', '))
         }
         finally
         {
-            if ($conn) { $conn.Close() }
+            if ($PSCmdlet.ParameterSetName -eq 'newDB' -and $conn) { $conn.Close() }
             Write-PSFMessage -Level Verbose -Message "Database connection closed"
         }
     }
