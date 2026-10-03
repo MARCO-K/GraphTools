@@ -32,3 +32,11 @@ A simulated local benchmark intercepting `Invoke-GTGraphRequest` with an artific
   - Ensure the batch request uses a `try/catch` block to fall back gracefully to the original N+1 logic if the batch request fails (fail-open strategy).
   - Handling parameter binding issues with `[ValidateNotNullOrEmpty()]` for collections like `$Results` in Pester tests requires injecting a dummy item during testing or using an intermediate array wrapper if the list is empty initially.
   - The fallback mechanism provides resilience against unexpected API batch restrictions while realizing significant ~40% execution time improvements in typical scenarios.
+
+## 2025-01-14 - Remove-GTUserGroupOwnership N+1 Query Optimization
+
+- **Bottleneck**: In `Remove-GTUserGroupOwnership.ps1`, a separate `Invoke-GTGraphPagedRequest` was made for each group a user owned to fetch the owner count (to determine if the user is the last owner). This caused an N+1 query problem, slowing down the `Remove-GTUserEntitlement` command when users owned many groups.
+- **Optimization**: I implemented the same batch fetching pattern previously applied to `Remove-GTUserEnterpriseAppOwnership.ps1`. Before entering the loop, it uses `Invoke-GTGraphBatch` to pre-fetch owner counts for all groups. It stores the counts in a hashmap (`$allOwnersCountMap`) and falls back to individual queries if the batch request fails or a group count is missing.
+- **Learnings**:
+  - Consistent patterns can be applied across similar resources (Groups, Apps, ServicePrincipals) when performing cleanup tasks.
+  - The `$batch` API is a great tool for converting N individual lookups into a single O(1) network operation in Entra ID incident response workflows.
