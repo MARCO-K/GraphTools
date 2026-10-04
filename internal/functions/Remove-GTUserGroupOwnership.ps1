@@ -40,6 +40,34 @@ function Remove-GTUserGroupOwnership
 
     $OwnedGroups = Invoke-GTGraphPagedRequest -Uri "v1.0/users/$($User.Id)/ownedObjects/microsoft.graph.group?`$select=id,displayName"
 
+    # Bolt Optimization: Batch fetch owners to eliminate N+1 queries.
+    $allOwnersCountMap = @{}
+    $batchRequests = [System.Collections.Generic.List[hashtable]]::new()
+
+    if ($OwnedGroups) {
+        foreach ($Group in $OwnedGroups) {
+            $batchRequests.Add(@{
+                id     = "group_$($Group.id)"
+                method = 'GET'
+                url    = "v1.0/groups/$($Group.id)/owners?`$select=id"
+            })
+        }
+    }
+
+    if ($batchRequests.Count -gt 0) {
+        try {
+            $batchResponses = Invoke-GTGraphBatch -Requests $batchRequests
+            foreach ($response in $batchResponses) {
+                if ($response.Status -ge 200 -and $response.Status -lt 300 -and $null -ne $response.Body.value) {
+                    $allOwnersCountMap[$response.Id] = $response.Body.value.Count
+                }
+            }
+        }
+        catch {
+            Write-PSFMessage -Level Warning -Message "Batch fetching owners failed. Falling back to individual requests. Details: $($_.Exception.Message)"
+        }
+    }
+
     foreach ($Group in $OwnedGroups)
     {
         $action = 'RemoveGroupOwnership'
@@ -52,8 +80,16 @@ function Remove-GTUserGroupOwnership
 
         try
         {
-            $owners = Invoke-GTGraphPagedRequest -Uri "v1.0/groups/$($Group.id)/owners?`$select=id"
-            if ($owners.Count -eq 1)
+            $ownerCount = 0
+            if ($allOwnersCountMap.ContainsKey("group_$($Group.id)")) {
+                $ownerCount = $allOwnersCountMap["group_$($Group.id)"]
+            } else {
+                # Fallback to single API call if batch failed
+                $owners = Invoke-GTGraphPagedRequest -Uri "v1.0/groups/$($Group.id)/owners?`$select=id"
+                $ownerCount = $owners.Count
+            }
+
+            if ($ownerCount -eq 1)
             {
                 Write-PSFMessage -Level Verbose -Message "Skipping last owner ($($User.Id)) of group $($Group.id)"
                 $output['Status'] = 'Skipped: Last owner'
