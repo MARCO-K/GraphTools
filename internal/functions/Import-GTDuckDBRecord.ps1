@@ -159,7 +159,7 @@ CREATE OR REPLACE TABLE $TableName ($($columns -join ", "));
                         $prop.Value = 'Null'
                     }
                     $prop.Value = $prop.Value.ToString()
-                    $p = ($prop.Value).Replace("'", "_")
+                    $p = ($prop.Value).Replace("'", "''")
                     "`'$p`'"
                 }
 

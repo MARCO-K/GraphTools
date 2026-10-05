@@ -7,6 +7,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+
+- **Performance Optimization (`Remove-GTUserGroupOwnership`)**:
+  - Replaced N+1 individual synchronous owner count queries for owned groups with bulk batch resolution via `Invoke-GTGraphBatch`.
+  - Added resilient fallback to individual requests if batch retrieval fails or subrequests return errors.
+
+### Fixed
+
+- **SQL Literal Escaping in DuckDB Record Import (`Import-GTDuckDBRecord`)**:
+  - Fixed data mutation bug where single quotes in record values were replaced with underscores (`Replace("'", "_")`), replacing it with standard SQL quote-doubling (`Replace("'", "''")`) to preserve strings containing apostrophes while safely preventing SQL injection.
+
 ## [0.28.0] - 2026-10-02
 
 ### Added
