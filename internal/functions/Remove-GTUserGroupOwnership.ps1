@@ -49,7 +49,6 @@ function Remove-GTUserGroupOwnership
             $batchRequests.Add(@{
                 id     = "group_$($Group.id)"
                 method = 'GET'
-                # Query only owner IDs to minimize payload size while allowing accurate owner count detection
                 url    = "v1.0/groups/$($Group.id)/owners?`$select=id"
             })
         }
@@ -60,7 +59,7 @@ function Remove-GTUserGroupOwnership
             $batchResponses = Invoke-GTGraphBatch -Requests $batchRequests
             foreach ($response in $batchResponses) {
                 if ($response.Status -ge 200 -and $response.Status -lt 300 -and $null -ne $response.Body.value) {
-                    $allOwnersCountMap[$response.Id] = @($response.Body.value).Count
+                    $allOwnersCountMap[$response.Id] = $response.Body.value.Count
                 }
             }
         }
@@ -87,7 +86,7 @@ function Remove-GTUserGroupOwnership
             } else {
                 # Fallback to single API call if batch failed
                 $owners = Invoke-GTGraphPagedRequest -Uri "v1.0/groups/$($Group.id)/owners?`$select=id"
-                $ownerCount = @($owners).Count
+                $ownerCount = $owners.Count
             }
 
             if ($ownerCount -eq 1)
