@@ -85,5 +85,27 @@ Describe "Import-GTDuckDBRecord" {
 
             { $records | Import-GTDuckDBRecord -TableName 'NoRecords' -DBConn $mockConn } | Should -Throw "*No unique records found for processing*"
         }
+
+        It "should safely escape single quotes without mutating data" {
+            $executedQueries = [System.Collections.Generic.List[string]]::new()
+            $mockConn = [PSCustomObject]@{} |
+                Add-Member -MemberType ScriptMethod -Name Close -Value { } -PassThru |
+                Add-Member -MemberType ScriptMethod -Name sql -Value {
+                    param($q)
+                    $executedQueries.Add($q)
+                    if ($q -like "SELECT COUNT(*)*") {
+                        return [PSCustomObject]@{ 'count_star()' = 1 }
+                    }
+                } -PassThru
+
+            $records = @(
+                [PSCustomObject]@{ ID = 'user-1'; Name = "O'Connor"; Note = "User's test note" }
+            )
+
+            $records | Import-GTDuckDBRecord -TableName 'EscapedUsers' -DBConn $mockConn
+
+            $insert = $executedQueries | Where-Object { $_ -like "INSERT INTO EscapedUsers VALUES*" }
+            $insert | Should -Be "INSERT INTO EscapedUsers VALUES ('user-1', 'O''Connor', 'User''s test note')"
+        }
     }
 }

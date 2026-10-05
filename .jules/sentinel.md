@@ -16,7 +16,7 @@
 **Learning:** `Get-Random` was used to generate exponential backoff delays. Even though not explicitly cryptographic, policy requires use of CSPRNG everywhere to avoid security analysis noise or future misuse.
 **Prevention:** Avoid `Get-Random` entirely. Always use `[System.Security.Cryptography.RandomNumberGenerator]`.
 
-## 2024-10-04 - SQL Escaping Data Mutation
+## 2026-10-04 - SQL Escaping Data Mutation
 **Vulnerability:** While SQL injection was prevented by replacing single quotes with underscores `Replace("'", "_")` during dynamic query generation for DuckDB, it caused unintended data mutation.
 **Learning:** Security fixes shouldn't compromise data integrity. Replacing `'` with `_` protects against injection but corrupts legitimate strings with apostrophes (e.g., "O'Connor" becomes "O_Connor").
 **Prevention:** Use standard SQL escaping by replacing a single quote with two single quotes `Replace("'", "''")` when building raw SQL queries, which prevents injection while preserving the original string content.
