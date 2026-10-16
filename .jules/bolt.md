@@ -44,3 +44,7 @@ A simulated local benchmark intercepting `Invoke-GTGraphRequest` with an artific
 ## 2026-10-06 - Avoid Multiple Pipeline Passes Over the Same Collection
 **Learning:** Using `Where-Object` repeatedly on the same large array to calculate aggregates or summaries causes an O(K*N) performance degradation (where K is the number of properties evaluated). In `Get-GTAppConsentReport`, scanning the pipeline 8 times for different risk/consent metrics scaled poorly.
 **Action:** Replace multiple pipeline passes with a single `foreach` loop that accumulates all necessary variables inside the loop (O(N) time complexity). Use `switch` statements and fast lookups like `HashSet[string]` to streamline the iteration.
+
+## 2026-10-16 - Avoid Multiple Pipeline Passes Over the Same Collection in `Get-GTExpiringSecret`
+**Learning:** Using `Where-Object` repeatedly on the same array to calculate KPI summaries (like counting Expired, Critical, Warning, Healthy status) causes an O(K*N) performance degradation. In `Get-GTExpiringSecret`, passing over the results array 6 times was inefficient.
+**Action:** Replaced multiple pipeline passes with a single `foreach` loop that accumulates all necessary variables inside the loop (O(N) time complexity), using a `switch` statement for status and `HashSet[string]` for distinct app ID counts.

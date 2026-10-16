@@ -456,18 +456,38 @@ function Get-GTExpiringSecret
             # KPI Summary emission mode
             if ($Summary)
             {
-                $orphanedAppIds = @($results | Where-Object { $_.IsOrphaned -eq $true } | ForEach-Object { $_.Id } | Select-Object -Unique)
-                $soleCredAppIds = @($results | Where-Object { $_.IsSoleCredential -eq $true } | ForEach-Object { $_.Id } | Select-Object -Unique)
+                # Bolt Optimization: Replace multiple pipeline passes (O(K*N)) with a single loop (O(N)) using HashSets for unique counts.
+                $expiredCount = 0
+                $criticalCount = 0
+                $warningCount = 0
+                $healthyCount = 0
+                $orphanedApps = [System.Collections.Generic.HashSet[string]]::new()
+                $soleCredApps = [System.Collections.Generic.HashSet[string]]::new()
+
+                foreach ($res in $results) {
+                    if ($res.IsOrphaned) {
+                        [void]$orphanedApps.Add($res.Id)
+                    }
+                    if ($res.IsSoleCredential) {
+                        [void]$soleCredApps.Add($res.Id)
+                    }
+                    switch ($res.Status) {
+                        'Expired'  { $expiredCount++ }
+                        'Critical' { $criticalCount++ }
+                        'Warning'  { $warningCount++ }
+                        'Healthy'  { $healthyCount++ }
+                    }
+                }
 
                 $summaryObj = [PSCustomObject]@{
                     TotalAppsScanned        = [int]$appsScannedCount
                     TotalCredentialsFound   = [int]$results.Count
-                    ExpiredCount            = [int]@($results | Where-Object { $_.Status -eq 'Expired' }).Count
-                    CriticalCount           = [int]@($results | Where-Object { $_.Status -eq 'Critical' }).Count
-                    WarningCount            = [int]@($results | Where-Object { $_.Status -eq 'Warning' }).Count
-                    HealthyCount            = [int]@($results | Where-Object { $_.Status -eq 'Healthy' }).Count
-                    SoleCredentialRiskCount = [int]$soleCredAppIds.Count
-                    OrphanedAppsCount       = [int]$orphanedAppIds.Count
+                    ExpiredCount            = [int]$expiredCount
+                    CriticalCount           = [int]$criticalCount
+                    WarningCount            = [int]$warningCount
+                    HealthyCount            = [int]$healthyCount
+                    SoleCredentialRiskCount = [int]$soleCredApps.Count
+                    OrphanedAppsCount       = [int]$orphanedApps.Count
                     ScanTimestamp           = Format-ODataDateTime -DateTime $now
                 }
                 return $summaryObj
