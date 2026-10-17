@@ -767,7 +767,7 @@ Describe "Get-GTRiskyAppPermissionReport" {
         }
 
         It "should call Get-GTGraphErrorDetails with valid ResourceType on failure" {
-            $capturedResourceType = $null
+            $script:capturedResourceType = $null
             Mock -CommandName "Invoke-GTGraphRequest" -MockWith { throw [System.InvalidOperationException]::new("Simulated Graph API Failure") }
             Mock -CommandName "Get-GTGraphErrorDetails" -MockWith {
                 param($Exception, $ResourceType)
