@@ -766,6 +766,19 @@ Describe "Get-GTRiskyAppPermissionReport" {
             { Get-GTRiskyAppPermissionReport } | Should -Throw
         }
 
+        It "should call Get-GTGraphErrorDetails with valid ResourceType on failure" {
+            $capturedResourceType = $null
+            Mock -CommandName "Invoke-GTGraphRequest" -MockWith { throw [System.InvalidOperationException]::new("Simulated Graph API Failure") }
+            Mock -CommandName "Get-GTGraphErrorDetails" -MockWith {
+                param($Exception, $ResourceType)
+                $script:capturedResourceType = $ResourceType
+                return [PSCustomObject]@{ Message = "Mocked Error" }
+            }
+
+            { Get-GTRiskyAppPermissionReport } | Should -Throw
+            $script:capturedResourceType | Should -Be 'resource'
+        }
+
         It "should handle empty results gracefully" {
             Mock -CommandName "Invoke-GTGraphRequest" -MockWith {
                 param($Method, $Uri, $ErrorAction)
