@@ -40,3 +40,7 @@ A simulated local benchmark intercepting `Invoke-GTGraphRequest` with an artific
 - **Learnings**:
   - Similar to the EnterpriseAppOwnership optimization, ensuring the batch request uses a `try/catch` block to fall back gracefully to the original N+1 logic if the batch request fails is a good fail-open strategy.
   - This N+1 batch-fetching pattern is broadly applicable across various Entitlement removal functions when evaluating owner counts to prevent creating orphaned resources.
+
+## 2026-10-06 - Avoid Multiple Pipeline Passes Over the Same Collection
+**Learning:** Using `Where-Object` repeatedly on the same large array to calculate aggregates or summaries causes an O(K*N) performance degradation (where K is the number of properties evaluated). In `Get-GTAppConsentReport`, scanning the pipeline 8 times for different risk/consent metrics scaled poorly.
+**Action:** Replace multiple pipeline passes with a single `foreach` loop that accumulates all necessary variables inside the loop (O(N) time complexity). Use `switch` statements and fast lookups like `HashSet[string]` to streamline the iteration.

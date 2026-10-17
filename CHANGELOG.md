@@ -20,6 +20,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Code Style Alignment (`Get-GTRiskyAppPermissionReport`)**:
   - Standardized control block braces to Allman style and normalized hashtable indentation.
 
+- **Performance Optimization (`Get-GTAppConsentReport`)**:
+  - Reworked the `-Summary` aggregation path to compute tenant-wide metrics in a single pass instead of repeatedly re-scanning the same consent data set for each KPI.
+  - Reduced redundant filtering and grouping work to lower CPU and memory overhead while preserving the same output contract.
+
 - **Performance Optimization (`Remove-GTUserGroupOwnership`)**:
   - Replaced N+1 individual synchronous owner count queries for owned groups with bulk batch resolution via `Invoke-GTGraphBatch`.
   - Added resilient fallback to individual requests if batch retrieval fails or subrequests return errors.

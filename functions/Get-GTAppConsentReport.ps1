@@ -523,17 +523,50 @@ function Get-GTAppConsentReport
         # 8. Output results
         if ($Summary)
         {
+            # Bolt Optimization: Replace 8 pipeline passes over $records (O(8N)) with a single iteration (O(N))
+            $criticalCount = 0
+            $highCount = 0
+            $mediumCount = 0
+            $lowCount = 0
+            $userConsentedCount = 0
+            $adminConsentedCount = 0
+            $unverifiedApps = [System.Collections.Generic.HashSet[string]]::new()
+            $thirdPartyApps = [System.Collections.Generic.HashSet[string]]::new()
+
+            foreach ($rec in $records) {
+                switch ($rec.RiskLevel) {
+                    'Critical' { $criticalCount++ }
+                    'High'     { $highCount++ }
+                    'Medium'   { $mediumCount++ }
+                    'Low'      { $lowCount++ }
+                }
+
+                if (-not $rec.IsPublisherVerified) {
+                    [void]$unverifiedApps.Add($rec.AppId)
+                }
+
+                if ($rec.IsThirdParty) {
+                    [void]$thirdPartyApps.Add($rec.AppId)
+                }
+
+                if ($rec.ConsentType -eq 'Principal') {
+                    $userConsentedCount++
+                } elseif ($rec.ConsentType -eq 'AllPrincipals') {
+                    $adminConsentedCount++
+                }
+            }
+
             $summaryObj = [PSCustomObject]@{
                 TotalGrantsScanned    = [int]$records.Count
                 TotalAppsScanned      = [int]$appsEncountered.Count
-                CriticalCount         = [int]@($records | Where-Object { $_.RiskLevel -eq 'Critical' }).Count
-                HighCount             = [int]@($records | Where-Object { $_.RiskLevel -eq 'High' }).Count
-                MediumCount           = [int]@($records | Where-Object { $_.RiskLevel -eq 'Medium' }).Count
-                LowCount              = [int]@($records | Where-Object { $_.RiskLevel -eq 'Low' }).Count
-                UnverifiedAppsCount   = [int]@($records | Where-Object { -not $_.IsPublisherVerified } | Select-Object -ExpandProperty AppId -Unique).Count
-                ThirdPartyAppsCount   = [int]@($records | Where-Object { $_.IsThirdParty } | Select-Object -ExpandProperty AppId -Unique).Count
-                UserConsentedCount    = [int]@($records | Where-Object { $_.ConsentType -eq 'Principal' }).Count
-                AdminConsentedCount   = [int]@($records | Where-Object { $_.ConsentType -eq 'AllPrincipals' }).Count
+                CriticalCount         = [int]$criticalCount
+                HighCount             = [int]$highCount
+                MediumCount           = [int]$mediumCount
+                LowCount              = [int]$lowCount
+                UnverifiedAppsCount   = [int]$unverifiedApps.Count
+                ThirdPartyAppsCount   = [int]$thirdPartyApps.Count
+                UserConsentedCount    = [int]$userConsentedCount
+                AdminConsentedCount   = [int]$adminConsentedCount
                 ScanTimestamp         = Format-ODataDateTime -DateTime (Get-UTCTime)
             }
             return $summaryObj
