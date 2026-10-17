@@ -149,7 +149,16 @@ function Get-GTCachedGraphToken
         param($Secret)
         if ($Secret -is [System.Security.SecureString])
         {
-            return [System.Net.NetworkCredential]::new('', $Secret).Password
+            $bstr = [System.IntPtr]::Zero
+            try {
+                $bstr = [System.Runtime.InteropServices.Marshal]::SecureStringToBSTR($Secret)
+                return [System.Runtime.InteropServices.Marshal]::PtrToStringBSTR($bstr)
+            }
+            finally {
+                if ($bstr -ne [System.IntPtr]::Zero) {
+                    [System.Runtime.InteropServices.Marshal]::ZeroFreeBSTR($bstr)
+                }
+            }
         }
         elseif ($Secret -is [string])
         {
