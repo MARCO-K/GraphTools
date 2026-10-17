@@ -9,6 +9,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **General ResourceType Unit Test Coverage (`tests/Get-GTGraphErrorDetails.Tests.ps1`)**:
+  - Added unit test asserting arbitrary resource descriptors (e.g., `'Directory Roles'`, `'CA Policy'`) are accepted and correctly formatted into 403/404 messages.
+
 - **Unit Test Coverage for Graph Error Handling (`tests/Get-GTRiskyAppPermissionReport.Tests.ps1`)**:
   - Added dedicated test asserting `Get-GTGraphErrorDetails` is called with a valid `ResourceType` (`'resource'`) when Graph API calls throw an exception.
 
@@ -22,6 +25,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Added resilient fallback to individual requests if batch retrieval fails or subrequests return errors.
 
 ### Fixed
+
+- **ResourceType Generalization in Error Handling (`internal/functions/Get-GTGraphErrorDetails.ps1`)**:
+  - Removed restrictive `[ValidateSet('user', 'device', 'resource')]` attribute on `$ResourceType`, allowing calling cmdlets across the module to provide descriptive resource contexts (such as `'Groups'`, `'CA Policy'`, `'Directory Roles'`) without triggering terminating `ParameterBindingValidationException` during catch block execution.
 
 - **Graph Error Resolution in Risky App Permission Report (`Get-GTRiskyAppPermissionReport`)**:
   - Corrected `-ResourceType` parameter from `'Permissions'` to `'resource'` in the catch handler's `Get-GTGraphErrorDetails` call to adhere to its `[ValidateSet('user', 'device', 'resource')]` constraint, preventing terminating `ParameterBindingValidationException` during Graph API failure scenarios.
