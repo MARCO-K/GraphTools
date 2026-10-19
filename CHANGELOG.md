@@ -7,19 +7,42 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- **General ResourceType Unit Test Coverage (`tests/Get-GTGraphErrorDetails.Tests.ps1`)**:
+  - Added unit test asserting arbitrary resource descriptors (e.g., `'Directory Roles'`, `'CA Policy'`) are accepted and correctly formatted into 403/404 messages.
+
+- **Unit Test Coverage for Graph Error Handling (`tests/Get-GTRiskyAppPermissionReport.Tests.ps1`)**:
+  - Added dedicated test asserting `Get-GTGraphErrorDetails` is called with a valid `ResourceType` (`'resource'`) when Graph API calls throw an exception.
+
 ### Changed
+
+- **Code Style Alignment (`Get-GTRiskyAppPermissionReport`)**:
+  - Standardized control block braces to Allman style and normalized hashtable indentation.
 
 - **Performance Optimization (`Get-GTAppConsentReport`)**:
   - Reworked the `-Summary` aggregation path to compute tenant-wide metrics in a single pass instead of repeatedly re-scanning the same consent data set for each KPI.
   - Reduced redundant filtering and grouping work to lower CPU and memory overhead while preserving the same output contract.
+
 - **Performance Optimization (`Remove-GTUserGroupOwnership`)**:
   - Replaced N+1 individual synchronous owner count queries for owned groups with bulk batch resolution via `Invoke-GTGraphBatch`.
   - Added resilient fallback to individual requests if batch retrieval fails or subrequests return errors.
 
 ### Fixed
 
+- **ResourceType Generalization in Error Handling (`internal/functions/Get-GTGraphErrorDetails.ps1`)**:
+  - Removed restrictive `[ValidateSet('user', 'device', 'resource')]` attribute on `$ResourceType`, allowing calling cmdlets across the module to provide descriptive resource contexts (such as `'Groups'`, `'CA Policy'`, `'Directory Roles'`) without triggering terminating `ParameterBindingValidationException` during catch block execution.
+
+- **Graph Error Resolution in Risky App Permission Report (`Get-GTRiskyAppPermissionReport`)**:
+  - Corrected `-ResourceType` parameter from `'Permissions'` to `'resource'` in the catch handler's `Get-GTGraphErrorDetails` call to adhere to its `[ValidateSet('user', 'device', 'resource')]` constraint, preventing terminating `ParameterBindingValidationException` during Graph API failure scenarios.
+
 - **SQL Literal Escaping in DuckDB Record Import (`Import-GTDuckDBRecord`)**:
   - Fixed data mutation bug where single quotes in record values were replaced with underscores (`Replace("'", "_")`), replacing it with standard SQL quote-doubling (`Replace("'", "''")`) to preserve strings containing apostrophes while safely preventing SQL injection.
+
+### Security
+
+- **Deterministic Memory Cleanup on SecureString Decryption (`internal/functions/Get-GTCachedGraphToken.ps1`)**:
+  - Replaced `[System.Net.NetworkCredential]` password decryption with `[System.Runtime.InteropServices.Marshal]::SecureStringToBSTR` / `PtrToStringBSTR` paired with deterministic `ZeroFreeBSTR` unmanaged buffer deallocation inside a `finally` block to minimize plaintext client secret persistence in memory dumps.
 
 ## [0.28.0] - 2026-10-02
 

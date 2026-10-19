@@ -55,7 +55,6 @@ function Get-GTGraphErrorDetails
         [string]$Context = '',
 
         [Parameter()]
-        [ValidateSet('user', 'device', 'resource')]
         [string]$ResourceType = 'resource'
     )
 
