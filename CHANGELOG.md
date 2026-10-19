@@ -39,6 +39,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **SQL Literal Escaping in DuckDB Record Import (`Import-GTDuckDBRecord`)**:
   - Fixed data mutation bug where single quotes in record values were replaced with underscores (`Replace("'", "_")`), replacing it with standard SQL quote-doubling (`Replace("'", "''")`) to preserve strings containing apostrophes while safely preventing SQL injection.
 
+### Security
+
+- **Deterministic Memory Cleanup on SecureString Decryption (`internal/functions/Get-GTCachedGraphToken.ps1`)**:
+  - Replaced `[System.Net.NetworkCredential]` password decryption with `[System.Runtime.InteropServices.Marshal]::SecureStringToBSTR` / `PtrToStringBSTR` paired with deterministic `ZeroFreeBSTR` unmanaged buffer deallocation inside a `finally` block to minimize plaintext client secret persistence in memory dumps.
+
 ## [0.28.0] - 2026-10-02
 
 ### Added
