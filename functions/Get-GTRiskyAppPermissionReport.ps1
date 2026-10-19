@@ -81,20 +81,20 @@ function Get-GTRiskyAppPermissionReport
 
         # 4. Curated High-Impact Overrides
         $CuratedOverrides = @{
-            'RoleManagement.ReadWrite.Directory'           = @{ Score = 10; Level = 'Critical'; Impact = 'Privilege Escalation';       Desc = 'Can promote self to Global Admin' }
-            'AppRoleAssignment.ReadWrite.All'              = @{ Score = 10; Level = 'Critical'; Impact = 'Privilege Escalation';       Desc = 'Can grant self any permission' }
-            'OnPremDirectorySynchronization.ReadWrite.All' = @{ Score = 10; Level = 'Critical'; Impact = 'Hybrid Identity Takeover';   Desc = 'Can tamper with directory synchronization accounts' }
-            'Domain.ReadWrite.All'                         = @{ Score = 10; Level = 'Critical'; Impact = 'Domain Takeover';            Desc = 'Can manipulate verified tenant domains' }
-            'UserAuthenticationMethod.ReadWrite.All'       = @{ Score = 10; Level = 'Critical'; Impact = 'Credential Manipulation';    Desc = 'Can reset MFA and authentication methods for users' }
-            'DelegatedPermissionGrant.ReadWrite.All'       = @{ Score = 10; Level = 'Critical'; Impact = 'Privilege Escalation';       Desc = 'Can grant arbitrary delegated permissions' }
-            'Directory.ReadWrite.All'                      = @{ Score = 9;  Level = 'Critical'; Impact = 'Tenant Destruction';         Desc = 'Can delete users, groups, and apps' }
-            'Mail.ReadWrite'                               = @{ Score = 8;  Level = 'High';     Impact = 'Data Integrity';             Desc = 'Can read and modify all email' }
-            'Files.ReadWrite.All'                          = @{ Score = 8;  Level = 'High';     Impact = 'Data Integrity';             Desc = 'Can read/modify all files' }
-            'BitlockerKey.Read.All'                        = @{ Score = 8;  Level = 'High';     Impact = 'Cryptographic Exfiltration'; Desc = 'Can extract BitLocker volume recovery keys' }
-            'Mail.Read'                                    = @{ Score = 7;  Level = 'High';     Impact = 'Data Exfiltration';          Desc = 'Can read all email' }
-            'Files.Read.All'                               = @{ Score = 7;  Level = 'High';     Impact = 'Data Exfiltration';          Desc = 'Can read all files' }
-            'Mail.Send'                                    = @{ Score = 6;  Level = 'Medium';   Impact = 'Impersonation';              Desc = 'Can send email as any user' }
-            'User.ReadWrite.All'                           = @{ Score = 6;  Level = 'Medium';   Impact = 'User Modification';          Desc = 'Can modify user profiles' }
+            'RoleManagement.ReadWrite.Directory'           = @{ Score = 10; Level = 'Critical'; Impact = 'Privilege Escalation'; Desc = 'Can promote self to Global Admin' }
+            'AppRoleAssignment.ReadWrite.All'              = @{ Score = 10; Level = 'Critical'; Impact = 'Privilege Escalation'; Desc = 'Can grant self any permission' }
+            'OnPremDirectorySynchronization.ReadWrite.All' = @{ Score = 10; Level = 'Critical'; Impact = 'Hybrid Identity Takeover'; Desc = 'Can tamper with directory synchronization accounts' }
+            'Domain.ReadWrite.All'                         = @{ Score = 10; Level = 'Critical'; Impact = 'Domain Takeover'; Desc = 'Can manipulate verified tenant domains' }
+            'UserAuthenticationMethod.ReadWrite.All'       = @{ Score = 10; Level = 'Critical'; Impact = 'Credential Manipulation'; Desc = 'Can reset MFA and authentication methods for users' }
+            'DelegatedPermissionGrant.ReadWrite.All'       = @{ Score = 10; Level = 'Critical'; Impact = 'Privilege Escalation'; Desc = 'Can grant arbitrary delegated permissions' }
+            'Directory.ReadWrite.All'                      = @{ Score = 9; Level = 'Critical'; Impact = 'Tenant Destruction'; Desc = 'Can delete users, groups, and apps' }
+            'Mail.ReadWrite'                               = @{ Score = 8; Level = 'High'; Impact = 'Data Integrity'; Desc = 'Can read and modify all email' }
+            'Files.ReadWrite.All'                          = @{ Score = 8; Level = 'High'; Impact = 'Data Integrity'; Desc = 'Can read/modify all files' }
+            'BitlockerKey.Read.All'                        = @{ Score = 8; Level = 'High'; Impact = 'Cryptographic Exfiltration'; Desc = 'Can extract BitLocker volume recovery keys' }
+            'Mail.Read'                                    = @{ Score = 7; Level = 'High'; Impact = 'Data Exfiltration'; Desc = 'Can read all email' }
+            'Files.Read.All'                               = @{ Score = 7; Level = 'High'; Impact = 'Data Exfiltration'; Desc = 'Can read all files' }
+            'Mail.Send'                                    = @{ Score = 6; Level = 'Medium'; Impact = 'Impersonation'; Desc = 'Can send email as any user' }
+            'User.ReadWrite.All'                           = @{ Score = 6; Level = 'Medium'; Impact = 'User Modification'; Desc = 'Can modify user profiles' }
         }
 
         $UserCache = @{}
@@ -120,9 +120,11 @@ function Get-GTRiskyAppPermissionReport
             {
                 $curated = $CuratedOverrides[$PermissionName]
                 $devxMeta = if ($permissionCatalog -and $permissionCatalog.ContainsKey($PermissionName)) { $permissionCatalog[$PermissionName] } else { $null }
-                $devxPriv = if ($devxMeta) {
+                $devxPriv = if ($devxMeta)
+                {
                     if ($Scheme -eq 'Application') { $devxMeta['appPrivilegeLevel'] } else { $devxMeta['delegatedPrivilegeLevel'] }
-                } else { $null }
+                }
+                else { $null }
                 $adminConsent = if ($devxMeta) { $devxMeta['requiresAdminConsent'] } else { $true }
 
                 $curatedScore = $curated.Score
@@ -167,27 +169,32 @@ function Get-GTRiskyAppPermissionReport
 
                 switch ($privLevel)
                 {
-                    { $_ -ge 5 } {
+                    { $_ -ge 5 }
+                    {
                         $catScore = 10
                         $catLevel = 'Critical'
                         $catImpact = 'Critical Privilege'
                     }
-                    4 {
+                    4
+                    {
                         $catScore = 8
                         $catLevel = 'High'
                         $catImpact = 'High Privilege'
                     }
-                    3 {
+                    3
+                    {
                         $catScore = 6
                         $catLevel = 'Medium'
                         $catImpact = 'Medium Privilege'
                     }
-                    2 {
+                    2
+                    {
                         $catScore = 4
                         $catLevel = 'Low'
                         $catImpact = 'Low Privilege'
                     }
-                    default {
+                    default
+                    {
                         $catScore = 2
                         $catLevel = 'Low'
                         $catImpact = 'Least Privilege'
@@ -281,26 +288,30 @@ function Get-GTRiskyAppPermissionReport
             $graphSpResp = Invoke-GTGraphRequest -Method GET -Uri "v1.0/servicePrincipals?`$filter=appId eq '00000003-0000-0000-c000-000000000000'&`$select=id,appRoles,resourceSpecificApplicationPermissions" -ErrorAction Stop
             $graphSp = $graphSpResp.value[0]
             $roleMap = @{}
-            if ($graphSp.appRoles) {
+            if ($graphSp.appRoles)
+            {
                 foreach ($role in $graphSp.appRoles) { $roleMap[$role.id] = $role.value }
             }
-            if ($graphSp.resourceSpecificApplicationPermissions) {
+            if ($graphSp.resourceSpecificApplicationPermissions)
+            {
                 foreach ($rsc in $graphSp.resourceSpecificApplicationPermissions) { $roleMap[$rsc.id] = $rsc.value }
             }
 
             # Fetch Service Principals
             # beta required: signInActivity is not available on servicePrincipals in v1.0
-            if ($targetAppIds.Count -gt 0) {
+            if ($targetAppIds.Count -gt 0)
+            {
                 $safeIds = $targetAppIds | ForEach-Object { ($_ -replace "'", "''") }
                 $spFilter = "appId in ('" + ($safeIds -join "','") + "')"
                 Write-PSFMessage -Level Verbose -Message "Fetching specific Service Principals ($($targetAppIds.Count))..."
                 $sps = Invoke-GTGraphPagedRequest -Uri "beta/servicePrincipals?`$filter=$([Uri]::EscapeDataString($spFilter))&`$select=id,appId,displayName,signInActivity&`$expand=appRoleAssignments" -Headers @{ ConsistencyLevel = 'eventual' }
             }
-            else {
+            else
+            {
                 Write-PSFMessage -Level Verbose -Message "Fetching ALL Service Principals..."
                 $sps = Invoke-GTGraphPagedRequest -Uri "beta/servicePrincipals?`$select=id,appId,displayName,signInActivity&`$expand=appRoleAssignments"
             }
-            
+
             $spLookup = @{}
             foreach ($sp in $sps) { $spLookup[$sp.id] = $sp }
 
@@ -308,12 +319,13 @@ function Get-GTRiskyAppPermissionReport
             if ($PermissionType -in 'Both', 'AppOnly')
             {
                 Write-PSFMessage -Level Verbose -Message "Analyzing App-Only Assignments..."
-                
+
                 foreach ($sp in $sps)
                 {
                     $lastSignIn = $sp.signInActivity.lastSignInDateTime
                     $isActive = $false
-                    if ($lastSignIn) {
+                    if ($lastSignIn)
+                    {
                         $daysSince = (New-TimeSpan -Start $lastSignIn -End $utcNow).Days
                         if ($daysSince -le 90) { $isActive = $true }
                     }
@@ -325,28 +337,35 @@ function Get-GTRiskyAppPermissionReport
                             if ($assign.resourceId -eq $graphSp.id)
                             {
                                 $permName = $roleMap[$assign.appRoleId]
-                                
+
                                 if ($permName)
                                 {
                                     $riskInfo = & $CalculateRisk -PermissionName $permName -Scheme 'Application'
 
                                     # Inclusion decision
                                     $isCandidate = $false
-                                    if ($HighRiskScopes -and ($HighRiskScopes -contains $permName)) {
+                                    if ($HighRiskScopes -and ($HighRiskScopes -contains $permName))
+                                    {
                                         $isCandidate = $true
                                     }
-                                    elseif ($MinPrivilegeLevel) {
-                                        if ($riskInfo.PrivilegeLevel -and ($riskInfo.PrivilegeLevel -ge $MinPrivilegeLevel)) {
+                                    elseif ($MinPrivilegeLevel)
+                                    {
+                                        if ($riskInfo.PrivilegeLevel -and ($riskInfo.PrivilegeLevel -ge $MinPrivilegeLevel))
+                                        {
                                             $isCandidate = $true
                                         }
                                     }
-                                    elseif ($RiskLevel) {
-                                        if ($riskInfo.Level -in $RiskLevel) {
+                                    elseif ($RiskLevel)
+                                    {
+                                        if ($riskInfo.Level -in $RiskLevel)
+                                        {
                                             $isCandidate = $true
                                         }
                                     }
-                                    else {
-                                        if ($riskInfo.Level -in @('Critical', 'High') -or $CuratedOverrides.ContainsKey($permName)) {
+                                    else
+                                    {
+                                        if ($riskInfo.Level -in @('Critical', 'High') -or $CuratedOverrides.ContainsKey($permName))
+                                        {
                                             $isCandidate = $true
                                         }
                                     }
@@ -354,21 +373,21 @@ function Get-GTRiskyAppPermissionReport
                                     if ($isCandidate)
                                     {
                                         $report.Add([PSCustomObject]@{
-                                            AppName              = $sp.displayName
-                                            AppId                = $sp.appId
-                                            Type                 = "Application (App-Only)"
-                                            Permission           = $permName
-                                            RiskLevel            = $riskInfo.Level
-                                            RiskScore            = $riskInfo.Score
-                                            PrivilegeLevel       = $riskInfo.PrivilegeLevel
-                                            AdminConsentRequired = $riskInfo.AdminConsentRequired
-                                            Impact               = $riskInfo.Impact
-                                            GrantedDate          = $assign.creationTimestamp
-                                            GrantedBy            = "Administrator"
-                                            LastSignIn           = $lastSignIn
-                                            IsActive             = $isActive
-                                            Description          = $riskInfo.Desc
-                                        })
+                                                AppName              = $sp.displayName
+                                                AppId                = $sp.appId
+                                                Type                 = "Application (App-Only)"
+                                                Permission           = $permName
+                                                RiskLevel            = $riskInfo.Level
+                                                RiskScore            = $riskInfo.Score
+                                                PrivilegeLevel       = $riskInfo.PrivilegeLevel
+                                                AdminConsentRequired = $riskInfo.AdminConsentRequired
+                                                Impact               = $riskInfo.Impact
+                                                GrantedDate          = $assign.creationTimestamp
+                                                GrantedBy            = "Administrator"
+                                                LastSignIn           = $lastSignIn
+                                                IsActive             = $isActive
+                                                Description          = $riskInfo.Desc
+                                            })
                                     }
                                 }
                             }
@@ -381,17 +400,22 @@ function Get-GTRiskyAppPermissionReport
             if ($PermissionType -in 'Both', 'Delegated')
             {
                 Write-PSFMessage -Level Verbose -Message "Fetching Delegated Grants..."
-                
-                if ($targetAppIds.Count -gt 0) {
+
+                if ($targetAppIds.Count -gt 0)
+                {
                     $spObjectIds = $sps | ForEach-Object { $_.id }
-                    if ($spObjectIds) {
+                    if ($spObjectIds)
+                    {
                         $grantFilter = "clientId in ('" + ($spObjectIds -join "','") + "')"
                         $grants = Invoke-GTGraphPagedRequest -Uri "v1.0/oauth2PermissionGrants?`$filter=$([Uri]::EscapeDataString($grantFilter))" -Headers @{ ConsistencyLevel = 'eventual' }
-                    } else {
+                    }
+                    else
+                    {
                         $grants = @()
                     }
                 }
-                else {
+                else
+                {
                     $grants = Invoke-GTGraphPagedRequest -Uri "v1.0/oauth2PermissionGrants?`$filter=resourceId eq '$($graphSp.id)'"
                 }
 
@@ -412,9 +436,9 @@ function Get-GTRiskyAppPermissionReport
                     foreach ($principalId in $unknownPrincipalIds)
                     {
                         $batchRequests.Add(@{
-                            id  = $principalId
-                            url = "v1.0/users/$principalId`?`$select=userPrincipalName"
-                        })
+                                id  = $principalId
+                                url = "v1.0/users/$principalId`?`$select=userPrincipalName"
+                            })
                     }
 
                     $batchResponses = Invoke-GTGraphBatch -Requests $batchRequests
@@ -438,7 +462,7 @@ function Get-GTRiskyAppPermissionReport
                 foreach ($grant in $grants)
                 {
                     $grantedScopes = $grant.scope -split ' '
-                    
+
                     foreach ($scope in $grantedScopes)
                     {
                         if (-not [string]::IsNullOrWhiteSpace($scope))
@@ -447,21 +471,28 @@ function Get-GTRiskyAppPermissionReport
 
                             # Inclusion decision
                             $isCandidate = $false
-                            if ($HighRiskScopes -and ($HighRiskScopes -contains $scope)) {
+                            if ($HighRiskScopes -and ($HighRiskScopes -contains $scope))
+                            {
                                 $isCandidate = $true
                             }
-                            elseif ($MinPrivilegeLevel) {
-                                if ($riskInfo.PrivilegeLevel -and ($riskInfo.PrivilegeLevel -ge $MinPrivilegeLevel)) {
+                            elseif ($MinPrivilegeLevel)
+                            {
+                                if ($riskInfo.PrivilegeLevel -and ($riskInfo.PrivilegeLevel -ge $MinPrivilegeLevel))
+                                {
                                     $isCandidate = $true
                                 }
                             }
-                            elseif ($RiskLevel) {
-                                if ($riskInfo.Level -in $RiskLevel) {
+                            elseif ($RiskLevel)
+                            {
+                                if ($riskInfo.Level -in $RiskLevel)
+                                {
                                     $isCandidate = $true
                                 }
                             }
-                            else {
-                                if ($riskInfo.Level -in @('Critical', 'High') -or $CuratedOverrides.ContainsKey($scope)) {
+                            else
+                            {
+                                if ($riskInfo.Level -in @('Critical', 'High') -or $CuratedOverrides.ContainsKey($scope))
+                                {
                                     $isCandidate = $true
                                 }
                             }
@@ -471,10 +502,11 @@ function Get-GTRiskyAppPermissionReport
                                 $clientSp = $spLookup[$grant.clientId]
                                 $appName = if ($clientSp) { $clientSp.displayName } else { $grant.clientId }
                                 $appId = if ($clientSp) { $clientSp.appId } else { "Unknown" }
-                                
+
                                 $lastSignIn = if ($clientSp) { $clientSp.signInActivity.lastSignInDateTime } else { $null }
                                 $isActive = $false
-                                if ($lastSignIn) {
+                                if ($lastSignIn)
+                                {
                                     $daysSince = (New-TimeSpan -Start $lastSignIn -End $utcNow).Days
                                     if ($daysSince -le 90) { $isActive = $true }
                                 }
@@ -482,51 +514,57 @@ function Get-GTRiskyAppPermissionReport
                                 $grantedBy = "Unknown"
                                 $target = "Specific User"
 
-                                if ($grant.consentType -eq 'AllPrincipals') {
+                                if ($grant.consentType -eq 'AllPrincipals')
+                                {
                                     $target = "Entire Tenant"
                                     $grantedBy = "Administrator"
                                 }
-                                elseif ($grant.principalId) {
+                                elseif ($grant.principalId)
+                                {
                                     $grantedBy = if ($UserCache.ContainsKey($grant.principalId)) { $UserCache[$grant.principalId] } else { "Unknown" }
                                 }
 
                                 $report.Add([PSCustomObject]@{
-                                    AppName              = $appName
-                                    AppId                = $appId
-                                    Type                 = "Delegated ($target)"
-                                    Permission           = $scope
-                                    RiskLevel            = $riskInfo.Level
-                                    RiskScore            = $riskInfo.Score
-                                    PrivilegeLevel       = $riskInfo.PrivilegeLevel
-                                    AdminConsentRequired = $riskInfo.AdminConsentRequired
-                                    Impact               = $riskInfo.Impact
-                                    GrantedDate          = $grant.startTime
-                                    GrantedBy            = $grantedBy
-                                    LastSignIn           = $lastSignIn
-                                    IsActive             = $isActive
-                                    Description          = $riskInfo.Desc
-                                })
+                                        AppName              = $appName
+                                        AppId                = $appId
+                                        Type                 = "Delegated ($target)"
+                                        Permission           = $scope
+                                        RiskLevel            = $riskInfo.Level
+                                        RiskScore            = $riskInfo.Score
+                                        PrivilegeLevel       = $riskInfo.PrivilegeLevel
+                                        AdminConsentRequired = $riskInfo.AdminConsentRequired
+                                        Impact               = $riskInfo.Impact
+                                        GrantedDate          = $grant.startTime
+                                        GrantedBy            = $grantedBy
+                                        LastSignIn           = $lastSignIn
+                                        IsActive             = $isActive
+                                        Description          = $riskInfo.Desc
+                                    })
                             }
                         }
                     }
                 }
             }
 
-            if ($RiskLevel) {
+            if ($RiskLevel)
+            {
                 $report = @($report | Where-Object { $_.RiskLevel -in $RiskLevel })
             }
 
-            if (@($report).Count -gt 0) {
+            if (@($report).Count -gt 0)
+            {
                 Write-PSFMessage -Level Warning -Message "Found $(@($report).Count) risky assignments."
                 return @($report | Sort-Object RiskScore -Descending)
-            } else {
+            }
+            else
+            {
                 Write-PSFMessage -Level Verbose -Message "No high-risk permissions found matching criteria."
                 return @()
             }
         }
         catch
         {
-            $err = Get-GTGraphErrorDetails -Exception $_.Exception -ResourceType 'Permissions'
+            $err = Get-GTGraphErrorDetails -Exception $_.Exception -ResourceType 'resource'
             Write-PSFMessage -Level $err.LogLevel -Message "Failed to audit permissions: $($err.Reason)"
             throw $err.ErrorMessage
         }
