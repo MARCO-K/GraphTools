@@ -20,3 +20,9 @@
 **Vulnerability:** While SQL injection was prevented by replacing single quotes with underscores `Replace("'", "_")` during dynamic query generation for DuckDB, it caused unintended data mutation.
 **Learning:** Security fixes shouldn't compromise data integrity. Replacing `'` with `_` protects against injection but corrupts legitimate strings with apostrophes (e.g., "O'Connor" becomes "O_Connor").
 **Prevention:** Use standard SQL escaping by replacing a single quote with two single quotes `Replace("'", "''")` when building raw SQL queries, which prevents injection while preserving the original string content.
+
+## 2026-10-06 - Insecure SecureString Decryption
+
+**Vulnerability:** Converting `SecureString` to plaintext using `[System.Net.NetworkCredential]` leaves the plaintext secret in unmanaged memory, exposing it to potential memory dumps.
+**Learning:** `[System.Net.NetworkCredential]::new('', $Secret).Password` is convenient but does not securely erase the plaintext password from memory after use, which defeats the purpose of using `SecureString` in the first place.
+**Prevention:** When decrypting a `SecureString` to plaintext, use `[System.Runtime.InteropServices.Marshal]::SecureStringToBSTR()`, read the string with `PtrToStringBSTR()`, and securely clear the unmanaged memory using `ZeroFreeBSTR()` inside a `finally` block to minimize plaintext memory exposure.
