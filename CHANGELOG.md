@@ -24,6 +24,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Reworked the `-Summary` aggregation path to compute tenant-wide metrics in a single pass instead of repeatedly re-scanning the same consent data set for each KPI.
   - Reduced redundant filtering and grouping work to lower CPU and memory overhead while preserving the same output contract.
 
+- **Performance Optimization (`Get-GTExpiringSecret`)**:
+  - Replaced six separate `Where-Object` pipeline passes and `Select-Object -Unique` operations in the `-Summary` KPI computation block with a single $O(N)$ `foreach` pass using case-insensitive `HashSet[string]` accumulators, eliminating redundant array evaluations in tenants with large credential volumes.
+
 - **Performance Optimization (`Remove-GTUserGroupOwnership`)**:
   - Replaced N+1 individual synchronous owner count queries for owned groups with bulk batch resolution via `Invoke-GTGraphBatch`.
   - Added resilient fallback to individual requests if batch retrieval fails or subrequests return errors.
