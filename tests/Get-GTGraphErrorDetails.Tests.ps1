@@ -173,6 +173,16 @@ Describe "Get-GTGraphErrorDetails" -Tag 'Unit' {
 
             $result.Reason | Should -Match 'resource could not be processed'
         }
+
+        It "accepts custom arbitrary ResourceType strings without validation errors" {
+            $exception = [System.Exception]::new('404 Not Found')
+
+            $resultRoles = Get-GTGraphErrorDetails -Exception $exception -ResourceType 'Directory Roles'
+            $resultRoles.Reason | Should -Match 'Directory Roles could not be processed'
+
+            $resultPolicy = Get-GTGraphErrorDetails -Exception $exception -ResourceType 'CA Policy'
+            $resultPolicy.Reason | Should -Match 'CA Policy could not be processed'
+        }
     }
 
     Context "Output Structure" {
