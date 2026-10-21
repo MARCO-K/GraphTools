@@ -3,6 +3,7 @@ Describe "Remove-GTUserDelegatedPermissionGrant" {
         function global:Write-PSFMessage { param($Level, $Message, $ErrorRecord) }
         function global:Test-GTGuid { param($InputObject, [switch]$Quiet) return $true }
         function global:Invoke-GTGraphPagedRequest { param($Uri) }
+        function global:Invoke-GTGraphBatch { param($Requests) }
         function global:Invoke-GTGraphRequest { param($Uri, $Method = 'GET', $Body, $Headers, $ContentType, [switch]$All, [int]$MaxRetries, [int]$RetryBaseDelaySeconds, $Token, [switch]$Raw, $ErrorAction) }
         function global:Get-GTGraphErrorDetails { param($Exception, $ResourceType) return [PSCustomObject]@{ HttpStatus = 500; LogLevel = 'Error'; Reason = 'Mock Error'; ErrorMessage = 'Mock Error' } }
 
@@ -14,6 +15,7 @@ Describe "Remove-GTUserDelegatedPermissionGrant" {
         Remove-Item Function:\global:Write-PSFMessage -Force -ErrorAction SilentlyContinue
         Remove-Item Function:\global:Test-GTGuid -Force -ErrorAction SilentlyContinue
         Remove-Item Function:\global:Invoke-GTGraphPagedRequest -Force -ErrorAction SilentlyContinue
+        Remove-Item Function:\global:Invoke-GTGraphBatch -Force -ErrorAction SilentlyContinue
         Remove-Item Function:\global:Invoke-GTGraphRequest -Force -ErrorAction SilentlyContinue
         Remove-Item Function:\global:Get-GTGraphErrorDetails -Force -ErrorAction SilentlyContinue
         Remove-Item Function:\Test-GTUserObject -Force -ErrorAction SilentlyContinue
@@ -46,18 +48,31 @@ Describe "Remove-GTUserDelegatedPermissionGrant" {
                     [PSCustomObject]@{ id = 'grant-2'; clientId = 'client-aaa'; scope = 'Mail.Read' }
                 )
             }
-            Mock -CommandName Invoke-GTGraphRequest -MockWith {
-                param($Uri, $Method)
-                if ($Method -eq 'GET' -and $Uri -like 'v1.0/servicePrincipals/client-aaa*') {
-                    return [PSCustomObject]@{ displayName = 'CachedApp' }
+            Mock -CommandName Invoke-GTGraphBatch -MockWith {
+                param($Requests)
+                $responses = [System.Collections.Generic.List[PSObject]]::new()
+                foreach ($req in $Requests) {
+                    $url = if ($null -ne $req.url) { $req.url } else { $req['url'] }
+                    $id = if ($null -ne $req.id) { $req.id } else { $req['id'] }
+                    if ($url -like "*client-aaa*") {
+                        $responses.Add([PSCustomObject]@{
+                            Id = $id
+                            Status = 200
+                            Body = [PSCustomObject]@{ displayName = 'CachedApp' }
+                        })
+                    }
                 }
-                return $null
+                return ,$responses.ToArray()
             }
+            Mock -CommandName Invoke-GTGraphRequest -MockWith { return $null }
 
             Remove-GTUserDelegatedPermissionGrant -User $user -OutputBase $outputBase -Results $results -Confirm:$false
 
-            # SP lookup should only be invoked once for client-aaa due to caching
-            Assert-MockCalled -CommandName Invoke-GTGraphRequest -Times 1 -ParameterFilter {
+            # Batch lookup should be invoked once
+            Assert-MockCalled -CommandName Invoke-GTGraphBatch -Times 1
+
+            # No individual GET lookups should be made
+            Assert-MockCalled -CommandName Invoke-GTGraphRequest -Times 0 -ParameterFilter {
                 $Method -eq 'GET' -and $Uri -like 'v1.0/servicePrincipals/client-aaa*'
             }
 

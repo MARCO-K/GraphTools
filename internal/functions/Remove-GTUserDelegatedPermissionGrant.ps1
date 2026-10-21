@@ -40,7 +40,7 @@ function Remove-GTUserDelegatedPermissionGrant
     {
         # Validate that User.Id is a GUID to prevent OData injection
         Test-GTGuid -InputObject $User.Id | Out-Null
-        
+
         # Get all OAuth2 permission grants for the user
         # These are delegated permissions granted to apps on behalf of the user
         $filter = "principalId eq '$($User.Id)'"
@@ -49,6 +49,39 @@ function Remove-GTUserDelegatedPermissionGrant
         if ($permissionGrants)
         {
             $servicePrincipalNameCache = @{}
+
+            # Bolt Optimization: Batch fetch service principal display names to eliminate N+1 queries.
+            $uniqueClientIds = [System.Collections.Generic.HashSet[string]]::new([System.StringComparer]::OrdinalIgnoreCase)
+            foreach ($grant in $permissionGrants) {
+                if (-not [string]::IsNullOrWhiteSpace($grant.clientId)) {
+                    [void]$uniqueClientIds.Add($grant.clientId)
+                }
+            }
+
+            if ($uniqueClientIds.Count -gt 0) {
+                $batchRequests = [System.Collections.Generic.List[hashtable]]::new()
+                foreach ($clientId in $uniqueClientIds) {
+                    $batchRequests.Add(@{
+                        id     = "sp_$clientId"
+                        method = 'GET'
+                        url    = "v1.0/servicePrincipals/${clientId}?`$select=displayName"
+                    })
+                }
+
+                try {
+                    $batchResponses = Invoke-GTGraphBatch -Requests $batchRequests
+                    foreach ($response in $batchResponses) {
+                        if ($response.Status -ge 200 -and $response.Status -lt 300 -and $null -ne $response.Body.displayName) {
+                            $spId = $response.Id -replace '^sp_', ''
+                            $servicePrincipalNameCache[$spId] = $response.Body.displayName
+                        }
+                    }
+                }
+                catch {
+                    Write-PSFMessage -Level Warning -Message "Batch fetching service principal names failed. Falling back to individual requests. Details: $($_.Exception.Message)"
+                }
+            }
+
             foreach ($grant in $permissionGrants)
             {
                 $action = 'RemoveDelegatedPermissionGrant'
@@ -103,7 +136,7 @@ function Remove-GTUserDelegatedPermissionGrant
                 {
                     # Use centralized error handling helper to parse Graph API exceptions
                     $errorDetails = Get-GTGraphErrorDetails -Exception $_.Exception -ResourceType 'resource'
-                    
+
                     # Log appropriate message based on error details
                     if ($errorDetails.HttpStatus -in 404, 403) {
                         Write-PSFMessage -Level $errorDetails.LogLevel -Message "Failed to remove delegated permission grant for '$appName' from user $($User.UserPrincipalName) - $($errorDetails.Reason)"
@@ -129,7 +162,7 @@ function Remove-GTUserDelegatedPermissionGrant
     {
         # Use centralized error handling helper to parse Graph API exceptions
         $errorDetails = Get-GTGraphErrorDetails -Exception $_.Exception -ResourceType 'user'
-        
+
         # Log appropriate message based on error details
         if ($errorDetails.HttpStatus -in 404, 403) {
             Write-PSFMessage -Level $errorDetails.LogLevel -Message "Failed to retrieve delegated permission grants for user $($User.UserPrincipalName) - $($errorDetails.Reason)"

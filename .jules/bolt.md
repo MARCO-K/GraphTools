@@ -44,3 +44,11 @@ A simulated local benchmark intercepting `Invoke-GTGraphRequest` with an artific
 ## 2026-10-06 - Avoid Multiple Pipeline Passes Over the Same Collection
 **Learning:** Using `Where-Object` repeatedly on the same large array to calculate aggregates or summaries causes an O(K*N) performance degradation (where K is the number of properties evaluated). In `Get-GTAppConsentReport`, scanning the pipeline 8 times for different risk/consent metrics scaled poorly.
 **Action:** Replace multiple pipeline passes with a single `foreach` loop that accumulates all necessary variables inside the loop (O(N) time complexity). Use `switch` statements and fast lookups like `HashSet[string]` to streamline the iteration.
+
+## 2026-10-21 - Remove-GTUserDelegatedPermissionGrant N+1 Query Optimization
+
+- **Bottleneck**: Inside a loop iterating over all OAuth2 delegated permission grants for a user, a separate API request (`Invoke-GTGraphRequest`) was made for each grant to fetch the service principal's `displayName` using its `clientId`. This caused severe N+1 delays.
+- **Optimization**: Used `Invoke-GTGraphBatch` to pre-fetch the display names for all identified unique `clientId`s before the loop begins. Built a hashmap (`$servicePrincipalNameCache`) to store the display names and look them up instantly inside the loop.
+- **Learnings**:
+  - Mocking `Invoke-GTGraphBatch` in Pester requires explicitly returning an array wrapper like `return ,$responses.ToArray()` to prevent PowerShell/Pester from unrolling the array in a way that disrupts loop iteration over the mock results.
+  - Using a batch mechanism significantly reduces network roundtrips for resolving metadata like display names, sharing the same fallback logic for robustness as other N+1 batch optimizations in Entitlement removal scripts.
