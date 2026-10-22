@@ -44,3 +44,10 @@ A simulated local benchmark intercepting `Invoke-GTGraphRequest` with an artific
 ## 2026-10-06 - Avoid Multiple Pipeline Passes Over the Same Collection
 **Learning:** Using `Where-Object` repeatedly on the same large array to calculate aggregates or summaries causes an O(K*N) performance degradation (where K is the number of properties evaluated). In `Get-GTAppConsentReport`, scanning the pipeline 8 times for different risk/consent metrics scaled poorly.
 **Action:** Replace multiple pipeline passes with a single `foreach` loop that accumulates all necessary variables inside the loop (O(N) time complexity). Use `switch` statements and fast lookups like `HashSet[string]` to streamline the iteration.
+
+## 2026-10-22 - Get-GTMFAReport Filter and Transformation Optimization
+- **Bottleneck**: The `Get-GTMFAReport` function processed the `$report` items using a pipeline with `foreach` to create `PSCustomObject` instances, followed by `Where-Object` to filter them based on multiple conditions, and then another pipeline pass with `Select-Object` and `ForEach-Object` when `$MarkMethods` was enabled. This created three separate O(N) passes, and instantiated objects unnecessarily for items that were going to be filtered out.
+- **Optimization**: Combined data transformation, filtering, and method analysis into a single `foreach` loop. Converted `$WeakMethods` and `$StrongMethods` into `HashSet[string]` instances for fast O(1) lookups during the method analysis. Moved the filtering conditions (`AdminsOnly`, `UsersWithoutMFA`, etc.) up before the object creation to avoid allocating `PSCustomObject`s for items that would be dropped.
+- **Learnings**:
+  - Doing an early `continue` in a `foreach` loop before instantiating heavy custom objects can save significant memory and time when many items are filtered out.
+  - Avoiding pipeline commands (`Where-Object`, `Select-Object`) in favor of native looping (`foreach` with generic lists) reduces PowerShell's overhead and speeds up the iteration over large datasets.
