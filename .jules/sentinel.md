@@ -26,3 +26,9 @@
 **Vulnerability:** Converting `SecureString` to plaintext using `[System.Net.NetworkCredential]` leaves the plaintext secret in unmanaged memory, exposing it to potential memory dumps.
 **Learning:** `[System.Net.NetworkCredential]::new('', $Secret).Password` is convenient but does not securely erase the plaintext password from memory after use, which defeats the purpose of using `SecureString` in the first place.
 **Prevention:** When decrypting a `SecureString` to plaintext, use `[System.Runtime.InteropServices.Marshal]::SecureStringToBSTR()`, read the string with `PtrToStringBSTR()`, and securely clear the unmanaged memory using `ZeroFreeBSTR()` inside a `finally` block to minimize plaintext memory exposure.
+
+## 2026-10-06 - Insecure SecureString Decryption (Re-evaluation)
+
+**Vulnerability:** Replacing `[System.Net.NetworkCredential]` with `[System.Runtime.InteropServices.Marshal]::SecureStringToBSTR()` and `PtrToStringBSTR()` for `SecureString` decryption does not prevent plaintext memory exposure.
+**Learning:** `PtrToStringBSTR()` allocates a managed `.NET` string (`[string]`) that cannot be deterministically cleared by the garbage collector, resulting in the same memory exposure as `[System.Net.NetworkCredential]::new('', $Secret).Password`. Adding this complex unmanaged code is ineffective security theater.
+**Prevention:** Avoid adding complex unmanaged memory code if a managed `.NET` string is ultimately returned and required by APIs (like `Invoke-RestMethod`). Use simpler standard methods when true in-memory security cannot be achieved due to downstream managed type dependencies.
