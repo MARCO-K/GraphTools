@@ -108,7 +108,7 @@ function Get-GTMFAReport
         {
             # Use centralized error handling helper to parse Graph API exceptions
             $errorDetails = Get-GTGraphErrorDetails -Exception $_.Exception -ResourceType 'user'
-            
+
             # Log appropriate message based on error details
             if ($errorDetails.HttpStatus -in 404, 403) {
                 Write-PSFMessage -Level $errorDetails.LogLevel -Message "Failed to retrieve MFA report from Microsoft Graph - $($errorDetails.Reason)"
@@ -123,67 +123,70 @@ function Get-GTMFAReport
             throw "Failed to retrieve MFA data: $($errorDetails.Reason)"
         }
 
-        # Data Transformation
-        $MFAList = foreach ($item in $report)
+        # Bolt Optimization: One Pass Filtering and Transformation
+        # Replaced pipeline Where-Object and Select-Object passes (O(3N)) with a single O(N) loop.
+        # This prevents allocating [PSCustomObject] memory for items that will be filtered out.
+        Write-PSFMessage -Level 'Verbose' -Message 'Processing and filtering the MFA report.'
+        $filteredList = [System.Collections.Generic.List[PSObject]]::new()
+        $totalItemsCount = 0
+
+        # Pre-compute Sets for faster lookups if MarkMethods is enabled
+        if ($MarkMethods)
         {
-            [PSCustomObject][ordered]@{
+            $weakMethodsSet = @{}
+            if ($WeakMethods) { foreach ($w in $WeakMethods) { $weakMethodsSet[$w] = $true } }
+            $strongMethodsSet = @{}
+            if ($StrongMethods) { foreach ($s in $StrongMethods) { $strongMethodsSet[$s] = $true } }
+        }
+
+        foreach ($item in $report)
+        {
+            $totalItemsCount++
+
+            # 1. Early Pipeline Filter Check
+            if ($AdminsOnly -and -not $item.isAdmin) { continue }
+            if ($UsersWithoutMFA -and $item.isMfaRegistered) { continue }
+            if ($NoGuestUser -and $item.userType -ne 'Member') { continue }
+            if ($MFACapable -and -not $item.isMfaCapable) { continue }
+
+            # 2. Data Transformation
+            $obj = [PSCustomObject][ordered]@{
                 UPN                                    = $item.userPrincipalName
                 DisplayName                            = $item.userDisplayName
                 IsAdmin                                = $item.isAdmin
                 UserType                               = $item.userType
-                MethodCount                            = $item.methodsRegistered.Count
+                MethodCount                            = if ($null -ne $item.methodsRegistered) { $item.methodsRegistered.Count } else { 0 }
                 RegisteredMethods                      = $item.methodsRegistered
                 UserPreferredAuthMethod                = $item.userPreferredMethodForSecondaryAuthentication
                 IsSystemPreferredAuthenticationEnabled = $item.isSystemPreferredAuthenticationMethodEnabled
                 IsPasswordlessCapable                  = $item.isPasswordlessCapable
                 IsMfaRegistered                        = $item.isMfaRegistered
                 IsMfaCapable                           = $item.isMfaCapable
-                SystemPreferredAuthenticationMethod    = $item.systemPreferredAuthenticationMethods -join ','
+                SystemPreferredAuthenticationMethod    = if ($null -ne $item.systemPreferredAuthenticationMethods) { $item.systemPreferredAuthenticationMethods -join ',' } else { $null }
             }
-        }
 
-        # Filter Pipeline
-        Write-PSFMessage -Level 'Verbose' -Message 'Filtering the MFA report based on the provided parameters.'
-        $filtered = $MFAList | Where-Object {
-            (-not $AdminsOnly -or $_.IsAdmin) -and
-            (-not $UsersWithoutMFA -or -not $_.IsMfaRegistered) -and
-            (-not $NoGuestUser -or $_.UserType -eq 'Member') -and
-            (-not $MFACapable -or $_.IsMfaCapable)
-        }
-
-        # Method Analysis
-        if ($MarkMethods)
-        {
-            # Convert to hashtables for faster lookups
-            $weakMethodsSet = @{}
-            $WeakMethods | ForEach-Object { $weakMethodsSet[$_] = $true }
-            $strongMethodsSet = @{}
-            $StrongMethods | ForEach-Object { $strongMethodsSet[$_] = $true }
-
-            $filtered = $filtered | Select-Object *,
-            @{Name = 'WeakMethod'; Expression = {
+            # 3. Method Analysis
+            if ($MarkMethods)
+            {
                 $hasWeak = $false
-                foreach ($method in $_.RegisteredMethods) {
-                    if ($weakMethodsSet.ContainsKey($method)) {
-                        $hasWeak = $true
-                        break
-                    }
-                }
-                $hasWeak
-            }},
-            @{Name = 'StrongMethod'; Expression = {
                 $hasStrong = $false
-                foreach ($method in $_.RegisteredMethods) {
-                    if ($strongMethodsSet.ContainsKey($method)) {
-                        $hasStrong = $true
-                        break
+                if ($null -ne $item.methodsRegistered)
+                {
+                    foreach ($method in $item.methodsRegistered)
+                    {
+                        if (-not $hasWeak -and $weakMethodsSet.ContainsKey($method)) { $hasWeak = $true }
+                        if (-not $hasStrong -and $strongMethodsSet.ContainsKey($method)) { $hasStrong = $true }
+                        if ($hasWeak -and $hasStrong) { break }
                     }
                 }
-                $hasStrong
-            }}
+                $obj | Add-Member -MemberType NoteProperty -Name 'WeakMethod' -Value $hasWeak
+                $obj | Add-Member -MemberType NoteProperty -Name 'StrongMethod' -Value $hasStrong
+            }
+
+            $filteredList.Add($obj)
         }
 
-        $filtered
-        Write-PSFMessage -Level 'Verbose' -Message 'MFA report collected successfully. The report contains $($MFAList.Count) entries.'
+        Write-Output ($filteredList.ToArray())
+        Write-PSFMessage -Level 'Verbose' -Message "MFA report collected successfully. The report scanned $($totalItemsCount) entries and returned $($filteredList.Count)."
     }
 }

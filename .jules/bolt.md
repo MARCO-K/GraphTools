@@ -44,3 +44,7 @@ A simulated local benchmark intercepting `Invoke-GTGraphRequest` with an artific
 ## 2026-10-06 - Avoid Multiple Pipeline Passes Over the Same Collection
 **Learning:** Using `Where-Object` repeatedly on the same large array to calculate aggregates or summaries causes an O(K*N) performance degradation (where K is the number of properties evaluated). In `Get-GTAppConsentReport`, scanning the pipeline 8 times for different risk/consent metrics scaled poorly.
 **Action:** Replace multiple pipeline passes with a single `foreach` loop that accumulates all necessary variables inside the loop (O(N) time complexity). Use `switch` statements and fast lookups like `HashSet[string]` to streamline the iteration.
+
+## 2024-05-18 - Avoid Pipeline Passes and Object Allocation Overhead
+**Learning:** In `Get-GTMFAReport.ps1`, chaining pipeline cmdlets like `Where-Object` and `Select-Object` with custom calculated properties on a large result set causes significant O(N) overhead per pass, particularly when it first constructs a large number of heavy `[PSCustomObject]`s for items that will immediately be filtered out.
+**Action:** Consolidate data transformation, conditional filtering, and custom property addition into a single `foreach` loop. Apply the filter conditions *before* constructing the `[PSCustomObject]` to avoid allocating memory for skipped records. Collect the results in a `[System.Collections.Generic.List[PSObject]]` and call `.ToArray()` at the end.
