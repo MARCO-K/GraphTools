@@ -26,3 +26,9 @@
 **Vulnerability:** Converting `SecureString` to plaintext using `[System.Net.NetworkCredential]` leaves the plaintext secret in unmanaged memory, exposing it to potential memory dumps.
 **Learning:** `[System.Net.NetworkCredential]::new('', $Secret).Password` is convenient but does not securely erase the plaintext password from memory after use, which defeats the purpose of using `SecureString` in the first place.
 **Prevention:** When decrypting a `SecureString` to plaintext, use `[System.Runtime.InteropServices.Marshal]::SecureStringToBSTR()`, read the string with `PtrToStringBSTR()`, and securely clear the unmanaged memory using `ZeroFreeBSTR()` inside a `finally` block to minimize plaintext memory exposure.
+
+## 2026-10-25 - SQL Injection in DuckDB Table and File Paths
+
+**Vulnerability:** SQL injection vulnerability via unsanitized strings injected into DuckDB dynamic queries when importing from GitHub in `Import-GTGitHubCsvToDuckDB.ps1`.
+**Learning:** Even internal toolings or APIs seemingly returning safe metadata like `$file.name` or `$file.download_url` can contain single quotes or malicious payloads. If directly concatenated into SQL queries without proper escaping, this introduces standard SQL injection and syntax breaks, bypassing expected database operations.
+**Prevention:** Always properly escape input dynamically concatenated into SQL string literals or identifiers by replacing single quotes with two single quotes (e.g., `.Replace("'", "''")`), regardless of the input source's presumed safety.
