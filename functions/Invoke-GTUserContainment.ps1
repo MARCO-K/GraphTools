@@ -343,11 +343,26 @@ function Invoke-GTUserContainment
                 {
                     Write-PSFMessage -Level Verbose -Message "$targetUser - Disabling registered devices..."
                     $deviceOutputs = Disable-GTUserDevice -UPN $targetUser -Force:$Force -ErrorAction Stop
-                    $userDevices = @($deviceOutputs | Where-Object { $_.User -eq $targetUser })
 
-                    $disabledCount = @($userDevices | Where-Object { $_.Status -eq 'Disabled' }).Count
-                    $failedCount   = @($userDevices | Where-Object { $_.Status -eq 'Failed' }).Count
-                    $hasNoDevices  = @($userDevices | Where-Object { $_.Status -eq 'NoDevices' }).Count -gt 0
+                    # Bolt Optimization: Replaced multiple Where-Object passes with a single O(N) foreach loop
+                    $disabledCount = 0
+                    $failedCount = 0
+                    $hasNoDevices = $false
+                    $userDevicesCount = 0
+
+                    foreach ($device in $deviceOutputs)
+                    {
+                        if ($device.User -eq $targetUser)
+                        {
+                            $userDevicesCount++
+                            switch ($device.Status)
+                            {
+                                'Disabled'  { $disabledCount++ }
+                                'Failed'    { $failedCount++ }
+                                'NoDevices' { $hasNoDevices = $true }
+                            }
+                        }
+                    }
 
                     if ($failedCount -gt 0)
                     {
@@ -361,14 +376,14 @@ function Invoke-GTUserContainment
                         $devicesDisabledResult = "Disabled ($disabledCount device(s))"
                         Write-PSFMessage -Level Verbose -Message "$targetUser - $disabledCount device(s) disabled successfully."
                     }
-                    elseif ($hasNoDevices -or @($userDevices).Count -eq 0)
+                    elseif ($hasNoDevices -or $userDevicesCount -eq 0)
                     {
                         $devicesDisabledResult = "NoDevices"
                         Write-PSFMessage -Level Verbose -Message "$targetUser - No registered devices found."
                     }
                     else
                     {
-                        $devicesDisabledResult = "Processed ($(@($userDevices).Count) device(s))"
+                        $devicesDisabledResult = "Processed ($userDevicesCount device(s))"
                     }
                 }
                 catch
