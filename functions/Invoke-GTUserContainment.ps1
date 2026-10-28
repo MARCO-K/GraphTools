@@ -286,7 +286,15 @@ function Invoke-GTUserContainment
                 {
                     Write-PSFMessage -Level Verbose -Message "$targetUser - Disabling user account..."
                     $disableOutput = Disable-GTUser -UPN $targetUser -Force:$Force -ErrorAction Stop
-                    $userDisableStatus = ($disableOutput | Where-Object { $_.User -eq $targetUser } | Select-Object -First 1)
+
+                    # Bolt Optimization: Replaced Where-Object pipeline with a foreach loop for finding userDisableStatus
+                    $userDisableStatus = $null
+                    foreach ($output in $disableOutput) {
+                        if ($output.User -eq $targetUser) {
+                            $userDisableStatus = $output
+                            break
+                        }
+                    }
 
                     if ($userDisableStatus -and $userDisableStatus.Status -eq 'Disabled')
                     {
@@ -343,11 +351,21 @@ function Invoke-GTUserContainment
                 {
                     Write-PSFMessage -Level Verbose -Message "$targetUser - Disabling registered devices..."
                     $deviceOutputs = Disable-GTUserDevice -UPN $targetUser -Force:$Force -ErrorAction Stop
-                    $userDevices = @($deviceOutputs | Where-Object { $_.User -eq $targetUser })
 
-                    $disabledCount = @($userDevices | Where-Object { $_.Status -eq 'Disabled' }).Count
-                    $failedCount   = @($userDevices | Where-Object { $_.Status -eq 'Failed' }).Count
-                    $hasNoDevices  = @($userDevices | Where-Object { $_.Status -eq 'NoDevices' }).Count -gt 0
+                    # Bolt Optimization: Replaced O(4*N) Where-Object passes with a single O(N) foreach loop
+                    $userDevices = [System.Collections.Generic.List[object]]::new()
+                    $disabledCount = 0
+                    $failedCount = 0
+                    $hasNoDevices = $false
+
+                    foreach ($device in $deviceOutputs) {
+                        if ($device.User -eq $targetUser) {
+                            $userDevices.Add($device)
+                            if ($device.Status -eq 'Disabled') { $disabledCount++ }
+                            elseif ($device.Status -eq 'Failed') { $failedCount++ }
+                            elseif ($device.Status -eq 'NoDevices') { $hasNoDevices = $true }
+                        }
+                    }
 
                     if ($failedCount -gt 0)
                     {
