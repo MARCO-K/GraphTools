@@ -26,3 +26,9 @@
 **Vulnerability:** Converting `SecureString` to plaintext using `[System.Net.NetworkCredential]` leaves the plaintext secret in unmanaged memory, exposing it to potential memory dumps.
 **Learning:** `[System.Net.NetworkCredential]::new('', $Secret).Password` is convenient but does not securely erase the plaintext password from memory after use, which defeats the purpose of using `SecureString` in the first place.
 **Prevention:** When decrypting a `SecureString` to plaintext, use `[System.Runtime.InteropServices.Marshal]::SecureStringToBSTR()`, read the string with `PtrToStringBSTR()`, and securely clear the unmanaged memory using `ZeroFreeBSTR()` inside a `finally` block to minimize plaintext memory exposure.
+
+## 2026-10-29 - Prevent SQL Injection via Structural Identifiers in DuckDB
+
+**Vulnerability:** SQL Injection through unsanitized table names.
+**Learning:** When dynamically constructing SQL queries in DuckDB, interpolating unvalidated input (like table names) directly into the query exposes the application to SQL injection. Standard parameterization often doesn't work for structural identifiers like table names.
+**Prevention:** Enforce strict whitelisting on parameters used as structural identifiers using `[ValidatePattern('^[a-zA-Z0-9_]+$')]` to ensure they only contain safe characters (alphanumeric and underscores) before using them in dynamic SQL construction.
