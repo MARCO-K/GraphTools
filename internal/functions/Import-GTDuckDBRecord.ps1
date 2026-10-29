@@ -35,6 +35,7 @@ function Import-GTDuckDBRecord
         [PSObject]$InputObject,
 
         [Parameter(Mandatory = $true)]
+        [ValidatePattern('^[a-zA-Z0-9_]+$')]
         [string]$TableName,
 
         [Parameter(Mandatory = $false, ParameterSetName = 'newDB')]
