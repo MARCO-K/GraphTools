@@ -44,3 +44,10 @@ A simulated local benchmark intercepting `Invoke-GTGraphRequest` with an artific
 ## 2026-10-06 - Avoid Multiple Pipeline Passes Over the Same Collection
 **Learning:** Using `Where-Object` repeatedly on the same large array to calculate aggregates or summaries causes an O(K*N) performance degradation (where K is the number of properties evaluated). In `Get-GTAppConsentReport`, scanning the pipeline 8 times for different risk/consent metrics scaled poorly.
 **Action:** Replace multiple pipeline passes with a single `foreach` loop that accumulates all necessary variables inside the loop (O(N) time complexity). Use `switch` statements and fast lookups like `HashSet[string]` to streamline the iteration.
+## 2026-10-06 - Remove-GTUserDelegatedPermissionGrant N+1 Query Optimization
+
+- **Bottleneck**: Inside a loop iterating over all delegated permission grants for a user, a separate API request (`Invoke-GTGraphRequest -Method GET`) was made for each grant to resolve the service principal display name via `clientId`. This caused severe N+1 delays, especially if the user had many permission grants.
+- **Optimization**: Used `Invoke-GTGraphBatch` to pre-fetch the service principal display names for all identified `clientId`s before the loop begins. Built a hashmap (`$servicePrincipalNameCache`) to store the names and look them up instantly inside the loop.
+- **Learnings**:
+  - Similar to the enterprise app and group ownership optimizations, ensuring the batch request uses a `try/catch` block to fall back gracefully to the original N+1 logic if the batch request fails is a good fail-open strategy.
+  - Mocking `Invoke-GTGraphBatch` in Pester tests requires returning a typed array of mock responses to match the expected format and ensuring subsequent fallback `GET` requests are not invoked.

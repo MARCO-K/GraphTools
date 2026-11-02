@@ -49,6 +49,40 @@ function Remove-GTUserDelegatedPermissionGrant
         if ($permissionGrants)
         {
             $servicePrincipalNameCache = @{}
+
+            # Bolt Optimization: Batch fetch service principal display names to eliminate N+1 queries.
+            $uniqueClientIds = [System.Collections.Generic.HashSet[string]]::new([System.StringComparer]::OrdinalIgnoreCase)
+            foreach ($grant in $permissionGrants) {
+                $clientId = [string]$grant.clientId
+                if (-not [string]::IsNullOrWhiteSpace($clientId)) {
+                    [void]$uniqueClientIds.Add($clientId)
+                }
+            }
+
+            if ($uniqueClientIds.Count -gt 0) {
+                $batchRequests = [System.Collections.Generic.List[hashtable]]::new()
+                foreach ($clientId in $uniqueClientIds) {
+                    $batchRequests.Add(@{
+                        id     = "sp_$clientId"
+                        method = 'GET'
+                        url    = "v1.0/servicePrincipals/$clientId?`$select=displayName"
+                    })
+                }
+
+                try {
+                    $batchResponses = Invoke-GTGraphBatch -Requests $batchRequests
+                    foreach ($response in $batchResponses) {
+                        if ($response.Status -ge 200 -and $response.Status -lt 300 -and $null -ne $response.Body.displayName) {
+                            $spId = $response.Id.Substring(3) # Remove 'sp_' prefix
+                            $servicePrincipalNameCache[$spId] = $response.Body.displayName
+                        }
+                    }
+                }
+                catch {
+                    Write-PSFMessage -Level Warning -Message "Batch fetching service principal names failed. Falling back to individual requests. Details: $($_.Exception.Message)"
+                }
+            }
+
             foreach ($grant in $permissionGrants)
             {
                 $action = 'RemoveDelegatedPermissionGrant'
